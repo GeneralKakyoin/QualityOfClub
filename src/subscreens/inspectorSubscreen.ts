@@ -407,13 +407,14 @@ export class InspectorSubscreen extends BaseSubscreen {
                     align-items: center;
                     justify-content: space-between;
                 `;
+                const matchedNote = detail.matchedMod ? ` (Matched: ${detail.matchedMod.name}${detail.matchedMod.version ? ` v${detail.matchedMod.version}` : ""})` : "";
                 card.innerHTML = `
                     <div>
                         <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">${detail.rule.modName}</div>
                         <div style="font-size: 12px; color: ${isMet ? "#81c784" : "#e57373"}; margin-top: 2px;">
                             ${isMandatory
-                                ? (isMet ? "✓ Mandatory requirement satisfied (Mod is active in session)" : "❌ MANDATORY REQUIREMENT VIOLATED: Mod is NOT loaded in session!")
-                                : (isMet ? "✓ Forbidden rule satisfied (Mod is not running)" : "🚫 FORBIDDEN RULE VIOLATED: Mod is actively running in session!")
+                                ? (isMet ? `✓ Mandatory requirement satisfied${matchedNote}` : "❌ MANDATORY REQUIREMENT VIOLATED: Mod is NOT loaded in session!")
+                                : (isMet ? "✓ Forbidden rule satisfied (Mod is not running)" : `🚫 FORBIDDEN RULE VIOLATED: Mod is actively running${matchedNote}!`)
                             }
                         </div>
                     </div>

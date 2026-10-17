@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.9";
+  var version2 = "1.0.10";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4995,37 +4995,89 @@ One of mods you are using is using an old version of SDK. It will work for now b
       name: "Bondage Club Extended (BCX)",
       description: "Rules, curses, statistics, extended room tools",
       scriptUrl: "https://jomshir98.github.io/bondage-club-extended/bcx.js",
-      detectKeys: ["bcx", "bondage club extended", "bondage-club-extended"]
+      detectKeys: ["bcx", "bondage club extended", "bondage-club-extended"],
+      repositoryMatch: "jomshir98/bondage-club-extended"
     },
     LSCG: {
       id: "LSCG",
       name: "Littlish Club (LSCG)",
       description: "Little Sister's Club overhaul & dynamics",
       scriptUrl: "https://furryzoi.github.io/Littlish-Club/bundle.js",
-      detectKeys: ["lscg", "littlish club", "littlish-club"]
+      detectKeys: ["lscg", "littlish club", "littlish-club"],
+      repositoryMatch: "furryzoi/littlish-club"
     },
     BCT: {
       id: "BCT",
       name: "Bondage Club Tools (BCT)",
       description: "Inventory searching, poses, quick actions",
       scriptUrl: "https://sidiousious.gitlab.io/bct/bundle.js",
-      detectKeys: ["bct", "bondage club tools"]
+      detectKeys: ["bct", "bondage club tools", "bondage-club-tools"],
+      repositoryMatch: "bct"
     },
     DOGS: {
       id: "DOGS",
       name: "Devious-Obligate-Great-Stuff (DOGS)",
       description: "Devious padlocks, remote controls, timers",
       scriptUrl: "https://furryzoi.github.io/Devious-Obligate-Great-Stuff/bundle.js",
-      detectKeys: ["dogs", "devious-obligate-great-stuff", "devious obligate great stuff"]
+      detectKeys: ["dogs", "devious-obligate-great-stuff", "devious obligate great stuff"],
+      repositoryMatch: "devious-obligate-great-stuff"
     },
     ClubChaos: {
       id: "ClubChaos",
       name: "Club Chaos",
       description: "Interactive chaos curses & toys",
       scriptUrl: "https://sidiousious.gitlab.io/bc-chaos/bundle.js",
-      detectKeys: ["clubchaos", "club chaos"]
+      detectKeys: ["clubchaos", "club chaos"],
+      repositoryMatch: "bc-chaos"
     }
   };
+  function getCuratedMod(idOrName) {
+    if (!idOrName) return null;
+    const target = idOrName.toLowerCase().trim();
+    if (CURATED_MOD_CATALOG[idOrName]) return CURATED_MOD_CATALOG[idOrName];
+    for (const item of Object.values(CURATED_MOD_CATALOG)) {
+      if (item.id.toLowerCase() === target || item.name.toLowerCase() === target) {
+        return item;
+      }
+      for (const k of item.detectKeys) {
+        if (k.toLowerCase() === target) return item;
+      }
+    }
+    return null;
+  }
+  function isDetectedModMatch(mod, identifierOrCurated) {
+    if (!mod || !identifierOrCurated) return false;
+    const curated = typeof identifierOrCurated === "object" ? identifierOrCurated : getCuratedMod(identifierOrCurated);
+    const mId = (mod.id || "").toLowerCase().trim();
+    const mName = (mod.name || "").toLowerCase().trim();
+    const mFull = (mod.fullName || "").toLowerCase().trim();
+    const mRepo = (mod.repository || "").toLowerCase().trim();
+    const clean = (s) => s.replace(/[^a-z0-9]/g, "");
+    if (curated) {
+      if (mId === curated.id.toLowerCase() || clean(mId) === clean(curated.id)) return true;
+      if (clean(mName) === clean(curated.id)) return true;
+      if (curated.repositoryMatch && mRepo && mRepo.includes(curated.repositoryMatch.toLowerCase())) {
+        return true;
+      }
+      const cleanCuratedId = clean(curated.id);
+      for (const rawKey of curated.detectKeys) {
+        const key = rawKey.toLowerCase().trim();
+        const cleanKey = clean(key);
+        if (mId === key || mName === key || mFull === key) return true;
+        if (clean(mId) === cleanKey || clean(mName) === cleanKey || clean(mFull) === cleanKey) return true;
+        if (key.includes(" ") || key.includes("-")) {
+          const strippedName = mName.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim();
+          const strippedFull = mFull.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim();
+          if (clean(strippedName) === cleanKey || clean(strippedFull) === cleanKey) return true;
+          if (clean(strippedName).startsWith(cleanKey) && clean(strippedName).includes(cleanCuratedId)) return true;
+        }
+      }
+      return false;
+    }
+    const target = (typeof identifierOrCurated === "string" ? identifierOrCurated : "").toLowerCase().trim();
+    if (!target) return false;
+    return mId === target || mName === target || mFull === target || clean(mId) === clean(target) || clean(mName) === clean(target);
+  }
   function getLoadedMods() {
     const modsMap = /* @__PURE__ */ new Map();
     try {
@@ -5051,45 +5103,63 @@ One of mods you are using is using an old version of SDK. It will work for now b
       console.warn("[QoC] Error reading bcModSdk mods info:", e);
     }
     const win = window;
-    if (win.bcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
+    const isRealGlobalObject = (obj) => {
+      if (!obj || typeof obj !== "object") return false;
+      if (typeof obj.nodeType === "number") return false;
+      if (typeof win.HTMLElement !== "undefined" && obj instanceof win.HTMLElement) return false;
+      return true;
+    };
+    const hasBcx = win.BCX_Loaded === true || typeof win.BCX_Loaded !== "undefined" && win.BCX_Loaded !== false || isRealGlobalObject(win.bcx) && typeof win.bcx.getApi === "function";
+    if (hasBcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
       modsMap.set("bcx", {
         id: "BCX",
         name: "Bondage Club Extended (BCX)",
-        version: win.bcx.version || "Active"
+        fullName: "Bondage Club Extended",
+        version: typeof win.bcx?.version === "string" ? win.bcx.version : "Active"
       });
     }
-    if (win.LITTLISH_CLUB && !modsMap.has("lscg") && !modsMap.has("littlish club")) {
+    const hasLscg = isRealGlobalObject(win.LITTLISH_CLUB) && typeof win.LITTLISH_CLUB.inModSubscreen === "function" || isRealGlobalObject(win.LSCG);
+    if (hasLscg && !modsMap.has("lscg") && !modsMap.has("littlish club")) {
       modsMap.set("lscg", {
         id: "LSCG",
         name: "Littlish Club (LSCG)",
+        fullName: "Littlish Club",
         version: "Active"
       });
     }
-    if (win.BCT && !modsMap.has("bct") && !modsMap.has("bondage club tools")) {
+    const hasBct = isRealGlobalObject(win.BCT) && (typeof win.BCT.Init === "function" || typeof win.BCT.version === "string");
+    if (hasBct && !modsMap.has("bct") && !modsMap.has("bondage club tools")) {
       modsMap.set("bct", {
         id: "BCT",
-        name: "Bondage Club Tools",
+        name: "Bondage Club Tools (BCT)",
+        fullName: "Bondage Club Tools",
         version: win.BCT.version || "Active"
       });
     }
-    if (win.DOGS && !modsMap.has("dogs") && !modsMap.has("devious-obligate-great-stuff")) {
+    const hasDogs = isRealGlobalObject(win.DOGS);
+    if (hasDogs && !modsMap.has("dogs") && !modsMap.has("devious-obligate-great-stuff")) {
       modsMap.set("dogs", {
         id: "DOGS",
         name: "Devious-Obligate-Great-Stuff (DOGS)",
+        fullName: "Devious-Obligate-Great-Stuff",
         version: "Active"
       });
     }
-    if (win.ClubChaos && !modsMap.has("clubchaos") && !modsMap.has("club chaos")) {
+    const hasClubChaos = isRealGlobalObject(win.ClubChaos);
+    if (hasClubChaos && !modsMap.has("clubchaos") && !modsMap.has("club chaos")) {
       modsMap.set("clubchaos", {
         id: "ClubChaos",
         name: "Club Chaos",
+        fullName: "Club Chaos",
         version: "Active"
       });
     }
-    if (win.FUSAM && !modsMap.has("fusam")) {
+    const hasFusam = isRealGlobalObject(win.FUSAM);
+    if (hasFusam && !modsMap.has("fusam")) {
       modsMap.set("fusam", {
         id: "FUSAM",
         name: "FUSAM",
+        fullName: "FUSAM",
         version: "Active"
       });
     }
@@ -5097,25 +5167,8 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
   function isModLoaded(identifier) {
     if (!identifier) return false;
-    const target = identifier.toLowerCase().trim();
     const loaded = getLoadedMods();
-    for (const mod of loaded) {
-      const modName = mod.name.toLowerCase();
-      const modId = mod.id.toLowerCase();
-      const modFull = (mod.fullName || "").toLowerCase();
-      if (modName === target || modId === target || modFull === target) {
-        return true;
-      }
-      const curated = CURATED_MOD_CATALOG[identifier] || Object.values(CURATED_MOD_CATALOG).find((c) => c.id.toLowerCase() === target || c.name.toLowerCase() === target);
-      if (curated) {
-        for (const key of curated.detectKeys) {
-          if (modName.includes(key) || modId.includes(key) || modFull.includes(key)) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
+    return loaded.some((mod) => isDetectedModMatch(mod, identifier));
   }
   function loadCuratedMod(catalogId) {
     if (!catalogId) return Promise.resolve(false);
@@ -5155,55 +5208,30 @@ One of mods you are using is using an old version of SDK. It will work for now b
   // src/modules/compliance.ts
   var isEvaluating = false;
   var promptedMods = /* @__PURE__ */ new Set();
-  function getCuratedMod(idOrName) {
-    if (!idOrName) return null;
-    const target = idOrName.toLowerCase().trim();
-    if (CURATED_MOD_CATALOG[idOrName]) return CURATED_MOD_CATALOG[idOrName];
-    for (const item of Object.values(CURATED_MOD_CATALOG)) {
-      if (item.id.toLowerCase() === target || item.name.toLowerCase() === target) {
-        return item;
-      }
-      for (const k of item.detectKeys) {
-        if (k.toLowerCase() === target) return item;
-      }
-    }
-    return null;
-  }
   function checkComplianceAgainstRules(mods, rules) {
     const missing = [];
     const forbidden = [];
     const details = [];
-    const isLoadedInList = (idOrName) => {
-      const target = idOrName.toLowerCase().trim();
-      return mods.some((m) => {
-        const mId = m.id.toLowerCase();
-        const mName = m.name.toLowerCase();
-        const mFull = (m.fullName || "").toLowerCase();
-        if (mId === target || mName === target || mFull === target) return true;
-        const curated = getCuratedMod(idOrName);
-        if (curated) {
-          return curated.detectKeys.some((k) => mId.includes(k) || mName.includes(k) || mFull.includes(k));
-        }
-        return false;
-      });
+    const findLoadedMatch = (rule) => {
+      return mods.find((m) => isDetectedModMatch(m, rule.modId) || rule.modName && isDetectedModMatch(m, rule.modName));
     };
     const hasRules = Array.isArray(rules) && rules.length > 0;
     if (hasRules) {
       for (const rule of rules) {
         const isMandatory = rule.type === "required" || rule.type === "mandatory";
         const isForbidden = rule.type === "forbidden";
-        const loaded = isLoadedInList(rule.modId) || isLoadedInList(rule.modName);
+        const matchedMod = findLoadedMatch(rule);
         if (isMandatory) {
-          if (!loaded) {
+          if (!matchedMod) {
             missing.push(rule);
             details.push({ rule, status: "violated" });
           } else {
-            details.push({ rule, status: "met" });
+            details.push({ rule, status: "met", matchedMod });
           }
         } else if (isForbidden) {
-          if (loaded) {
+          if (matchedMod) {
             forbidden.push(rule);
-            details.push({ rule, status: "violated" });
+            details.push({ rule, status: "violated", matchedMod });
           } else {
             details.push({ rule, status: "met" });
           }
@@ -8136,11 +8164,12 @@ One of mods you are using is using an old version of SDK. It will work for now b
                     align-items: center;
                     justify-content: space-between;
                 `;
+          const matchedNote = detail.matchedMod ? ` (Matched: ${detail.matchedMod.name}${detail.matchedMod.version ? ` v${detail.matchedMod.version}` : ""})` : "";
           card.innerHTML = `
                     <div>
                         <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">${detail.rule.modName}</div>
                         <div style="font-size: 12px; color: ${isMet ? "#81c784" : "#e57373"}; margin-top: 2px;">
-                            ${isMandatory ? isMet ? "\u2713 Mandatory requirement satisfied (Mod is active in session)" : "\u274C MANDATORY REQUIREMENT VIOLATED: Mod is NOT loaded in session!" : isMet ? "\u2713 Forbidden rule satisfied (Mod is not running)" : "\u{1F6AB} FORBIDDEN RULE VIOLATED: Mod is actively running in session!"}
+                            ${isMandatory ? isMet ? `\u2713 Mandatory requirement satisfied${matchedNote}` : "\u274C MANDATORY REQUIREMENT VIOLATED: Mod is NOT loaded in session!" : isMet ? "\u2713 Forbidden rule satisfied (Mod is not running)" : `\u{1F6AB} FORBIDDEN RULE VIOLATED: Mod is actively running${matchedNote}!`}
                         </div>
                     </div>
                     <span style="background: ${isMet ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMet ? "#81c784" : "#e57373"}; border: 1px solid ${isMet ? "#4caf50" : "#f44336"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;">

@@ -1,8 +1,10 @@
 import { modStorage, ModRule } from "./storage";
-import { isModLoaded, loadCuratedMod, CURATED_MOD_CATALOG, DetectedMod } from "./modDetection";
+import { isModLoaded, loadCuratedMod, CURATED_MOD_CATALOG, DetectedMod, getCuratedMod, isDetectedModMatch } from "./modDetection";
 import { toastsManager } from "zois-core/toasts";
 import { dialogsManager } from "zois-core/dialogs";
 import { MOD_NAME } from "src/constants";
+
+export { getCuratedMod };
 
 export interface ComplianceReport {
     isCompliant: boolean;
@@ -13,31 +15,16 @@ export interface ComplianceReport {
 let isEvaluating = false;
 export const promptedMods = new Set<string>();
 
-/**
- * Resolves a curated mod entry case-insensitively by ID, name, or detect keys.
- */
-export function getCuratedMod(idOrName: string) {
-    if (!idOrName) return null;
-    const target = idOrName.toLowerCase().trim();
-    if (CURATED_MOD_CATALOG[idOrName]) return CURATED_MOD_CATALOG[idOrName];
-
-    for (const item of Object.values(CURATED_MOD_CATALOG)) {
-        if (item.id.toLowerCase() === target || item.name.toLowerCase() === target) {
-            return item;
-        }
-        for (const k of item.detectKeys) {
-            if (k.toLowerCase() === target) return item;
-        }
-    }
-    return null;
-}
-
 export interface ComplianceCheckResult {
     hasRules: boolean;
     isCompliant: boolean;
     missing: ModRule[];
     forbidden: ModRule[];
-    details: { rule: ModRule; status: "met" | "violated" }[];
+    details: {
+        rule: ModRule;
+        status: "met" | "violated";
+        matchedMod?: DetectedMod;
+    }[];
 }
 
 /**
@@ -46,21 +33,10 @@ export interface ComplianceCheckResult {
 export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[]): ComplianceCheckResult {
     const missing: ModRule[] = [];
     const forbidden: ModRule[] = [];
-    const details: { rule: ModRule; status: "met" | "violated" }[] = [];
+    const details: { rule: ModRule; status: "met" | "violated"; matchedMod?: DetectedMod }[] = [];
 
-    const isLoadedInList = (idOrName: string) => {
-        const target = idOrName.toLowerCase().trim();
-        return mods.some(m => {
-            const mId = m.id.toLowerCase();
-            const mName = m.name.toLowerCase();
-            const mFull = (m.fullName || "").toLowerCase();
-            if (mId === target || mName === target || mFull === target) return true;
-            const curated = getCuratedMod(idOrName);
-            if (curated) {
-                return curated.detectKeys.some(k => mId.includes(k) || mName.includes(k) || mFull.includes(k));
-            }
-            return false;
-        });
+    const findLoadedMatch = (rule: ModRule): DetectedMod | undefined => {
+        return mods.find(m => isDetectedModMatch(m, rule.modId) || (rule.modName && isDetectedModMatch(m, rule.modName)));
     };
 
     const hasRules = Array.isArray(rules) && rules.length > 0;
@@ -69,19 +45,19 @@ export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[
         for (const rule of rules) {
             const isMandatory = rule.type === "required" || (rule.type as string) === "mandatory";
             const isForbidden = rule.type === "forbidden";
-            const loaded = isLoadedInList(rule.modId) || isLoadedInList(rule.modName);
+            const matchedMod = findLoadedMatch(rule);
 
             if (isMandatory) {
-                if (!loaded) {
+                if (!matchedMod) {
                     missing.push(rule);
                     details.push({ rule, status: "violated" });
                 } else {
-                    details.push({ rule, status: "met" });
+                    details.push({ rule, status: "met", matchedMod });
                 }
             } else if (isForbidden) {
-                if (loaded) {
+                if (matchedMod) {
                     forbidden.push(rule);
-                    details.push({ rule, status: "violated" });
+                    details.push({ rule, status: "violated", matchedMod });
                 } else {
                     details.push({ rule, status: "met" });
                 }
