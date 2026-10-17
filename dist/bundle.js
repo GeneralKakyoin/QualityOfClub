@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.10";
+  var version2 = "1.0.11";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -7294,7 +7294,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     {
       key: "rules_force_compliance",
       name: "Allow forcing compliance evaluations",
-      description: "Permits triggering remote compliance checks, auto-injections, and violation alerts.",
+      description: "Permits commanding this character's game to immediately evaluate all rules, auto-inject missing mandatory addons, and alert on forbidden ones.",
       category: "Rules"
     },
     // General
@@ -7441,23 +7441,45 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
   function canSenderInspect(senderId) {
     if (!modStorage.inspector.enabled) {
+      return { allowed: false, canViewAddons: false, canViewRules: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
+    }
+    const canViewAddons = checkPermissionAccess("inspect_view_addons", senderId);
+    const canViewRules = checkPermissionAccess("inspect_view_rules", senderId);
+    if (!canViewAddons && !canViewRules) {
+      return { allowed: false, canViewAddons: false, canViewRules: false, reason: "Permission Denied: You do not meet the minimum role required to inspect this player's addons or rules." };
+    }
+    return { allowed: true, canViewAddons, canViewRules };
+  }
+  function canSenderEnforceRules(senderId, newRules) {
+    if (!modStorage.inspector.enabled) {
       return { allowed: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
     }
-    const hasAccess = checkPermissionAccess("inspect_view_addons", senderId);
-    if (!hasAccess) {
-      return { allowed: false, reason: "Permission Denied: You do not meet the minimum role required to inspect this player's addons." };
-    }
-    return { allowed: true };
-  }
-  function canSenderEnforceRules(senderId, rules) {
-    if (!modStorage.inspector.enabled) {
-      return { allowed: false, reason: "Quality of Club Addon Inspector is disabled." };
-    }
+    const currentRules = modStorage.inspector.rules || [];
     const hasMandatoryAccess = checkPermissionAccess("rules_lock_mandatory", senderId);
     const hasForbiddenAccess = checkPermissionAccess("rules_lock_forbidden", senderId);
     const hasRemoveAccess = checkPermissionAccess("rules_remove_rules", senderId);
-    if (!hasMandatoryAccess && !hasForbiddenAccess && !hasRemoveAccess) {
-      return { allowed: false, reason: "Permission Denied: You do not meet the minimum role required to enforce addon rules on this player." };
+    for (const rule of newRules) {
+      const isMandatory = rule.type === "required" || rule.type === "mandatory";
+      const isForbidden = rule.type === "forbidden";
+      const prev = currentRules.find((r) => r.modId.toLowerCase() === rule.modId.toLowerCase());
+      if (isMandatory && (!prev || prev.type !== "required" && prev.type !== "mandatory")) {
+        if (!hasMandatoryAccess) {
+          return { allowed: false, reason: `Permission Denied: You do not meet the minimum role required to lock mandatory addons (attempted on ${rule.modName}).` };
+        }
+      }
+      if (isForbidden && (!prev || prev.type !== "forbidden")) {
+        if (!hasForbiddenAccess) {
+          return { allowed: false, reason: `Permission Denied: You do not meet the minimum role required to lock forbidden addons (attempted on ${rule.modName}).` };
+        }
+      }
+    }
+    for (const prev of currentRules) {
+      const stillExists = newRules.some((r) => r.modId.toLowerCase() === prev.modId.toLowerCase());
+      if (!stillExists) {
+        if (!hasRemoveAccess) {
+          return { allowed: false, reason: `Permission Denied: You do not meet the minimum role required to remove active addon rules (attempted on ${prev.modName}).` };
+        }
+      }
     }
     return { allowed: true };
   }
@@ -7500,8 +7522,10 @@ One of mods you are using is using an old version of SDK. It will work for now b
           const permCheck = canSenderInspect(senderId);
           const responseData = permCheck.allowed ? {
             allowed: true,
-            mods: getLoadedMods(),
-            rules: modStorage.inspector.rules,
+            canViewAddons: permCheck.canViewAddons,
+            canViewRules: permCheck.canViewRules,
+            mods: permCheck.canViewAddons ? getLoadedMods() : [],
+            rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
             autoLoadMode: modStorage.inspector.autoLoadMode,
             authority: modStorage.authority,
             callerAccessLevel: getCharacterAccessLevel(senderId),
@@ -7543,6 +7567,36 @@ One of mods you are using is using an old version of SDK. It will work for now b
             message: dictData.message,
             data: responseData
           }, senderId);
+          return;
+        }
+        if (dictData.message === "qoc_triggerCompliance") {
+          if (!checkPermissionAccess("rules_force_compliance", senderId)) {
+            messagesManager.sendPacket("requestResponse", {
+              requestId: dictData.requestId,
+              message: dictData.message,
+              data: { success: false, reason: "Permission Denied: You do not have authority to force compliance evaluations on this player." }
+            }, senderId);
+            return;
+          }
+          toastsManager.info({
+            title: `${MOD_NAME} Compliance Triggered`,
+            message: `${senderName} requested an immediate compliance check.`,
+            duration: 4e3
+          });
+          evaluateCompliance().then((report) => {
+            messagesManager.sendPacket("requestResponse", {
+              requestId: dictData.requestId,
+              message: dictData.message,
+              data: {
+                success: true,
+                report: {
+                  isCompliant: report.isCompliant,
+                  missingCount: report.missingRequired.length,
+                  forbiddenCount: report.detectedForbidden.length
+                }
+              }
+            }, senderId);
+          });
           return;
         }
         if (dictData.message === "qoc_updateAuthority") {
@@ -7626,8 +7680,10 @@ One of mods you are using is using an old version of SDK. It will work for now b
           const permCheck = canSenderInspect(senderId);
           const responseData = permCheck.allowed ? {
             allowed: true,
-            mods: getLoadedMods(),
-            rules: modStorage.inspector.rules,
+            canViewAddons: permCheck.canViewAddons,
+            canViewRules: permCheck.canViewRules,
+            mods: permCheck.canViewAddons ? getLoadedMods() : [],
+            rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
             autoLoadMode: modStorage.inspector.autoLoadMode,
             authority: modStorage.authority,
             callerAccessLevel: getCharacterAccessLevel(senderId),
@@ -7663,6 +7719,38 @@ One of mods you are using is using an old version of SDK. It will work for now b
             message: data.message,
             data: responseData
           }, senderId);
+          return;
+        }
+        if (data.message === "qoc_triggerCompliance") {
+          if (!checkPermissionAccess("rules_force_compliance", senderId)) {
+            messagesManager.sendBeep({
+              type: `${MOD_KEY}_requestResponse`,
+              requestId: data.requestId,
+              message: data.message,
+              data: { success: false, reason: "Permission Denied: You do not have authority to force compliance evaluations on this player." }
+            }, senderId);
+            return;
+          }
+          toastsManager.info({
+            title: `${MOD_NAME} Compliance Triggered`,
+            message: `${senderName} requested an immediate compliance check.`,
+            duration: 4e3
+          });
+          evaluateCompliance().then((report) => {
+            messagesManager.sendBeep({
+              type: `${MOD_KEY}_requestResponse`,
+              requestId: data.requestId,
+              message: data.message,
+              data: {
+                success: true,
+                report: {
+                  isCompliant: report.isCompliant,
+                  missingCount: report.missingRequired.length,
+                  forbiddenCount: report.detectedForbidden.length
+                }
+              }
+            }, senderId);
+          });
           return;
         }
         if (data.message === "qoc_updateAuthority") {
@@ -7835,6 +7923,43 @@ One of mods you are using is using an old version of SDK. It will work for now b
       return {
         success: false,
         error: err?.message || "Failed to transmit authority update."
+      };
+    }
+  }
+  async function requestTriggerCompliance(targetMemberNumber) {
+    try {
+      let res = await messagesManager.sendRequest({
+        message: "qoc_triggerCompliance",
+        target: targetMemberNumber,
+        type: "packet"
+      });
+      if (res.isError || !res.data) {
+        res = await messagesManager.sendRequest({
+          message: "qoc_triggerCompliance",
+          target: targetMemberNumber,
+          type: "beep"
+        });
+      }
+      if (res.isError || !res.data) {
+        return {
+          success: false,
+          error: "Target player did not respond to compliance trigger request."
+        };
+      }
+      if (!res.data.success) {
+        return {
+          success: false,
+          error: res.data.reason || "Target player rejected compliance trigger."
+        };
+      }
+      return {
+        success: true,
+        data: res.data
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err?.message || "Failed to communicate with target player."
       };
     }
   }
@@ -8093,60 +8218,142 @@ One of mods you are using is using an old version of SDK. It will work for now b
       if (!this.contentArea) return;
       this.contentArea.innerHTML = "";
       const subjectName = this.getSubjectName();
+      const canViewAddons = this.isSelf ? checkPermissionAccess("inspect_view_addons") : this.targetData?.canViewAddons ?? true;
+      const canViewRules = this.isSelf ? checkPermissionAccess("inspect_view_rules") : this.targetData?.canViewRules ?? true;
+      const canRemoveRules = this.isSelf ? checkPermissionAccess("rules_remove_rules") : this.targetData?.callerPermissions?.rules_remove_rules ?? false;
+      const canForceCompliance = this.isSelf ? checkPermissionAccess("rules_force_compliance") : this.targetData?.callerPermissions?.rules_force_compliance ?? false;
       const mods = this.isSelf ? getLoadedMods() : this.targetData?.mods || [];
       const rules = this.isSelf ? modStorage.inspector.rules : this.targetRulesCopy.length > 0 ? this.targetRulesCopy : this.targetData?.rules || [];
       const compliance = checkComplianceAgainstRules(mods, rules);
-      const banner = document.createElement("div");
-      if (!compliance.hasRules) {
-        banner.style.cssText = `
-                padding: 14px 20px;
-                border-radius: 6px;
-                background: rgba(41, 121, 255, 0.15);
-                border: 1px solid #2979ff;
-                color: #90caf9;
-                margin-bottom: 12px;
-            `;
-        banner.innerHTML = `
-                <div style="font-size: 15px; font-weight: bold;">\u2139\uFE0F NO ACTIVE RULES CONFIGURED</div>
-                <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
-                    No mandatory or forbidden addon rules are currently locked on ${subjectName}.
-                    ${!this.isSelf ? "Switch to the <b>\u{1F512} Enforce Rules</b> tab to set mandatory or forbidden requirements." : ""}
-                </div>
-            `;
-      } else if (compliance.isCompliant) {
-        banner.style.cssText = `
-                padding: 14px 20px;
-                border-radius: 6px;
-                background: rgba(46, 125, 50, 0.25);
-                border: 1px solid #4caf50;
-                color: #a5d6a7;
-                margin-bottom: 12px;
-            `;
-        banner.innerHTML = `
-                <div style="font-size: 15px; font-weight: bold;">\u2713 FULLY COMPLIANT: All ${rules.length} active addon rule(s) met.</div>
-                <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
-                    ${subjectName} satisfies all mandatory and forbidden addon requirements.
-                </div>
-            `;
+      if (canViewRules) {
+        const banner = document.createElement("div");
+        if (!compliance.hasRules) {
+          banner.style.cssText = `
+                    padding: 14px 20px;
+                    border-radius: 6px;
+                    background: rgba(41, 121, 255, 0.15);
+                    border: 1px solid #2979ff;
+                    color: #90caf9;
+                    margin-bottom: 12px;
+                `;
+          banner.innerHTML = `
+                    <div style="font-size: 15px; font-weight: bold;">\u2139\uFE0F NO ACTIVE RULES CONFIGURED</div>
+                    <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
+                        No mandatory or forbidden addon rules are currently locked on ${subjectName}.
+                        Switch to the <b>\u{1F512} Enforce Rules</b> tab to configure rules.
+                    </div>
+                `;
+        } else if (compliance.isCompliant) {
+          banner.style.cssText = `
+                    padding: 14px 20px;
+                    border-radius: 6px;
+                    background: rgba(46, 125, 50, 0.25);
+                    border: 1px solid #4caf50;
+                    color: #a5d6a7;
+                    margin-bottom: 12px;
+                `;
+          banner.innerHTML = `
+                    <div style="font-size: 15px; font-weight: bold;">\u2713 FULLY COMPLIANT: All ${rules.length} active addon rule(s) met.</div>
+                    <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
+                        ${subjectName} satisfies all mandatory and forbidden addon requirements.
+                    </div>
+                `;
+        } else {
+          banner.style.cssText = `
+                    padding: 14px 20px;
+                    border-radius: 6px;
+                    background: rgba(198, 40, 40, 0.3);
+                    border: 1px solid #ef5350;
+                    color: #ffcdd2;
+                    margin-bottom: 12px;
+                `;
+          banner.innerHTML = `
+                    <div style="font-size: 15px; font-weight: bold;">\u26A0\uFE0F POLICY VIOLATION: ${subjectName} is NON-COMPLIANT!</div>
+                    <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
+                        ${compliance.missing.length > 0 ? `Missing Mandatory: <b>${compliance.missing.map((m) => m.modName).join(", ")}</b>. ` : ""}
+                        ${compliance.forbidden.length > 0 ? `Running Forbidden: <b>${compliance.forbidden.map((m) => m.modName).join(", ")}</b>.` : ""}
+                    </div>
+                `;
+        }
+        this.contentArea.appendChild(banner);
       } else {
-        banner.style.cssText = `
-                padding: 14px 20px;
-                border-radius: 6px;
-                background: rgba(198, 40, 40, 0.3);
-                border: 1px solid #ef5350;
-                color: #ffcdd2;
-                margin-bottom: 12px;
+        const ruleLockBanner = document.createElement("div");
+        ruleLockBanner.style.cssText = "padding: 14px 20px; border-radius: 6px; background: rgba(239, 83, 80, 0.15); border: 1px solid #ef5350; color: #ef9a9a; margin-bottom: 12px;";
+        ruleLockBanner.innerHTML = `
+                <div style="font-size: 15px; font-weight: bold;">\u{1F512} ACTIVE RULES & COMPLIANCE HIDDEN</div>
+                <div style="font-size: 13px; margin-top: 4px; color: #ffcdd2;">You do not meet the minimum role required to view active addon rules on ${subjectName}.</div>
             `;
-        banner.innerHTML = `
-                <div style="font-size: 15px; font-weight: bold;">\u26A0\uFE0F POLICY VIOLATION: ${subjectName} is NON-COMPLIANT!</div>
-                <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
-                    ${compliance.missing.length > 0 ? `Missing Mandatory: <b>${compliance.missing.map((m) => m.modName).join(", ")}</b>. ` : ""}
-                    ${compliance.forbidden.length > 0 ? `Running Forbidden: <b>${compliance.forbidden.map((m) => m.modName).join(", ")}</b>.` : ""}
-                </div>
-            `;
+        this.contentArea.appendChild(ruleLockBanner);
       }
-      this.contentArea.appendChild(banner);
-      if (compliance.hasRules) {
+      if (canViewRules && (canForceCompliance || canRemoveRules && rules.length > 0)) {
+        const toolbar = document.createElement("div");
+        toolbar.style.cssText = "display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;";
+        if (canForceCompliance) {
+          const forceBtn = document.createElement("button");
+          forceBtn.textContent = "\u26A1 Force Compliance Evaluation Now";
+          forceBtn.style.cssText = "padding: 9px 18px; border-radius: 5px; background: #1565c0; border: 1px solid #42a5f5; color: white; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;";
+          forceBtn.addEventListener("click", async () => {
+            forceBtn.disabled = true;
+            forceBtn.textContent = "\u23F3 Evaluating...";
+            if (this.isSelf) {
+              const report = await evaluateCompliance();
+              toastsManager.info({
+                title: `${MOD_NAME} Compliance Check`,
+                message: report.isCompliant ? "All addon rules are currently satisfied." : `Check complete: ${report.missingRequired.length} missing, ${report.detectedForbidden.length} forbidden.`,
+                duration: 4e3
+              });
+              this.renderAddonsTab();
+            } else if (this.target && typeof this.target.MemberNumber === "number") {
+              const res = await requestTriggerCompliance(this.target.MemberNumber);
+              if (res.success && res.data?.report) {
+                toastsManager.info({
+                  title: `${MOD_NAME} Compliance Evaluated`,
+                  message: res.data.report.isCompliant ? `${subjectName} satisfies all rules!` : `${subjectName} has ${res.data.report.missingCount} missing mandatory, ${res.data.report.forbiddenCount} forbidden addons.`,
+                  duration: 5e3
+                });
+                this.loadTargetData();
+              } else {
+                toastsManager.error({
+                  title: `${MOD_NAME} Trigger Failed`,
+                  message: res.error || "Target player rejected compliance trigger.",
+                  duration: 4e3
+                });
+              }
+            }
+            forceBtn.disabled = false;
+            forceBtn.textContent = "\u26A1 Force Compliance Evaluation Now";
+          });
+          toolbar.appendChild(forceBtn);
+        }
+        if (canRemoveRules && rules.length > 0) {
+          const clearAllBtn = document.createElement("button");
+          clearAllBtn.textContent = "\u{1F5D1}\uFE0F Clear All Rules";
+          clearAllBtn.style.cssText = "padding: 9px 18px; border-radius: 5px; background: rgba(198, 40, 40, 0.4); border: 1px solid #ef5350; color: #ffcdd2; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;";
+          clearAllBtn.addEventListener("click", async () => {
+            if (!confirm(`Are you sure you want to remove ALL active rules from ${subjectName}?`)) return;
+            this.targetRulesCopy = [];
+            if (this.isSelf) {
+              modStorage.inspector.rules = [];
+              saveStorage();
+              syncStorage();
+              toastsManager.info({ title: `${MOD_NAME} Rules Cleared`, message: "All addon rules cleared.", duration: 3e3 });
+              this.renderAddonsTab();
+            } else if (this.target && typeof this.target.MemberNumber === "number") {
+              const res = await requestSetRules(this.target.MemberNumber, []);
+              if (res.success) {
+                if (this.targetData) this.targetData.rules = [];
+                toastsManager.info({ title: `${MOD_NAME} Rules Cleared`, message: `All rules cleared from ${subjectName}.`, duration: 3e3 });
+                this.renderAddonsTab();
+              } else {
+                toastsManager.error({ title: `${MOD_NAME} Clear Failed`, message: res.error || "Failed to clear rules.", duration: 4e3 });
+              }
+            }
+          });
+          toolbar.appendChild(clearAllBtn);
+        }
+        this.contentArea.appendChild(toolbar);
+      }
+      if (canViewRules && compliance.hasRules) {
         const rulesSection = document.createElement("div");
         rulesSection.style.cssText = "display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;";
         rulesSection.innerHTML = `<div style="font-size: 15px; font-weight: bold; color: #64b5f6;">Rule Requirements & Live Status (${rules.length}):</div>`;
@@ -8165,45 +8372,85 @@ One of mods you are using is using an old version of SDK. It will work for now b
                     justify-content: space-between;
                 `;
           const matchedNote = detail.matchedMod ? ` (Matched: ${detail.matchedMod.name}${detail.matchedMod.version ? ` v${detail.matchedMod.version}` : ""})` : "";
-          card.innerHTML = `
-                    <div>
-                        <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">${detail.rule.modName}</div>
-                        <div style="font-size: 12px; color: ${isMet ? "#81c784" : "#e57373"}; margin-top: 2px;">
-                            ${isMandatory ? isMet ? `\u2713 Mandatory requirement satisfied${matchedNote}` : "\u274C MANDATORY REQUIREMENT VIOLATED: Mod is NOT loaded in session!" : isMet ? "\u2713 Forbidden rule satisfied (Mod is not running)" : `\u{1F6AB} FORBIDDEN RULE VIOLATED: Mod is actively running${matchedNote}!`}
-                        </div>
+          const leftDiv = document.createElement("div");
+          leftDiv.innerHTML = `
+                    <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">${detail.rule.modName}</div>
+                    <div style="font-size: 12px; color: ${isMet ? "#81c784" : "#e57373"}; margin-top: 2px;">
+                        ${isMandatory ? isMet ? `\u2713 Mandatory requirement satisfied${matchedNote}` : "\u274C MANDATORY REQUIREMENT VIOLATED: Mod is NOT loaded in session!" : isMet ? "\u2713 Forbidden rule satisfied (Mod is not running)" : `\u{1F6AB} FORBIDDEN RULE VIOLATED: Mod is actively running${matchedNote}!`}
                     </div>
-                    <span style="background: ${isMet ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMet ? "#81c784" : "#e57373"}; border: 1px solid ${isMet ? "#4caf50" : "#f44336"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;">
-                        ${isMet ? "MET" : "VIOLATION"}
-                    </span>
                 `;
+          const rightDiv = document.createElement("div");
+          rightDiv.style.cssText = "display: flex; align-items: center; gap: 8px;";
+          const badge = document.createElement("span");
+          badge.style.cssText = `background: ${isMet ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMet ? "#81c784" : "#e57373"}; border: 1px solid ${isMet ? "#4caf50" : "#f44336"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;`;
+          badge.textContent = isMet ? "MET" : "VIOLATION";
+          rightDiv.appendChild(badge);
+          if (canRemoveRules) {
+            const removeBtn = document.createElement("button");
+            removeBtn.textContent = "\u{1F5D1}\uFE0F Remove";
+            removeBtn.title = "Remove this active rule";
+            removeBtn.style.cssText = "padding: 4px 10px; border-radius: 4px; background: rgba(198, 40, 40, 0.2); border: 1px solid #ef5350; color: #ef9a9a; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.15s;";
+            removeBtn.addEventListener("click", async () => {
+              this.targetRulesCopy = this.targetRulesCopy.filter((r) => r.modId.toLowerCase() !== detail.rule.modId.toLowerCase());
+              if (this.isSelf) {
+                modStorage.inspector.rules = structuredClone(this.targetRulesCopy);
+                saveStorage();
+                syncStorage();
+                toastsManager.info({ title: `${MOD_NAME} Rule Removed`, message: `Rule for ${detail.rule.modName} removed.`, duration: 2500 });
+                this.renderAddonsTab();
+              } else if (this.target && typeof this.target.MemberNumber === "number") {
+                const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
+                if (res.success) {
+                  if (this.targetData) this.targetData.rules = structuredClone(this.targetRulesCopy);
+                  toastsManager.info({ title: `${MOD_NAME} Rule Removed`, message: `Rule for ${detail.rule.modName} removed from ${subjectName}.`, duration: 2500 });
+                  this.renderAddonsTab();
+                } else {
+                  toastsManager.error({ title: `${MOD_NAME} Remove Failed`, message: res.error || "Failed to remove rule.", duration: 4e3 });
+                }
+              }
+            });
+            rightDiv.appendChild(removeBtn);
+          }
+          card.appendChild(leftDiv);
+          card.appendChild(rightDiv);
           rulesSection.appendChild(card);
         });
         this.contentArea.appendChild(rulesSection);
       }
-      const modsHeader = document.createElement("div");
-      modsHeader.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 8px;";
-      modsHeader.textContent = `Loaded Addons in Session (${mods.length}):`;
-      this.contentArea.appendChild(modsHeader);
-      if (mods.length === 0) {
-        const empty = document.createElement("div");
-        empty.style.cssText = "color: #90a4ae; padding: 20px; text-align: center; background: rgba(30, 36, 48, 0.6); border-radius: 6px;";
-        empty.textContent = "No external addons detected in session.";
-        this.contentArea.appendChild(empty);
-        return;
-      }
-      for (const mod of mods) {
-        const card = document.createElement("div");
-        card.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;";
-        card.innerHTML = `
-                <div>
-                    <div style="font-size: 15px; font-weight: bold; color: #64b5f6;">${mod.name}</div>
-                    <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">ID: ${mod.id}${mod.repository ? ` \u2022 Repo: ${mod.repository}` : ""}</div>
-                </div>
-                <span style="background: rgba(41, 121, 255, 0.2); border: 1px solid #2979ff; color: #82b1ff; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                    v${mod.version || "Active"}
-                </span>
+      if (canViewAddons) {
+        const modsHeader = document.createElement("div");
+        modsHeader.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 8px;";
+        modsHeader.textContent = `Loaded Addons in Session (${mods.length}):`;
+        this.contentArea.appendChild(modsHeader);
+        if (mods.length === 0) {
+          const empty = document.createElement("div");
+          empty.style.cssText = "color: #90a4ae; padding: 20px; text-align: center; background: rgba(30, 36, 48, 0.6); border-radius: 6px;";
+          empty.textContent = "No external addons detected in session.";
+          this.contentArea.appendChild(empty);
+        } else {
+          for (const mod of mods) {
+            const card = document.createElement("div");
+            card.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;";
+            card.innerHTML = `
+                        <div>
+                            <div style="font-size: 15px; font-weight: bold; color: #64b5f6;">${mod.name}</div>
+                            <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">ID: ${mod.id}${mod.repository ? ` \u2022 Repo: ${mod.repository}` : ""}</div>
+                        </div>
+                        <span style="background: rgba(41, 121, 255, 0.2); border: 1px solid #2979ff; color: #82b1ff; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                            v${mod.version || "Active"}
+                        </span>
+                    `;
+            this.contentArea.appendChild(card);
+          }
+        }
+      } else {
+        const addonLockNotice = document.createElement("div");
+        addonLockNotice.style.cssText = "padding: 14px 20px; border-radius: 6px; background: rgba(239, 83, 80, 0.15); border: 1px solid #ef5350; color: #ef9a9a;";
+        addonLockNotice.innerHTML = `
+                <div style="font-size: 15px; font-weight: bold;">\u{1F512} LOADED ADDONS HIDDEN</div>
+                <div style="font-size: 13px; margin-top: 4px; color: #ffcdd2;">You do not meet the minimum role required to view loaded addons in ${subjectName}'s session.</div>
             `;
-        this.contentArea.appendChild(card);
+        this.contentArea.appendChild(addonLockNotice);
       }
     }
     // ==========================================
@@ -8214,16 +8461,25 @@ One of mods you are using is using an old version of SDK. It will work for now b
       this.contentArea.innerHTML = "";
       const subjectName = this.getSubjectName();
       if (this.isSelf) {
-        const rules = modStorage.inspector.rules;
-        if (rules.length === 0) {
-          this.contentArea.innerHTML = `
-                    <div style="padding: 24px; text-align: center; color: #90a4ae;">
-                        No addon rules are currently locked on you. Your Dominant(s) can set mandatory or forbidden rules via their inspector.
-                    </div>
-                `;
-          return;
-        }
-        for (const rule of rules) {
+        this.targetRulesCopy = structuredClone(modStorage.inspector.rules || []);
+      }
+      const canMandatory = this.isSelf ? checkPermissionAccess("rules_lock_mandatory") : this.targetData?.callerPermissions?.rules_lock_mandatory ?? false;
+      const canForbidden = this.isSelf ? checkPermissionAccess("rules_lock_forbidden") : this.targetData?.callerPermissions?.rules_lock_forbidden ?? false;
+      const canRemove = this.isSelf ? checkPermissionAccess("rules_remove_rules") : this.targetData?.callerPermissions?.rules_remove_rules ?? false;
+      if (!canMandatory && !canForbidden && !canRemove) {
+        const lockNotice = document.createElement("div");
+        lockNotice.style.cssText = "color: #ef5350; font-size: 13px; font-weight: bold; padding: 14px; background: rgba(239, 83, 80, 0.12); border: 1px solid #ef5350; border-radius: 6px; margin-bottom: 14px;";
+        lockNotice.textContent = this.isSelf ? "\u{1F512} Rule management is locked: You do not have self-access to modify addon rules on yourself (controlled by your dominant)." : `\u{1F512} Rule enforcement is restricted: You do not meet the minimum role required to lock addon rules on ${subjectName}.`;
+        this.contentArea.appendChild(lockNotice);
+      }
+      if (this.targetRulesCopy.length > 0) {
+        const activeHeader = document.createElement("div");
+        activeHeader.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 8px;";
+        activeHeader.textContent = `Currently Active Rules (${this.targetRulesCopy.length}):`;
+        this.contentArea.appendChild(activeHeader);
+        const activeList = document.createElement("div");
+        activeList.style.cssText = "display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;";
+        for (const rule of this.targetRulesCopy) {
           const isMandatory = rule.type === "required" || rule.type === "mandatory";
           const card = document.createElement("div");
           card.style.cssText = `
@@ -8231,44 +8487,68 @@ One of mods you are using is using an old version of SDK. It will work for now b
                     border-left: 5px solid ${isMandatory ? "#4caf50" : "#ef5350"};
                     border: 1px solid rgba(80, 100, 140, 0.4);
                     border-radius: 6px;
-                    padding: 12px 18px;
+                    padding: 10px 16px;
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
                 `;
-          card.innerHTML = `
-                    <div>
-                        <div style="font-size: 15px; font-weight: bold; color: #e0e6ed;">${rule.modName}</div>
-                        <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">Enforced by: Member #${rule.enforcedBy}${rule.enforcedByName ? ` (${rule.enforcedByName})` : ""}</div>
-                    </div>
-                    <span style="background: ${isMandatory ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMandatory ? "#81c784" : "#e57373"}; border: 1px solid ${isMandatory ? "#4caf50" : "#f44336"}; padding: 5px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                        ${isMandatory ? "MANDATORY" : "FORBIDDEN"}
-                    </span>
+          const left = document.createElement("div");
+          left.innerHTML = `
+                    <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">${rule.modName}</div>
+                    <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">Enforced by: Member #${rule.enforcedBy}${rule.enforcedByName ? ` (${rule.enforcedByName})` : ""}</div>
                 `;
-          this.contentArea.appendChild(card);
+          const right = document.createElement("div");
+          right.style.cssText = "display: flex; align-items: center; gap: 8px;";
+          const badge = document.createElement("span");
+          badge.style.cssText = `background: ${isMandatory ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMandatory ? "#81c784" : "#e57373"}; border: 1px solid ${isMandatory ? "#4caf50" : "#f44336"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;`;
+          badge.textContent = isMandatory ? "MANDATORY" : "FORBIDDEN";
+          right.appendChild(badge);
+          if (canRemove) {
+            const removeBtn = document.createElement("button");
+            removeBtn.textContent = "\u{1F5D1}\uFE0F Remove";
+            removeBtn.style.cssText = "padding: 4px 10px; border-radius: 4px; background: rgba(198, 40, 40, 0.2); border: 1px solid #ef5350; color: #ef9a9a; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.15s;";
+            removeBtn.addEventListener("click", async () => {
+              this.targetRulesCopy = this.targetRulesCopy.filter((r) => r.modId.toLowerCase() !== rule.modId.toLowerCase());
+              if (this.isSelf) {
+                modStorage.inspector.rules = structuredClone(this.targetRulesCopy);
+                saveStorage();
+                syncStorage();
+                toastsManager.info({ title: `${MOD_NAME} Rule Removed`, message: `Rule for ${rule.modName} removed.`, duration: 2500 });
+                this.renderRulesTab();
+              } else if (this.target && typeof this.target.MemberNumber === "number") {
+                const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
+                if (res.success) {
+                  if (this.targetData) this.targetData.rules = structuredClone(this.targetRulesCopy);
+                  toastsManager.info({ title: `${MOD_NAME} Rule Removed`, message: `Rule for ${rule.modName} removed from ${subjectName}.`, duration: 2500 });
+                  this.renderRulesTab();
+                } else {
+                  toastsManager.error({ title: `${MOD_NAME} Remove Failed`, message: res.error || "Failed to remove rule.", duration: 4e3 });
+                }
+              }
+            });
+            right.appendChild(removeBtn);
+          }
+          card.appendChild(left);
+          card.appendChild(right);
+          activeList.appendChild(card);
         }
-        return;
+        this.contentArea.appendChild(activeList);
       }
-      const canMandatory = this.targetData?.callerPermissions?.rules_lock_mandatory ?? false;
-      const canForbidden = this.targetData?.callerPermissions?.rules_lock_forbidden ?? false;
-      const canRemove = this.targetData?.callerPermissions?.rules_remove_rules ?? false;
-      if (!canMandatory && !canForbidden && !canRemove) {
-        const lockNotice = document.createElement("div");
-        lockNotice.style.cssText = "color: #ef5350; font-size: 13px; font-weight: bold; padding: 12px; background: rgba(239, 83, 80, 0.1); border: 1px solid #ef5350; border-radius: 6px; margin-bottom: 12px;";
-        lockNotice.textContent = "\u{1F512} Rule enforcement is restricted: You do not meet the minimum role required to lock addon rules on this player.";
-        this.contentArea.appendChild(lockNotice);
-      }
+      const catalogHeader = document.createElement("div");
+      catalogHeader.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 8px;";
+      catalogHeader.textContent = "Curated Addon Catalog:";
+      this.contentArea.appendChild(catalogHeader);
       const curatedList = Object.values(CURATED_MOD_CATALOG);
       for (const item of curatedList) {
         const row = document.createElement("div");
-        row.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;";
+        row.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;";
         const left = document.createElement("div");
         left.innerHTML = `
                 <div style="font-size: 15px; font-weight: bold; color: #64b5f6;">${item.name}</div>
                 <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">${item.description}</div>
             `;
-        const existingRule = this.targetRulesCopy.find((r) => r.modId === item.id);
-        const currentState = existingRule ? existingRule.type : "none";
+        const existingRule = this.targetRulesCopy.find((r) => r.modId.toLowerCase() === item.id.toLowerCase());
+        const currentState = existingRule ? existingRule.type === "required" ? "required" : existingRule.type : "none";
         const btnGroup = document.createElement("div");
         btnGroup.style.cssText = "display: flex; gap: 8px;";
         const createChoiceBtn = (state, label, color, enabled) => {
@@ -8290,7 +8570,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
                 `;
           b.addEventListener("click", async () => {
             if (!enabled) return;
-            this.targetRulesCopy = this.targetRulesCopy.filter((r) => r.modId !== item.id);
+            this.targetRulesCopy = this.targetRulesCopy.filter((r) => r.modId.toLowerCase() !== item.id.toLowerCase());
             if (state !== "none") {
               this.targetRulesCopy.push({
                 modId: item.id,
@@ -8301,24 +8581,37 @@ One of mods you are using is using an old version of SDK. It will work for now b
                 enforcedAt: Date.now()
               });
             }
-            if (this.targetData) {
-              this.targetData.rules = structuredClone(this.targetRulesCopy);
-            }
-            this.renderRulesTab();
-            if (this.target && typeof this.target.MemberNumber === "number") {
-              const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
-              if (res.success) {
-                toastsManager.info({
-                  title: `${MOD_NAME} Rules`,
-                  message: `Rule for ${item.name} synced to ${subjectName}.`,
-                  duration: 2500
-                });
-              } else {
-                toastsManager.error({
-                  title: `${MOD_NAME} Sync Failed`,
-                  message: res.error || "Failed to sync rule to target.",
-                  duration: 4e3
-                });
+            if (this.isSelf) {
+              modStorage.inspector.rules = structuredClone(this.targetRulesCopy);
+              saveStorage();
+              syncStorage();
+              evaluateCompliance();
+              toastsManager.info({
+                title: `${MOD_NAME} Rules`,
+                message: `Rule for ${item.name} set to ${state === "none" ? "Neutral (Removed)" : state.toUpperCase()}.`,
+                duration: 2500
+              });
+              this.renderRulesTab();
+            } else {
+              if (this.targetData) {
+                this.targetData.rules = structuredClone(this.targetRulesCopy);
+              }
+              this.renderRulesTab();
+              if (this.target && typeof this.target.MemberNumber === "number") {
+                const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
+                if (res.success) {
+                  toastsManager.info({
+                    title: `${MOD_NAME} Rules`,
+                    message: `Rule for ${item.name} synced to ${subjectName}.`,
+                    duration: 2500
+                  });
+                } else {
+                  toastsManager.error({
+                    title: `${MOD_NAME} Sync Failed`,
+                    message: res.error || "Failed to sync rule to target.",
+                    duration: 4e3
+                  });
+                }
               }
             }
           });
@@ -8331,35 +8624,37 @@ One of mods you are using is using an old version of SDK. It will work for now b
         row.appendChild(btnGroup);
         this.contentArea.appendChild(row);
       }
-      const saveBtn = document.createElement("button");
-      saveBtn.textContent = "\u{1F4BE} Re-sync All Rules to Target";
-      saveBtn.style.cssText = "padding: 12px 28px; border-radius: 6px; background: #2e7d32; border: 1px solid #4caf50; color: white; font-weight: bold; font-size: 15px; cursor: pointer; width: fit-content; margin-top: 10px;";
-      saveBtn.addEventListener("click", async () => {
-        if (!this.target || typeof this.target.MemberNumber !== "number") return;
-        toastsManager.info({
-          title: `${MOD_NAME} Syncing`,
-          message: "Transmitting addon rules to target player...",
-          duration: 3e3
-        });
-        const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
-        if (res.success) {
-          if (this.targetData) {
-            this.targetData.rules = structuredClone(this.targetRulesCopy);
+      if (!this.isSelf) {
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "\u{1F4BE} Re-sync All Rules to Target";
+        saveBtn.style.cssText = "padding: 12px 28px; border-radius: 6px; background: #2e7d32; border: 1px solid #4caf50; color: white; font-weight: bold; font-size: 15px; cursor: pointer; width: fit-content; margin-top: 14px;";
+        saveBtn.addEventListener("click", async () => {
+          if (!this.target || typeof this.target.MemberNumber !== "number") return;
+          toastsManager.info({
+            title: `${MOD_NAME} Syncing`,
+            message: "Transmitting addon rules to target player...",
+            duration: 3e3
+          });
+          const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
+          if (res.success) {
+            if (this.targetData) {
+              this.targetData.rules = structuredClone(this.targetRulesCopy);
+            }
+            toastsManager.success({
+              title: `${MOD_NAME} Rules Synced`,
+              message: "Addon rules successfully locked on target!",
+              duration: 5e3
+            });
+          } else {
+            toastsManager.error({
+              title: `${MOD_NAME} Sync Failed`,
+              message: res.error || "Target rejected rule sync.",
+              duration: 5e3
+            });
           }
-          toastsManager.success({
-            title: `${MOD_NAME} Rules Synced`,
-            message: "Addon rules successfully locked on target!",
-            duration: 5e3
-          });
-        } else {
-          toastsManager.error({
-            title: `${MOD_NAME} Sync Failed`,
-            message: res.error || "Target rejected rule sync.",
-            duration: 6e3
-          });
-        }
-      });
-      this.contentArea.appendChild(saveBtn);
+        });
+        this.contentArea.appendChild(saveBtn);
+      }
     }
     // ==========================================
     // TAB 3: ROLE MANAGEMENT

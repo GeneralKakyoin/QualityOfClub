@@ -70,7 +70,7 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     {
         key: "rules_force_compliance",
         name: "Allow forcing compliance evaluations",
-        description: "Permits triggering remote compliance checks, auto-injections, and violation alerts.",
+        description: "Permits commanding this character's game to immediately evaluate all rules, auto-inject missing mandatory addons, and alert on forbidden ones.",
         category: "Rules"
     },
 

@@ -11,6 +11,8 @@ import { MOD_NAME, MOD_KEY } from "src/constants";
 export interface InspectResponseData {
     allowed: boolean;
     reason?: string;
+    canViewAddons?: boolean;
+    canViewRules?: boolean;
     mods?: DetectedMod[];
     rules?: ModRule[];
     autoLoadMode?: AutoLoadMode;
@@ -23,6 +25,16 @@ export interface InspectResponseData {
 export interface SetRulesResponseData {
     success: boolean;
     reason?: string;
+}
+
+export interface TriggerComplianceResponseData {
+    success: boolean;
+    reason?: string;
+    report?: {
+        isCompliant: boolean;
+        missingCount: number;
+        forbiddenCount: number;
+    };
 }
 
 export interface AuthorityUpdateRequest {
@@ -64,35 +76,64 @@ function getCallerPermissions(senderId: number): Record<QoCPermission, boolean> 
 }
 
 /**
- * Checks if a sender has permission to view our loaded addons according to Authority settings.
+ * Checks if a sender has permission to view our loaded addons or active rules.
  */
-function canSenderInspect(senderId: number): { allowed: boolean; reason?: string } {
+function canSenderInspect(senderId: number): { allowed: boolean; canViewAddons: boolean; canViewRules: boolean; reason?: string } {
     if (!modStorage.inspector.enabled) {
-        return { allowed: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
+        return { allowed: false, canViewAddons: false, canViewRules: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
     }
 
-    const hasAccess = checkPermissionAccess("inspect_view_addons", senderId);
-    if (!hasAccess) {
-        return { allowed: false, reason: "Permission Denied: You do not meet the minimum role required to inspect this player's addons." };
+    const canViewAddons = checkPermissionAccess("inspect_view_addons", senderId);
+    const canViewRules = checkPermissionAccess("inspect_view_rules", senderId);
+
+    if (!canViewAddons && !canViewRules) {
+        return { allowed: false, canViewAddons: false, canViewRules: false, reason: "Permission Denied: You do not meet the minimum role required to inspect this player's addons or rules." };
     }
 
-    return { allowed: true };
+    return { allowed: true, canViewAddons, canViewRules };
 }
 
 /**
  * Checks if a sender has authority to set rules on us according to Authority settings.
+ * Accurately enforces specific permissions for locking mandatory, locking forbidden, or removing rules.
  */
-function canSenderEnforceRules(senderId: number, rules?: ModRule[]): { allowed: boolean; reason?: string } {
+function canSenderEnforceRules(senderId: number, newRules: ModRule[]): { allowed: boolean; reason?: string } {
     if (!modStorage.inspector.enabled) {
-        return { allowed: false, reason: "Quality of Club Addon Inspector is disabled." };
+        return { allowed: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
     }
 
+    const currentRules = modStorage.inspector.rules || [];
     const hasMandatoryAccess = checkPermissionAccess("rules_lock_mandatory", senderId);
     const hasForbiddenAccess = checkPermissionAccess("rules_lock_forbidden", senderId);
     const hasRemoveAccess = checkPermissionAccess("rules_remove_rules", senderId);
 
-    if (!hasMandatoryAccess && !hasForbiddenAccess && !hasRemoveAccess) {
-        return { allowed: false, reason: "Permission Denied: You do not meet the minimum role required to enforce addon rules on this player." };
+    // 1. Check newly added or modified rules
+    for (const rule of newRules) {
+        const isMandatory = rule.type === "required" || (rule.type as string) === "mandatory";
+        const isForbidden = rule.type === "forbidden";
+        const prev = currentRules.find(r => r.modId.toLowerCase() === rule.modId.toLowerCase());
+
+        if (isMandatory && (!prev || (prev.type !== "required" && (prev.type as string) !== "mandatory"))) {
+            if (!hasMandatoryAccess) {
+                return { allowed: false, reason: `Permission Denied: You do not meet the minimum role required to lock mandatory addons (attempted on ${rule.modName}).` };
+            }
+        }
+
+        if (isForbidden && (!prev || prev.type !== "forbidden")) {
+            if (!hasForbiddenAccess) {
+                return { allowed: false, reason: `Permission Denied: You do not meet the minimum role required to lock forbidden addons (attempted on ${rule.modName}).` };
+            }
+        }
+    }
+
+    // 2. Check removed rules
+    for (const prev of currentRules) {
+        const stillExists = newRules.some(r => r.modId.toLowerCase() === prev.modId.toLowerCase());
+        if (!stillExists) {
+            if (!hasRemoveAccess) {
+                return { allowed: false, reason: `Permission Denied: You do not meet the minimum role required to remove active addon rules (attempted on ${prev.modName}).` };
+            }
+        }
     }
 
     return { allowed: true };
@@ -162,8 +203,10 @@ export function initNetworkSync(): void {
                 const permCheck = canSenderInspect(senderId);
                 const responseData: InspectResponseData = permCheck.allowed ? {
                     allowed: true,
-                    mods: getLoadedMods(),
-                    rules: modStorage.inspector.rules,
+                    canViewAddons: permCheck.canViewAddons,
+                    canViewRules: permCheck.canViewRules,
+                    mods: permCheck.canViewAddons ? getLoadedMods() : [],
+                    rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
                     autoLoadMode: modStorage.inspector.autoLoadMode,
                     authority: modStorage.authority,
                     callerAccessLevel: getCharacterAccessLevel(senderId),
@@ -212,6 +255,40 @@ export function initNetworkSync(): void {
                     message: dictData.message,
                     data: responseData
                 }, senderId);
+                return;
+            }
+
+            // Incoming Trigger Compliance Check
+            if (dictData.message === "qoc_triggerCompliance") {
+                if (!checkPermissionAccess("rules_force_compliance", senderId)) {
+                    messagesManager.sendPacket("requestResponse", {
+                        requestId: dictData.requestId,
+                        message: dictData.message,
+                        data: { success: false, reason: "Permission Denied: You do not have authority to force compliance evaluations on this player." }
+                    }, senderId);
+                    return;
+                }
+
+                toastsManager.info({
+                    title: `${MOD_NAME} Compliance Triggered`,
+                    message: `${senderName} requested an immediate compliance check.`,
+                    duration: 4000
+                });
+
+                evaluateCompliance().then(report => {
+                    messagesManager.sendPacket("requestResponse", {
+                        requestId: dictData.requestId,
+                        message: dictData.message,
+                        data: {
+                            success: true,
+                            report: {
+                                isCompliant: report.isCompliant,
+                                missingCount: report.missingRequired.length,
+                                forbiddenCount: report.detectedForbidden.length
+                            }
+                        }
+                    }, senderId);
+                });
                 return;
             }
 
@@ -312,8 +389,10 @@ export function initNetworkSync(): void {
                 const permCheck = canSenderInspect(senderId);
                 const responseData: InspectResponseData = permCheck.allowed ? {
                     allowed: true,
-                    mods: getLoadedMods(),
-                    rules: modStorage.inspector.rules,
+                    canViewAddons: permCheck.canViewAddons,
+                    canViewRules: permCheck.canViewRules,
+                    mods: permCheck.canViewAddons ? getLoadedMods() : [],
+                    rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
                     autoLoadMode: modStorage.inspector.autoLoadMode,
                     authority: modStorage.authority,
                     callerAccessLevel: getCharacterAccessLevel(senderId),
@@ -352,6 +431,41 @@ export function initNetworkSync(): void {
                     message: data.message,
                     data: responseData
                 }, senderId);
+                return;
+            }
+
+            if (data.message === "qoc_triggerCompliance") {
+                if (!checkPermissionAccess("rules_force_compliance", senderId)) {
+                    messagesManager.sendBeep({
+                        type: `${MOD_KEY}_requestResponse`,
+                        requestId: data.requestId,
+                        message: data.message,
+                        data: { success: false, reason: "Permission Denied: You do not have authority to force compliance evaluations on this player." }
+                    }, senderId);
+                    return;
+                }
+
+                toastsManager.info({
+                    title: `${MOD_NAME} Compliance Triggered`,
+                    message: `${senderName} requested an immediate compliance check.`,
+                    duration: 4000
+                });
+
+                evaluateCompliance().then(report => {
+                    messagesManager.sendBeep({
+                        type: `${MOD_KEY}_requestResponse`,
+                        requestId: data.requestId,
+                        message: data.message,
+                        data: {
+                            success: true,
+                            report: {
+                                isCompliant: report.isCompliant,
+                                missingCount: report.missingRequired.length,
+                                forbiddenCount: report.detectedForbidden.length
+                            }
+                        }
+                    }, senderId);
+                });
                 return;
             }
 
@@ -557,6 +671,51 @@ export async function requestUpdateAuthority(targetMemberNumber: number, update:
         return {
             success: false,
             error: err?.message || "Failed to transmit authority update."
+        };
+    }
+}
+
+/**
+ * Sends a request to trigger an immediate remote compliance evaluation on a target player.
+ */
+export async function requestTriggerCompliance(targetMemberNumber: number): Promise<{ success: boolean; data?: TriggerComplianceResponseData; error?: string }> {
+    try {
+        let res = await messagesManager.sendRequest<TriggerComplianceResponseData>({
+            message: "qoc_triggerCompliance",
+            target: targetMemberNumber,
+            type: "packet"
+        });
+
+        if (res.isError || !res.data) {
+            res = await messagesManager.sendRequest<TriggerComplianceResponseData>({
+                message: "qoc_triggerCompliance",
+                target: targetMemberNumber,
+                type: "beep"
+            });
+        }
+
+        if (res.isError || !res.data) {
+            return {
+                success: false,
+                error: "Target player did not respond to compliance trigger request."
+            };
+        }
+
+        if (!res.data.success) {
+            return {
+                success: false,
+                error: res.data.reason || "Target player rejected compliance trigger."
+            };
+        }
+
+        return {
+            success: true,
+            data: res.data
+        };
+    } catch (err: any) {
+        return {
+            success: false,
+            error: err?.message || "Failed to communicate with target player."
         };
     }
 }
