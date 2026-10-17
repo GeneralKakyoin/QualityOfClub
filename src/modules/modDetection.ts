@@ -171,7 +171,13 @@ export function isModLoaded(identifier: string): boolean {
  * Safely loads a mod if and only if it belongs to the curated whitelist.
  */
 export function loadCuratedMod(catalogId: string): Promise<boolean> {
-    const mod = CURATED_MOD_CATALOG[catalogId];
+    if (!catalogId) return Promise.resolve(false);
+    const target = catalogId.toLowerCase().trim();
+    const mod = CURATED_MOD_CATALOG[catalogId] || Object.values(CURATED_MOD_CATALOG).find(c =>
+        c.id.toLowerCase() === target ||
+        c.name.toLowerCase() === target ||
+        c.detectKeys.some(k => k.toLowerCase() === target)
+    );
     if (!mod) {
         console.warn(`[QoC] Cannot auto-load unverified mod '${catalogId}'. Only curated catalog mods can be auto-loaded.`);
         return Promise.resolve(false);

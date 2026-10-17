@@ -11,11 +11,29 @@ export interface ComplianceReport {
 }
 
 let isEvaluating = false;
-const promptedMods = new Set<string>();
+export const promptedMods = new Set<string>();
+
+/**
+ * Resolves a curated mod entry case-insensitively by ID, name, or detect keys.
+ */
+export function getCuratedMod(idOrName: string) {
+    if (!idOrName) return null;
+    const target = idOrName.toLowerCase().trim();
+    if (CURATED_MOD_CATALOG[idOrName]) return CURATED_MOD_CATALOG[idOrName];
+
+    for (const item of Object.values(CURATED_MOD_CATALOG)) {
+        if (item.id.toLowerCase() === target || item.name.toLowerCase() === target) {
+            return item;
+        }
+        for (const k of item.detectKeys) {
+            if (k.toLowerCase() === target) return item;
+        }
+    }
+    return null;
+}
 
 /**
  * Checks compliance for a given list of mods against a set of rules.
- * Used for inspecting both ourselves and remote targets.
  */
 export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[]): {
     isCompliant: boolean;
@@ -31,7 +49,12 @@ export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[
             const mId = m.id.toLowerCase();
             const mName = m.name.toLowerCase();
             const mFull = (m.fullName || "").toLowerCase();
-            return mId === target || mName === target || mFull === target;
+            if (mId === target || mName === target || mFull === target) return true;
+            const curated = getCuratedMod(idOrName);
+            if (curated) {
+                return curated.detectKeys.some(k => mId.includes(k) || mName.includes(k) || mFull.includes(k));
+            }
+            return false;
         });
     };
 
@@ -52,8 +75,7 @@ export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[
 }
 
 /**
- * Evaluates active rules on the local player and initiates auto-loading
- * or prompts if required.
+ * Evaluates active rules on the local player and initiates auto-loading or prompts.
  */
 export async function evaluateCompliance(): Promise<ComplianceReport> {
     if (isEvaluating || !modStorage.inspector.enabled) {
@@ -76,41 +98,65 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
             if (rule.type === "required" && !loaded) {
                 missingRequired.push(rule);
 
-                const isCurated = !!CURATED_MOD_CATALOG[rule.modId];
-                if (modStorage.inspector.autoLoadMode === "Silent" && isCurated) {
-                    toastsManager.info({
-                        title: `${MOD_NAME} Auto-Loader`,
-                        message: `Auto-loading required addon: ${rule.modName}...`,
-                        duration: 3500
-                    });
-                    await loadCuratedMod(rule.modId);
-                } else if (modStorage.inspector.autoLoadMode === "Prompt" && isCurated) {
-                    if (!promptedMods.has(rule.modId)) {
-                        promptedMods.add(rule.modId);
-                        dialogsManager.confirm({
-                            message: `[${MOD_NAME}] Mandatory Addon: ${rule.modName} is required by your Owner. Load it now?`
-                        }).then((ok) => {
-                            if (ok) {
-                                loadCuratedMod(rule.modId);
+                const curated = getCuratedMod(rule.modId) || getCuratedMod(rule.modName);
+                if (curated) {
+                    if (modStorage.inspector.autoLoadMode === "Silent") {
+                        toastsManager.info({
+                            title: `${MOD_NAME} Auto-Loader`,
+                            message: `Auto-injecting mandatory addon: ${curated.name}...`,
+                            duration: 4000
+                        });
+                        const success = await loadCuratedMod(curated.id);
+                        if (success) {
+                            toastsManager.success({
+                                title: `${MOD_NAME} Injected`,
+                                message: `Successfully loaded ${curated.name}!`,
+                                duration: 4000
+                            });
+                        }
+                    } else if (modStorage.inspector.autoLoadMode === "Prompt") {
+                        if (!promptedMods.has(curated.id)) {
+                            promptedMods.add(curated.id);
+                            const name = rule.enforcedByName || `Member #${rule.enforcedBy}`;
+                            const promptMsg = `[${MOD_NAME}] Mandatory Addon: ${curated.name} is required by ${name}. Load it now?`;
+                            try {
+                                dialogsManager.confirm({
+                                    message: promptMsg
+                                }).then(async (ok) => {
+                                    if (ok) {
+                                        await loadCuratedMod(curated.id);
+                                    }
+                                }).catch(async () => {
+                                    if (typeof window !== "undefined" && window.confirm(promptMsg)) {
+                                        await loadCuratedMod(curated.id);
+                                    }
+                                });
+                            } catch {
+                                if (typeof window !== "undefined" && window.confirm(promptMsg)) {
+                                    await loadCuratedMod(curated.id);
+                                }
                             }
-                        }).catch(() => {});
+                        }
                     }
                 } else {
                     toastsManager.warn({
                         title: `${MOD_NAME} Compliance Notice`,
-                        message: `Mandatory addon '${rule.modName}' is not loaded. Please load it manually.`,
+                        message: `Mandatory addon '${rule.modName}' is not loaded. Please load it.`,
                         duration: 6000
                     });
                 }
             } else if (rule.type === "forbidden" && loaded) {
                 detectedForbidden.push(rule);
-                toastsManager.warn({
+                const enforcer = rule.enforcedByName || `Member #${rule.enforcedBy}`;
+                toastsManager.error({
                     title: `${MOD_NAME} Policy Violation`,
-                    message: `Addon '${rule.modName}' is FORBIDDEN by your Owner (#${rule.enforcedBy}). Please disable it and reload.`,
-                    duration: 8000
+                    message: `Addon '${rule.modName}' is FORBIDDEN by ${enforcer}. Please disable it immediately!`,
+                    duration: 9000
                 });
             }
         }
+    } catch (e) {
+        console.error("[QoC] Error evaluating compliance:", e);
     } finally {
         isEvaluating = false;
     }

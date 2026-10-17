@@ -1,11 +1,13 @@
 import { BaseSubscreen, getRelativeX, getRelativeY, getRelativeWidth, getRelativeHeight, setSubscreen, setPreviousSubscreen } from "zois-core/ui";
 import { toastsManager } from "zois-core/toasts";
-import { modStorage, saveStorage, syncStorage, ModRule, InspectViewPermission, AutoLoadMode } from "modules/storage";
+import { modStorage, saveStorage, syncStorage, ModRule, AutoLoadMode, ACCESS_LEVEL_NAMES, AccessLevel } from "modules/storage";
 import { getLoadedMods, CURATED_MOD_CATALOG } from "modules/modDetection";
 import { checkComplianceAgainstRules } from "modules/compliance";
 import { requestInspect, requestSetRules, hasRuleAuthorityOver, InspectResponseData } from "modules/networkSync";
+import { checkPermissionAccess } from "modules/authority";
 import { MOD_NAME } from "src/constants";
 import { MainSubscreen } from "./mainSubscreen";
+import { AuthoritySubscreen } from "./authoritySubscreen";
 
 export class InspectorSubscreen extends BaseSubscreen {
     private target: Character | null = null;
@@ -355,101 +357,112 @@ export class InspectorSubscreen extends BaseSubscreen {
         this.contentArea.innerHTML = "";
 
         const container = document.createElement("div");
-        container.style.cssText = "display: flex; flex-direction: column; gap: 18px;";
+        container.style.cssText = "display: flex; flex-direction: column; gap: 20px;";
 
-        const createCheckboxRow = (label: string, checked: boolean, onChange: (val: boolean) => void) => {
-            const row = document.createElement("label");
-            row.style.cssText = "display: flex; align-items: center; gap: 12px; cursor: pointer; font-size: 15px;";
-            const input = document.createElement("input");
-            input.type = "checkbox";
-            input.checked = checked;
-            input.style.cssText = "width: 20px; height: 20px; cursor: pointer; accent-color: #1976d2;";
-            input.addEventListener("change", () => onChange(input.checked));
-            row.appendChild(input);
-            const text = document.createElement("span");
-            text.textContent = label;
-            row.appendChild(text);
-            return row;
-        };
+        const canEditAutoLoad = checkPermissionAccess("rules_edit_autoload_mode");
 
-        // 1. Allow Owner rules
-        container.appendChild(createCheckboxRow(
-            "Allow Owner to lock mandatory / forbidden addon rules on me",
-            modStorage.inspector.allowOwnerRules,
-            (val) => {
-                modStorage.inspector.allowOwnerRules = val;
-                saveStorage();
-                syncStorage();
-            }
-        ));
-
-        // 2. Allow Lovers rules
-        container.appendChild(createCheckboxRow(
-            "Allow Lovers / Whitelisted partners to lock addon rules",
-            modStorage.inspector.allowLoversRules,
-            (val) => {
-                modStorage.inspector.allowLoversRules = val;
-                saveStorage();
-                syncStorage();
-            }
-        ));
-
-        // 3. Auto-load behavior
+        // 1. Auto-load behavior Card
         const autoLoadSection = document.createElement("div");
-        autoLoadSection.style.cssText = "margin-top: 10px;";
-        autoLoadSection.innerHTML = "<div style='font-size: 15px; font-weight: bold; margin-bottom: 8px;'>Missing Mandatory Addon Behavior:</div>";
-        const autoModes: { mode: AutoLoadMode; label: string }[] = [
-            { mode: "Prompt", label: "Prompt First (Recommended)" },
-            { mode: "Silent", label: "Silent Auto-Load" }
+        autoLoadSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 18px;";
+        autoLoadSection.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
+                Mandatory Addon Auto-Injection Behavior
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 14px;">
+                Choose how Quality of Club acts when entering a room or checking compliance if a mandatory addon is missing.
+            </div>
+        `;
+
+        const autoModes: { mode: AutoLoadMode; label: string; desc: string }[] = [
+            { mode: "Prompt", label: "Prompt First (Recommended)", desc: "Prompts you with a confirmation dialog before loading missing addons." },
+            { mode: "Silent", label: "Silent Auto-Injection", desc: "Silently auto-injects missing mandatory scripts automatically in the background." }
         ];
+
         const autoRow = document.createElement("div");
-        autoRow.style.cssText = "display: flex; gap: 10px;";
+        autoRow.style.cssText = "display: flex; flex-direction: column; gap: 10px;";
+
         autoModes.forEach(m => {
             const isSel = modStorage.inspector.autoLoadMode === m.mode;
-            const b = document.createElement("button");
-            b.textContent = `${isSel ? "● " : "○ "}${m.label}`;
-            b.style.cssText = `padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; background: ${isSel ? "#1976d2" : "rgba(45, 55, 75, 0.8)"}; border: 1px solid ${isSel ? "#42a5f5" : "#666"}; color: ${isSel ? "white" : "#ccc"};`;
-            b.addEventListener("click", () => {
+            const btn = document.createElement("button");
+            btn.disabled = !canEditAutoLoad;
+            btn.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 18px;
+                border-radius: 6px;
+                background: ${isSel ? "rgba(25, 118, 210, 0.3)" : "rgba(45, 55, 75, 0.7)"};
+                border: 1px solid ${isSel ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
+                color: ${isSel ? "#90caf9" : "#cfd8dc"};
+                cursor: ${canEditAutoLoad ? "pointer" : "not-allowed"};
+                text-align: left;
+                transition: all 0.15s ease;
+            `;
+            btn.innerHTML = `
+                <div>
+                    <div style="font-size: 14px; font-weight: bold;">${isSel ? "● " : "○ "}${m.label}</div>
+                    <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">${m.desc}</div>
+                </div>
+            `;
+            btn.addEventListener("click", () => {
+                if (!canEditAutoLoad) return;
                 modStorage.inspector.autoLoadMode = m.mode;
                 saveStorage();
                 syncStorage();
                 this.renderTabContent();
             });
-            autoRow.appendChild(b);
+            autoRow.appendChild(btn);
         });
+
         autoLoadSection.appendChild(autoRow);
+
+        if (!canEditAutoLoad) {
+            const lockMsg = document.createElement("div");
+            lockMsg.style.cssText = "color: #ef5350; font-size: 12px; margin-top: 10px; font-weight: bold;";
+            lockMsg.textContent = "🔒 Auto-Load modification is restricted by your Owner / Mistress.";
+            autoLoadSection.appendChild(lockMsg);
+        }
+
         container.appendChild(autoLoadSection);
 
-        // 4. View Permissions
-        const permSection = document.createElement("div");
-        permSection.style.cssText = "margin-top: 10px;";
-        permSection.innerHTML = "<div style='font-size: 15px; font-weight: bold; margin-bottom: 8px;'>Who May Inspect Your Loaded Addons:</div>";
-        const perms: { perm: InspectViewPermission; label: string }[] = [
-            { perm: "Prompt", label: "Prompt Me (Recommended)" },
-            { perm: "Owner", label: "Owner Only" },
-            { perm: "Lovers", label: "Owner & Lovers" },
-            { perm: "Whitelist", label: "Whitelist / Friends" },
-            { perm: "Anyone", label: "Anyone in Room" },
-            { perm: "Disabled", label: "Disabled (Nobody)" }
-        ];
-        const permRow = document.createElement("div");
-        permRow.style.cssText = "display: flex; flex-wrap: wrap; gap: 10px;";
-        perms.forEach(p => {
-            const isSel = modStorage.inspector.viewPermission === p.perm;
-            const b = document.createElement("button");
-            b.textContent = `${isSel ? "● " : "○ "}${p.label}`;
-            b.style.cssText = `padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; background: ${isSel ? "#1976d2" : "rgba(45, 55, 75, 0.8)"}; border: 1px solid ${isSel ? "#42a5f5" : "#666"}; color: ${isSel ? "white" : "#ccc"};`;
-            b.addEventListener("click", () => {
-                modStorage.inspector.viewPermission = p.perm;
-                saveStorage();
-                syncStorage();
-                this.renderTabContent();
-            });
-            permRow.appendChild(b);
-        });
-        permSection.appendChild(permRow);
-        container.appendChild(permSection);
+        // 2. Authority & Permissions Summary Card
+        const authSection = document.createElement("div");
+        authSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 18px;";
+        authSection.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
+                Authority & Addon Policy Settings
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 14px;">
+                Addon inspection permissions, mandatory/forbidden rule enforcement, and Owner/Mistress lists are managed in the Authority system.
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; background: rgba(20, 26, 38, 0.6); padding: 12px 16px; border-radius: 6px; border: 1px solid rgba(80, 100, 140, 0.3); margin-bottom: 16px;">
+                <div><span style="color: #90a4ae;">Inspect Addons:</span> <b>${ACCESS_LEVEL_NAMES[modStorage.authority.permissions.inspect_view_addons?.min ?? AccessLevel.public]}</b></div>
+                <div><span style="color: #90a4ae;">Lock Mandatory Rules:</span> <b>${ACCESS_LEVEL_NAMES[modStorage.authority.permissions.rules_lock_mandatory?.min ?? AccessLevel.owner]}</b></div>
+                <div><span style="color: #90a4ae;">Lock Forbidden Rules:</span> <b>${ACCESS_LEVEL_NAMES[modStorage.authority.permissions.rules_lock_forbidden?.min ?? AccessLevel.owner]}</b></div>
+                <div><span style="color: #90a4ae;">Remove / Reset Rules:</span> <b>${ACCESS_LEVEL_NAMES[modStorage.authority.permissions.rules_remove_rules?.min ?? AccessLevel.owner]}</b></div>
+            </div>
+        `;
 
+        const openAuthBtn = document.createElement("button");
+        openAuthBtn.textContent = "🛡️ Open Authority & Role Management Subscreen";
+        openAuthBtn.style.cssText = `
+            padding: 12px 24px;
+            background: #1976d2;
+            border: 1px solid #42a5f5;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        `;
+        openAuthBtn.addEventListener("click", () => {
+            this.cleanup();
+            setSubscreen(new AuthoritySubscreen());
+        });
+        authSection.appendChild(openAuthBtn);
+
+        container.appendChild(authSection);
         this.contentArea.appendChild(container);
     }
 

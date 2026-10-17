@@ -3,7 +3,66 @@ import { version } from "../../package.json";
 
 declare const LZString: any;
 
-export type InspectViewPermission = "Owner" | "Lovers" | "Whitelist" | "Prompt" | "Anyone" | "Disabled";
+export enum AccessLevel {
+    self = 0,
+    clubowner = 1,
+    owner = 2,
+    lover = 3,
+    mistress = 4,
+    whitelist = 5,
+    friend = 6,
+    public = 7,
+}
+
+export const ACCESS_LEVEL_NAMES: Record<AccessLevel, string> = {
+    [AccessLevel.self]: "Self",
+    [AccessLevel.clubowner]: "Clubowner",
+    [AccessLevel.owner]: "Owner",
+    [AccessLevel.lover]: "Lover",
+    [AccessLevel.mistress]: "Mistress",
+    [AccessLevel.whitelist]: "Whitelist",
+    [AccessLevel.friend]: "Friend",
+    [AccessLevel.public]: "Public"
+};
+
+export type QoCPermission =
+    | "authority_edit_roles"         // Add/remove QoC Owners & Mistresses
+    | "authority_edit_min_role"      // Change lowest permitted role
+    | "authority_edit_self_access"   // Grant or revoke self-access
+    | "inspect_view_addons"          // Query and view active loaded addons
+    | "inspect_view_rules"           // Query and view active rules and compliance
+    | "rules_lock_mandatory"         // Set mandatory addon requirements
+    | "rules_lock_forbidden"         // Set forbidden addon bans
+    | "rules_remove_rules"           // Remove or clear active rules
+    | "rules_edit_autoload_mode"     // Change auto-load behavior (Silent vs Prompt)
+    | "rules_force_compliance"       // Force immediate compliance check & reload
+    | "menu_open_settings";          // Open and view QoC settings menu
+
+export interface PermissionSetting {
+    self: boolean;
+    min: AccessLevel;
+}
+
+export interface AuthorityData {
+    owners: number[];
+    mistresses: number[];
+    permissions: Record<QoCPermission, PermissionSetting>;
+}
+
+export const DEFAULT_PERMISSIONS: Record<QoCPermission, PermissionSetting> = {
+    authority_edit_roles: { self: true, min: AccessLevel.owner },
+    authority_edit_min_role: { self: true, min: AccessLevel.owner },
+    authority_edit_self_access: { self: true, min: AccessLevel.owner },
+    inspect_view_addons: { self: true, min: AccessLevel.public },
+    inspect_view_rules: { self: true, min: AccessLevel.whitelist },
+    rules_lock_mandatory: { self: true, min: AccessLevel.owner },
+    rules_lock_forbidden: { self: true, min: AccessLevel.owner },
+    rules_remove_rules: { self: true, min: AccessLevel.owner },
+    rules_edit_autoload_mode: { self: true, min: AccessLevel.owner },
+    rules_force_compliance: { self: true, min: AccessLevel.owner },
+    menu_open_settings: { self: true, min: AccessLevel.owner }
+};
+
 export type AutoLoadMode = "Silent" | "Prompt";
 
 export interface ModRule {
@@ -22,11 +81,9 @@ export interface QoCSettings {
         splitPercent: number; // 50 to 80 (graphic view percentage of canvas)
         showDivider: boolean; // whether to show the in-room drag handle
     };
+    authority: AuthorityData;
     inspector: {
         enabled: boolean;
-        viewPermission: InspectViewPermission;
-        allowOwnerRules: boolean;
-        allowLoversRules: boolean;
         autoLoadMode: AutoLoadMode;
         rules: ModRule[];
     };
@@ -40,11 +97,13 @@ const DEFAULT_SETTINGS: QoCSettings = {
         splitPercent: DEFAULT_SPLIT_PERCENT,
         showDivider: true
     },
+    authority: {
+        owners: [],
+        mistresses: [],
+        permissions: structuredClone(DEFAULT_PERMISSIONS)
+    },
     inspector: {
         enabled: true,
-        viewPermission: "Prompt",
-        allowOwnerRules: true,
-        allowLoversRules: false,
         autoLoadMode: "Prompt",
         rules: []
     },
@@ -91,6 +150,14 @@ export function loadStorage(): void {
             chatResizer: {
                 ...DEFAULT_SETTINGS.chatResizer,
                 ...(loadedData.chatResizer || {})
+            },
+            authority: {
+                owners: Array.isArray(loadedData.authority?.owners) ? loadedData.authority.owners : [],
+                mistresses: Array.isArray(loadedData.authority?.mistresses) ? loadedData.authority.mistresses : [],
+                permissions: {
+                    ...DEFAULT_PERMISSIONS,
+                    ...(loadedData.authority?.permissions || {})
+                }
             },
             inspector: {
                 ...DEFAULT_SETTINGS.inspector,

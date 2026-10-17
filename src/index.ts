@@ -46,7 +46,7 @@ export function initializeQoC(): void {
 }
 
 import { ChatResizerSubscreen } from "./subscreens/chatResizerSubscreen";
-import { AddonPolicySubscreen } from "./subscreens/addonPolicySubscreen";
+import { AuthoritySubscreen } from "./subscreens/authoritySubscreen";
 
 // Bootstrap with zois-core
 bootstrap({
@@ -58,7 +58,7 @@ bootstrap({
     subscreens: {
         MainSubscreen,
         ChatResizerSubscreen,
-        AddonPolicySubscreen,
+        AuthoritySubscreen,
         InspectorSubscreen
     },
     onReady: initializeQoC
