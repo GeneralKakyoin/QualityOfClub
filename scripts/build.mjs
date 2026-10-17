@@ -37,51 +37,41 @@ await build({
     process.exit(1);
 });
 
-// Read the generated bundle
-const bundleContent = fs.readFileSync("./dist/bundle.js", "utf-8");
-
-// Generate self-contained Tampermonkey/Violentmonkey userscript
-const userScriptHeader = `// ==UserScript==
-// @name         Quality of Club
-// @namespace    https://www.bondageprojects.com/
-// @version      1.0.0
-// @description  Quality-of-life enhancements for Bondage Club (Chat Resizer and more)
-// @author       Matti
-// @match        https://bondageprojects.elementfx.com/*
-// @match        https://www.bondageprojects.elementfx.com/*
-// @match        https://bondage-europe.com/*
-// @match        https://www.bondage-europe.com/*
-// @match        https://bondageprojects.com/*
-// @match        https://www.bondageprojects.com/*
-// @match        http://localhost:*/*
-// @run-at       document-end
-// @grant        none
+// Generate standard FurryZoi-style userscript loader
+const userScript = `// ==UserScript==
+// @name Quality of Club
+// @namespace https://www.bondageprojects.com/
+// @version 1.0.0
+// @description Quality of life improvements for Bondage Club
+// @author Matti
+// @match *://*.bondageprojects.elementfx.com/*
+// @match *://bondageprojects.elementfx.com/*
+// @match *://*.bondage-europe.com/*
+// @match *://bondage-europe.com/*
+// @match *://*.bondageeurope.com/*
+// @match *://bondageeurope.com/*
+// @match *://*.bondageprojects.com/*
+// @match *://bondageprojects.com/*
+// @include /^https?:\\/\\/[^\\/]*bondage[^\\/]*\\/.*$/
+// @run-at document-end
+// @grant none
 // ==/UserScript==
 
-(function () {
-    'use strict';
-    function launchQoC() {
-        if (typeof window.bcModSdk !== "undefined" || typeof window.CommonDraw !== "undefined" || typeof window.ServerSend !== "undefined" || typeof window.Player !== "undefined") {
-            try {
-${bundleContent}
-            } catch (e) {
-                console.error("[Quality of Club] Startup error:", e);
-            }
-        } else {
-            setTimeout(launchQoC, 400);
-        }
-    }
-    launchQoC();
-})();
+setTimeout(function () {
+    let n = document.createElement("script");
+    n.setAttribute("language", "JavaScript");
+    n.setAttribute("crossorigin", "anonymous");
+    n.setAttribute("src", "https://generalkakyoin.github.io/QualityOfClub/bundle.js");
+    n.onload = () => n.remove();
+    document.head.appendChild(n);
+}, 1000);
 `;
 
-fs.writeFileSync("./dist/QualityOfClub.user.js", userScriptHeader, "utf-8");
+fs.writeFileSync("./dist/QualityOfClub.user.js", userScript, "utf-8");
 
-// Generate one-line bookmarklet
-const bookmarkletCode = `javascript:(function(){${encodeURIComponent(
-    `function launchQoC(){if(typeof window.bcModSdk!=="undefined"||typeof window.CommonDraw!=="undefined"||typeof window.ServerSend!=="undefined"){${bundleContent}}else{setTimeout(launchQoC,400);}}launchQoC();`
-)}})();`;
-fs.writeFileSync("./dist/QualityOfClub.bookmark.txt", bookmarkletCode, "utf-8");
+// Generate bookmarklet
+const bookmarklet = `javascript:(function(){let n=document.createElement("script");n.setAttribute("language","JavaScript");n.setAttribute("crossorigin","anonymous");n.setAttribute("src","https://generalkakyoin.github.io/QualityOfClub/bundle.js");n.onload=()=>n.remove();document.head.appendChild(n);})();`;
+fs.writeFileSync("./dist/QualityOfClub.bookmark.txt", bookmarklet, "utf-8");
 
 console.log(chalk.green("Build completed successfully:\n"));
 const files = fs.readdirSync("dist", { recursive: true, withFileTypes: true });
