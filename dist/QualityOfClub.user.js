@@ -1,18 +1,20 @@
 // ==UserScript==
 // @name Quality of Club
 // @namespace https://www.bondageprojects.com/
-// @version 1.0.0
+// @version 1.0.1
 // @description Quality of life improvements for Bondage Club
 // @author Matti
-// @match *://*.bondageprojects.elementfx.com/*
-// @match *://bondageprojects.elementfx.com/*
-// @match *://*.bondage-europe.com/*
-// @match *://bondage-europe.com/*
 // @match *://*.bondageeurope.com/*
 // @match *://bondageeurope.com/*
+// @match *://*.bondage-europe.com/*
+// @match *://bondage-europe.com/*
 // @match *://*.bondageprojects.com/*
 // @match *://bondageprojects.com/*
-// @include /^https?:\/\/[^\/]*bondage[^\/]*\/.*$/
+// @match *://*.bondageprojects.elementfx.com/*
+// @match *://bondageprojects.elementfx.com/*
+// @match https://www.bondageeurope.com/*
+// @match https://www.bondageeurope.com/R*/*
+// @include *://*bondage*/*
 // @run-at document-end
 // @grant none
 // ==/UserScript==
