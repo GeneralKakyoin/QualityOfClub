@@ -1,0 +1,33 @@
+{
+  "name": "quality-of-club",
+  "version": "1.0.12",
+  "description": "Quality of Club (QoC) - Quality of life improvements for Bondage Club",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "build:dev": "node ./scripts/build.mjs --dev"
+  },
+  "keywords": [
+    "bondage-club",
+    "fusam",
+    "quality-of-life"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bc-stubs": "132.0.0",
+    "lucide": "^1.29.0",
+    "reflect-metadata": "^0.2.2",
+    "zois-core": "^2.2.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "chalk": "^5.4.1",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.8.2"
+  }
+}
