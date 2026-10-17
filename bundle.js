@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.4";
+  var version2 = "1.0.5";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -7198,43 +7198,125 @@ One of mods you are using is using an old version of SDK. It will work for now b
     return false;
   }
   function initNetworkSync() {
-    messagesManager.onRequest("qoc_inspect", async (data, sender, senderName) => {
-      const senderId = typeof sender === "number" ? sender : sender.MemberNumber ?? -1;
-      const permCheck = await canSenderInspect(senderId, senderName);
-      if (!permCheck.allowed) {
-        return {
-          allowed: false,
-          reason: permCheck.reason
-        };
+    hookFunction("ChatRoomMessage", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+      const msg = args[0];
+      if (!msg || msg.Content !== MOD_KEY || !msg.Dictionary) {
+        return next(args);
       }
-      return {
-        allowed: true,
-        mods: getLoadedMods(),
-        rules: modStorage.inspector.rules,
-        version: version2
-      };
+      const dict = msg.Dictionary;
+      const dictMsg = dict?.msg;
+      const dictData = dict?.data;
+      if (dictMsg === "request" && dictData && typeof dictData.requestId === "string") {
+        const senderId = msg.Sender;
+        if (typeof senderId !== "number") {
+          return next(args);
+        }
+        if (typeof Player !== "undefined" && senderId === Player.MemberNumber) {
+          return next(args);
+        }
+        const senderChar = typeof Character !== "undefined" && typeof Character.find === "function" ? Character.find((c) => c.MemberNumber === senderId) : null;
+        const senderName = senderChar?.Name || `Member #${senderId}`;
+        if (dictData.message === "qoc_inspect") {
+          const permCheck = await canSenderInspect(senderId, senderName);
+          const responseData = permCheck.allowed ? {
+            allowed: true,
+            mods: getLoadedMods(),
+            rules: modStorage.inspector.rules,
+            version: version2
+          } : {
+            allowed: false,
+            reason: permCheck.reason
+          };
+          messagesManager.sendPacket("requestResponse", {
+            requestId: dictData.requestId,
+            message: dictData.message,
+            data: responseData
+          }, senderId);
+          return;
+        }
+        if (dictData.message === "qoc_setRules") {
+          const authCheck = canSenderEnforceRules(senderId);
+          let responseData;
+          if (!authCheck.allowed) {
+            responseData = {
+              success: false,
+              reason: authCheck.reason
+            };
+          } else {
+            const newRules = Array.isArray(dictData.data?.rules) ? dictData.data.rules : [];
+            modStorage.inspector.rules = newRules;
+            syncStorage();
+            evaluateCompliance();
+            toastsManager.info({
+              title: `${MOD_NAME} Rules Updated`,
+              message: `Addon rules updated by ${senderName}.`,
+              duration: 5e3
+            });
+            responseData = { success: true };
+          }
+          messagesManager.sendPacket("requestResponse", {
+            requestId: dictData.requestId,
+            message: dictData.message,
+            data: responseData
+          }, senderId);
+          return;
+        }
+      }
+      return next(args);
     });
-    messagesManager.onRequest("qoc_setRules", (data, sender, senderName) => {
-      const senderId = typeof sender === "number" ? sender : sender.MemberNumber ?? -1;
-      const authCheck = canSenderEnforceRules(senderId);
-      if (!authCheck.allowed) {
-        return {
-          success: false,
-          reason: authCheck.reason
-        };
+    hookFunction("ServerAccountBeep", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+      const beep = args[0];
+      if (!beep || beep.BeepType !== "Leash") return next(args);
+      let data;
+      try {
+        data = JSON.parse(beep.Message);
+      } catch {
+        return next(args);
       }
-      const newRules = Array.isArray(data?.rules) ? data.rules : [];
-      modStorage.inspector.rules = newRules;
-      syncStorage();
-      evaluateCompliance();
-      toastsManager.info({
-        title: `${MOD_NAME} Rules Updated`,
-        message: `Addon rules updated by ${senderName || `Member #${senderId}`}.`,
-        duration: 5e3
-      });
-      return {
-        success: true
-      };
+      if (data && data.type === `${MOD_KEY}_request` && typeof data.requestId === "string") {
+        const senderId = beep.MemberNumber;
+        const senderName = beep.MemberName || `Member #${senderId}`;
+        if (data.message === "qoc_inspect") {
+          const permCheck = await canSenderInspect(senderId, senderName);
+          const responseData = permCheck.allowed ? {
+            allowed: true,
+            mods: getLoadedMods(),
+            rules: modStorage.inspector.rules,
+            version: version2
+          } : {
+            allowed: false,
+            reason: permCheck.reason
+          };
+          messagesManager.sendBeep({
+            type: `${MOD_KEY}_requestResponse`,
+            requestId: data.requestId,
+            message: data.message,
+            data: responseData
+          }, senderId);
+          return;
+        }
+        if (data.message === "qoc_setRules") {
+          const authCheck = canSenderEnforceRules(senderId);
+          let responseData;
+          if (!authCheck.allowed) {
+            responseData = { success: false, reason: authCheck.reason };
+          } else {
+            const newRules = Array.isArray(data.data?.rules) ? data.data.rules : [];
+            modStorage.inspector.rules = newRules;
+            syncStorage();
+            evaluateCompliance();
+            responseData = { success: true };
+          }
+          messagesManager.sendBeep({
+            type: `${MOD_KEY}_requestResponse`,
+            requestId: data.requestId,
+            message: data.message,
+            data: responseData
+          }, senderId);
+          return;
+        }
+      }
+      return next(args);
     });
     hookFunction("ChatRoomSync", HookPriority.OBSERVE, (args, next) => {
       const ret = next(args);
@@ -7244,11 +7326,21 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
   async function requestInspect(targetMemberNumber) {
     try {
-      const res = await messagesManager.sendRequest({
+      console.log(`[${MOD_NAME}] Sending qoc_inspect request to member #${targetMemberNumber}...`);
+      let res = await messagesManager.sendRequest({
         message: "qoc_inspect",
         target: targetMemberNumber,
         type: "packet"
       });
+      if (res.isError || !res.data) {
+        console.log(`[${MOD_NAME}] Packet request to #${targetMemberNumber} failed or timed out. Trying beep fallback...`);
+        res = await messagesManager.sendRequest({
+          message: "qoc_inspect",
+          target: targetMemberNumber,
+          type: "beep"
+        });
+      }
+      console.log(`[${MOD_NAME}] Inspection response from #${targetMemberNumber}:`, res);
       if (res.isError || !res.data) {
         return {
           success: false,
