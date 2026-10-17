@@ -6,7 +6,7 @@ import { modStorage, syncStorage, ModRule } from "./storage";
 import { DetectedMod, getLoadedMods } from "./modDetection";
 import { evaluateCompliance } from "./compliance";
 import { version } from "../../package.json";
-import { MOD_NAME } from "src/constants";
+import { MOD_NAME, MOD_KEY } from "src/constants";
 
 export interface InspectResponseData {
     allowed: boolean;
@@ -149,54 +149,146 @@ export function hasRuleAuthorityOver(target: Character | number): boolean {
  * Initializes network message handlers and room sync listeners.
  */
 export function initNetworkSync(): void {
-    // 1. Handle incoming inspection requests
-    messagesManager.onRequest("qoc_inspect", async (data: any, sender: Character | number, senderName?: string) => {
-        const senderId = typeof sender === "number" ? sender : (sender.MemberNumber ?? -1);
-        const permCheck = await canSenderInspect(senderId, senderName);
-
-        if (!permCheck.allowed) {
-            return {
-                allowed: false,
-                reason: permCheck.reason
-            };
+    // 1. Direct packet request listener for ChatRoomMessage (supports async permission checks & avoids zois-core unawaited Promise bug)
+    hookFunction("ChatRoomMessage", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+        const msg = args[0];
+        if (!msg || msg.Content !== MOD_KEY || !msg.Dictionary) {
+            return next(args);
         }
 
-        return {
-            allowed: true,
-            mods: getLoadedMods(),
-            rules: modStorage.inspector.rules,
-            version
-        };
+        const dict = msg.Dictionary as any;
+        const dictMsg = dict?.msg;
+        const dictData = dict?.data;
+
+        if (dictMsg === "request" && dictData && typeof dictData.requestId === "string") {
+            const senderId = msg.Sender;
+            if (typeof senderId !== "number") {
+                return next(args);
+            }
+            if (typeof Player !== "undefined" && senderId === Player.MemberNumber) {
+                return next(args);
+            }
+
+            const senderChar = typeof Character !== "undefined" && typeof Character.find === "function"
+                ? Character.find((c: Character) => c.MemberNumber === senderId)
+                : null;
+            const senderName = senderChar?.Name || `Member #${senderId}`;
+
+            if (dictData.message === "qoc_inspect") {
+                const permCheck = await canSenderInspect(senderId, senderName);
+                const responseData: InspectResponseData = permCheck.allowed ? {
+                    allowed: true,
+                    mods: getLoadedMods(),
+                    rules: modStorage.inspector.rules,
+                    version
+                } : {
+                    allowed: false,
+                    reason: permCheck.reason
+                };
+
+                messagesManager.sendPacket("requestResponse", {
+                    requestId: dictData.requestId,
+                    message: dictData.message,
+                    data: responseData
+                }, senderId);
+                return;
+            }
+
+            if (dictData.message === "qoc_setRules") {
+                const authCheck = canSenderEnforceRules(senderId);
+                let responseData: SetRulesResponseData;
+                if (!authCheck.allowed) {
+                    responseData = {
+                        success: false,
+                        reason: authCheck.reason
+                    };
+                } else {
+                    const newRules = Array.isArray(dictData.data?.rules) ? (dictData.data.rules as ModRule[]) : [];
+                    modStorage.inspector.rules = newRules;
+                    syncStorage();
+                    evaluateCompliance();
+
+                    toastsManager.info({
+                        title: `${MOD_NAME} Rules Updated`,
+                        message: `Addon rules updated by ${senderName}.`,
+                        duration: 5000
+                    });
+
+                    responseData = { success: true };
+                }
+
+                messagesManager.sendPacket("requestResponse", {
+                    requestId: dictData.requestId,
+                    message: dictData.message,
+                    data: responseData
+                }, senderId);
+                return;
+            }
+        }
+
+        return next(args);
     });
 
-    // 2. Handle incoming rule updates
-    messagesManager.onRequest("qoc_setRules", (data: any, sender: Character | number, senderName?: string) => {
-        const senderId = typeof sender === "number" ? sender : (sender.MemberNumber ?? -1);
-        const authCheck = canSenderEnforceRules(senderId);
-
-        if (!authCheck.allowed) {
-            return {
-                success: false,
-                reason: authCheck.reason
-            };
+    // 2. Direct beep request listener for ServerAccountBeep
+    hookFunction("ServerAccountBeep", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+        const beep = args[0];
+        if (!beep || beep.BeepType !== "Leash") return next(args);
+        let data: any;
+        try {
+            data = JSON.parse(beep.Message);
+        } catch {
+            return next(args);
         }
 
-        const newRules = Array.isArray(data?.rules) ? (data.rules as ModRule[]) : [];
-        modStorage.inspector.rules = newRules;
-        syncStorage();
+        if (data && data.type === `${MOD_KEY}_request` && typeof data.requestId === "string") {
+            const senderId = beep.MemberNumber;
+            const senderName = beep.MemberName || `Member #${senderId}`;
 
-        // Re-evaluate compliance immediately on the client
-        evaluateCompliance();
+            if (data.message === "qoc_inspect") {
+                const permCheck = await canSenderInspect(senderId, senderName);
+                const responseData: InspectResponseData = permCheck.allowed ? {
+                    allowed: true,
+                    mods: getLoadedMods(),
+                    rules: modStorage.inspector.rules,
+                    version
+                } : {
+                    allowed: false,
+                    reason: permCheck.reason
+                };
 
-        toastsManager.info({
-            title: `${MOD_NAME} Rules Updated`,
-            message: `Addon rules updated by ${senderName || `Member #${senderId}`}.`,
-            duration: 5000
-        });
+                messagesManager.sendBeep({
+                    type: `${MOD_KEY}_requestResponse`,
+                    requestId: data.requestId,
+                    message: data.message,
+                    data: responseData
+                }, senderId);
+                return;
+            }
 
-        return {
-            success: true
-        };
+            if (data.message === "qoc_setRules") {
+                const authCheck = canSenderEnforceRules(senderId);
+                let responseData: SetRulesResponseData;
+                if (!authCheck.allowed) {
+                    responseData = { success: false, reason: authCheck.reason };
+                } else {
+                    const newRules = Array.isArray(data.data?.rules) ? (data.data.rules as ModRule[]) : [];
+                    modStorage.inspector.rules = newRules;
+                    syncStorage();
+                    evaluateCompliance();
+                    responseData = { success: true };
+                }
+
+                messagesManager.sendBeep({
+                    type: `${MOD_KEY}_requestResponse`,
+                    requestId: data.requestId,
+                    message: data.message,
+                    data: responseData
+                }, senderId);
+                return;
+            }
+        }
+
+        return next(args);
     });
 
     // 3. Periodic / room sync hook for compliance
@@ -212,11 +304,23 @@ export function initNetworkSync(): void {
  */
 export async function requestInspect(targetMemberNumber: number): Promise<{ success: boolean; data?: InspectResponseData; error?: string }> {
     try {
-        const res = await messagesManager.sendRequest<InspectResponseData>({
+        console.log(`[${MOD_NAME}] Sending qoc_inspect request to member #${targetMemberNumber}...`);
+        let res = await messagesManager.sendRequest<InspectResponseData>({
             message: "qoc_inspect",
             target: targetMemberNumber,
             type: "packet"
         });
+
+        if (res.isError || !res.data) {
+            console.log(`[${MOD_NAME}] Packet request to #${targetMemberNumber} failed or timed out. Trying beep fallback...`);
+            res = await messagesManager.sendRequest<InspectResponseData>({
+                message: "qoc_inspect",
+                target: targetMemberNumber,
+                type: "beep"
+            });
+        }
+
+        console.log(`[${MOD_NAME}] Inspection response from #${targetMemberNumber}:`, res);
 
         if (res.isError || !res.data) {
             return {
