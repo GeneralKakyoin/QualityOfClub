@@ -1732,6 +1732,21 @@ One of mods you are using is using an old version of SDK. It will work for now b
     ["path", { d: "M8 7h6" }]
   ];
 
+  // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/bug.mjs
+  var Bug = [
+    ["path", { d: "M12 20v-9" }],
+    ["path", { d: "M14 7a4 4 0 0 1 4 4v3a6 6 0 0 1-12 0v-3a4 4 0 0 1 4-4z" }],
+    ["path", { d: "M14.12 3.88 16 2" }],
+    ["path", { d: "M21 21a4 4 0 0 0-3.81-4" }],
+    ["path", { d: "M21 5a4 4 0 0 1-3.55 3.97" }],
+    ["path", { d: "M22 13h-4" }],
+    ["path", { d: "M3 21a4 4 0 0 1 3.81-4" }],
+    ["path", { d: "M3 5a4 4 0 0 0 3.55 3.97" }],
+    ["path", { d: "M6 13H2" }],
+    ["path", { d: "m8 2 1.88 1.88" }],
+    ["path", { d: "M9 7.13V6a3 3 0 1 1 6 0v1.13" }]
+  ];
+
   // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/check.mjs
   var Check = [["path", { d: "M20 6 9 17l-5-5" }]];
 
@@ -1758,11 +1773,26 @@ One of mods you are using is using an old version of SDK. It will work for now b
     ["path", { d: "m9 9 6 6" }]
   ];
 
+  // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/code-xml.mjs
+  var CodeXml = [
+    ["path", { d: "m18 16 4-4-4-4" }],
+    ["path", { d: "m6 8-4 4 4 4" }],
+    ["path", { d: "m14.5 4-5 16" }]
+  ];
+
   // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/external-link.mjs
   var ExternalLink = [
     ["path", { d: "M15 3h6v6" }],
     ["path", { d: "M10 14 21 3" }],
     ["path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }]
+  ];
+
+  // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/git-pull-request.mjs
+  var GitPullRequest = [
+    ["circle", { cx: "18", cy: "18", r: "3" }],
+    ["circle", { cx: "6", cy: "6", r: "3" }],
+    ["path", { d: "M13 6h3a2 2 0 0 1 2 2v7" }],
+    ["line", { x1: "6", x2: "6", y1: "9", y2: "21" }]
   ];
 
   // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/info.mjs
@@ -1776,6 +1806,23 @@ One of mods you are using is using an old version of SDK. It will work for now b
   var RotateCcw = [
     ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }],
     ["path", { d: "M3 3v5h5" }]
+  ];
+
+  // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/search.mjs
+  var Search = [
+    ["path", { d: "m21 21-4.34-4.34" }],
+    ["circle", { cx: "11", cy: "11", r: "8" }]
+  ];
+
+  // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/shield-check.mjs
+  var ShieldCheck = [
+    [
+      "path",
+      {
+        d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+      }
+    ],
+    ["path", { d: "m9 12 2 2 4-4" }]
   ];
 
   // node_modules/.pnpm/lucide@1.58.0/node_modules/lucide/dist/esm/icons/sliders-vertical.mjs
@@ -4212,6 +4259,12 @@ One of mods you are using is using an old version of SDK. It will work for now b
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
+  function getPlayer(value) {
+    if (!value) return null;
+    return ChatRoomCharacter.find((Character2) => {
+      return Character2.MemberNumber == value || Character2.Name.toLowerCase() === value || Character2.Nickname?.toLowerCase() === value;
+    }) ?? null;
+  }
 
   // package.json
   var version2 = "1.0.0";
@@ -4220,7 +4273,6 @@ One of mods you are using is using an old version of SDK. It will work for now b
   var MOD_NAME = "Quality of Club";
   var MOD_FULL_NAME = "Quality of Club (QoC)";
   var MOD_KEY = "QoC";
-  var MOD_VERSION = "1.0.0";
   var MOD_REPOSITORY = "https://github.com/GeneralKakyoin/QualityOfClub";
   var STORAGE_KEY = "QOC_SETTINGS";
   var CANVAS_WIDTH = 2e3;
@@ -4228,36 +4280,71 @@ One of mods you are using is using an old version of SDK. It will work for now b
   var DEFAULT_SPLIT_PERCENT = 50;
   var MIN_SPLIT_PERCENT = 50;
   var MAX_SPLIT_PERCENT = 80;
+  var PROFILE_BUTTON_POSITION = [1700, 790, 90, 90];
+  var EXTENSION_SETTINGS_KEY = "QOC";
 
   // src/modules/storage.ts
   var DEFAULT_SETTINGS = {
     version: version2,
     chatResizer: {
-      enabled: true,
+      enabled: false,
       splitPercent: DEFAULT_SPLIT_PERCENT,
       showDivider: true
-    }
+    },
+    inspector: {
+      enabled: true,
+      viewPermission: "Prompt",
+      allowOwnerRules: true,
+      allowLoversRules: false,
+      autoLoadMode: "Prompt",
+      rules: []
+    },
+    managedRules: {}
   };
   var modStorage = structuredClone(DEFAULT_SETTINGS);
   function loadStorage() {
+    let loadedData = null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        modStorage = {
-          ...DEFAULT_SETTINGS,
-          ...parsed,
-          chatResizer: {
-            ...DEFAULT_SETTINGS.chatResizer,
-            ...parsed.chatResizer || {}
+      if (typeof Player !== "undefined" && Player.ExtensionSettings && Player.ExtensionSettings[EXTENSION_SETTINGS_KEY]) {
+        const rawCompressed = Player.ExtensionSettings[EXTENSION_SETTINGS_KEY];
+        if (typeof rawCompressed === "string" && typeof LZString !== "undefined") {
+          const decompressed = LZString.decompressFromBase64(rawCompressed);
+          if (decompressed) {
+            loadedData = JSON.parse(decompressed);
           }
-        };
-        return;
+        }
       }
     } catch (e) {
-      console.warn("[QoC] Failed to load settings from localStorage, using defaults", e);
+      console.warn("[QoC] Failed to decompress server ExtensionSettings, falling back to localStorage", e);
     }
-    modStorage = structuredClone(DEFAULT_SETTINGS);
+    if (!loadedData) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          loadedData = JSON.parse(raw);
+        }
+      } catch (e) {
+        console.warn("[QoC] Failed to load settings from localStorage", e);
+      }
+    }
+    if (loadedData) {
+      modStorage = {
+        ...DEFAULT_SETTINGS,
+        ...loadedData,
+        chatResizer: {
+          ...DEFAULT_SETTINGS.chatResizer,
+          ...loadedData.chatResizer || {}
+        },
+        inspector: {
+          ...DEFAULT_SETTINGS.inspector,
+          ...loadedData.inspector || {},
+          rules: Array.isArray(loadedData.inspector?.rules) ? loadedData.inspector.rules : []
+        },
+        managedRules: loadedData.managedRules || {}
+      };
+    } else {
+      modStorage = structuredClone(DEFAULT_SETTINGS);
+    }
   }
   function saveStorage() {
     try {
@@ -4265,6 +4352,19 @@ One of mods you are using is using an old version of SDK. It will work for now b
     } catch (e) {
       console.error("[QoC] Failed to save settings to localStorage", e);
     }
+    try {
+      if (typeof Player !== "undefined" && Player.ExtensionSettings && typeof LZString !== "undefined") {
+        Player.ExtensionSettings[EXTENSION_SETTINGS_KEY] = LZString.compressToBase64(JSON.stringify(modStorage));
+        if (typeof ServerPlayerExtensionSettingsSync === "function") {
+          ServerPlayerExtensionSettingsSync(EXTENSION_SETTINGS_KEY);
+        }
+      }
+    } catch (e) {
+      console.warn("[QoC] Failed to sync settings to BC ServerPlayerExtensionSettingsSync", e);
+    }
+  }
+  function syncStorage() {
+    saveStorage();
   }
 
   // src/modules/chatResizer.ts
@@ -4533,48 +4633,23 @@ One of mods you are using is using an old version of SDK. It will work for now b
     });
   }
 
-  // src/subscreens/mainSubscreen.ts
-  var MainSubscreen2 = class extends BaseSubscreen {
+  // src/subscreens/chatResizerSubscreen.ts
+  var ChatResizerSubscreen = class extends BaseSubscreen {
     sliderContainer = null;
     sliderInput = null;
     sliderValueLabel = null;
     get name() {
-      return `${MOD_NAME} (v${MOD_VERSION})`;
+      return "Chat Window Resizer";
+    }
+    onRun() {
+      DrawRect(0, 0, 2e3, 1e3, "#191f2b");
     }
     onLoad() {
-      this.createTabs({
-        x: 100,
-        y: 130,
-        width: 1800,
-        currentTabName: "Interface",
-        tabs: [
-          {
-            name: "Interface",
-            load: () => this.loadInterfaceTab(),
-            unload: () => this.unloadInterfaceTab()
-          }
-        ]
-      });
-    }
-    onExit() {
-      this.unloadInterfaceTab();
-      setSubscreen(null);
-      if (typeof PreferenceSubscreenExtensionsClear === "function") {
-        try {
-          PreferenceSubscreenExtensionsClear();
-        } catch (e) {
-          console.warn("[QoC] Error clearing extension screen", e);
-        }
-      } else if (typeof PreferenceOpenSubscreen === "function") {
-        PreferenceOpenSubscreen("Extensions");
-      }
-    }
-    loadInterfaceTab() {
       this.createCheckbox({
         x: 120,
-        y: 220,
+        y: 200,
         width: 800,
-        height: 45,
+        height: 48,
         text: "Enable Chat Window Resizer",
         isChecked: modStorage.chatResizer.enabled,
         tooltip: {
@@ -4589,14 +4664,14 @@ One of mods you are using is using an old version of SDK. It will work for now b
       });
       this.createCheckbox({
         x: 120,
-        y: 280,
+        y: 265,
         width: 800,
-        height: 45,
+        height: 48,
         text: "Show Draggable Divider in Chatrooms",
         isChecked: modStorage.chatResizer.showDivider,
         tooltip: {
           position: "right",
-          text: "Shows an interactive vertical line between the canvas and chat to drag-resize directly."
+          text: "Shows an interactive vertical line between canvas and chat to drag-resize directly."
         },
         onChange: () => {
           modStorage.chatResizer.showDivider = !modStorage.chatResizer.showDivider;
@@ -4606,7 +4681,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
       });
       this.createText({
         x: 120,
-        y: 355,
+        y: 350,
         fontSize: 4,
         text: "Graphic View Size Proportions"
       });
@@ -4642,11 +4717,14 @@ One of mods you are using is using an old version of SDK. It will work for now b
         x: 120,
         y: 720,
         fontSize: 3,
-        text: "Tip: In any chatroom, drag the vertical line between the canvas and chat to resize live! Double-click the line to reset to 50/50."
+        text: "Tip: When enabled, drag the vertical divider line in chatrooms to resize live! Double-click to reset to 50/50."
       });
-      hint.style.color = "#777";
+      hint.style.color = "#8fa0b5";
     }
-    unloadInterfaceTab() {
+    onExit() {
+      this.cleanup();
+    }
+    cleanup() {
       if (this.sliderContainer) {
         this.sliderContainer.remove();
         this.sliderContainer = null;
@@ -4655,9 +4733,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
       this.sliderValueLabel = null;
     }
     createSliderControl(x, y) {
-      if (this.sliderContainer) {
-        this.sliderContainer.remove();
-      }
+      this.cleanup();
       const container = document.createElement("div");
       Object.assign(container.style, {
         position: "fixed",
@@ -4686,7 +4762,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
         minWidth: "220px",
         fontWeight: "bold",
         fontSize: "calc(2.5px * var(--size-unit, 4px))",
-        color: "var(--tmd-text, black)"
+        color: "var(--tmd-text, white)"
       });
       slider.addEventListener("input", () => {
         const val = Number(slider.value);
@@ -4711,6 +4787,3352 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
   };
 
+  // src/modules/modDetection.ts
+  var CURATED_MOD_CATALOG = {
+    BCX: {
+      id: "BCX",
+      name: "Bondage Club Extended (BCX)",
+      description: "Rules, curses, statistics, extended room tools",
+      scriptUrl: "https://jomshir98.github.io/bondage-club-extended/bcx.js",
+      detectKeys: ["bcx", "bondage club extended", "bondage-club-extended"]
+    },
+    LSCG: {
+      id: "LSCG",
+      name: "Littlish Club (LSCG)",
+      description: "Little Sister's Club overhaul & dynamics",
+      scriptUrl: "https://furryzoi.github.io/Littlish-Club/bundle.js",
+      detectKeys: ["lscg", "littlish club", "littlish-club"]
+    },
+    BCT: {
+      id: "BCT",
+      name: "Bondage Club Tools (BCT)",
+      description: "Inventory searching, poses, quick actions",
+      scriptUrl: "https://sidiousious.gitlab.io/bct/bundle.js",
+      detectKeys: ["bct", "bondage club tools"]
+    },
+    DOGS: {
+      id: "DOGS",
+      name: "Devious-Obligate-Great-Stuff (DOGS)",
+      description: "Devious padlocks, remote controls, timers",
+      scriptUrl: "https://furryzoi.github.io/Devious-Obligate-Great-Stuff/bundle.js",
+      detectKeys: ["dogs", "devious-obligate-great-stuff", "devious obligate great stuff"]
+    },
+    ClubChaos: {
+      id: "ClubChaos",
+      name: "Club Chaos",
+      description: "Interactive chaos curses & toys",
+      scriptUrl: "https://sidiousious.gitlab.io/bc-chaos/bundle.js",
+      detectKeys: ["clubchaos", "club chaos"]
+    }
+  };
+  function getLoadedMods() {
+    const modsMap = /* @__PURE__ */ new Map();
+    try {
+      const modSdk2 = window.bcModSdk;
+      if (modSdk2 && typeof modSdk2.getModsInfo === "function") {
+        const list = modSdk2.getModsInfo();
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            if (!item) continue;
+            const name = item.name || item.fullName || "Unknown Mod";
+            const key = name.toLowerCase().trim();
+            modsMap.set(key, {
+              id: item.name || key,
+              name: item.name || name,
+              fullName: item.fullName || name,
+              version: item.version || "Unknown",
+              repository: item.repository
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[QoC] Error reading bcModSdk mods info:", e);
+    }
+    const win = window;
+    if (win.bcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
+      modsMap.set("bcx", {
+        id: "BCX",
+        name: "Bondage Club Extended (BCX)",
+        version: win.bcx.version || "Active"
+      });
+    }
+    if (win.LITTLISH_CLUB && !modsMap.has("lscg") && !modsMap.has("littlish club")) {
+      modsMap.set("lscg", {
+        id: "LSCG",
+        name: "Littlish Club (LSCG)",
+        version: "Active"
+      });
+    }
+    if (win.BCT && !modsMap.has("bct") && !modsMap.has("bondage club tools")) {
+      modsMap.set("bct", {
+        id: "BCT",
+        name: "Bondage Club Tools",
+        version: win.BCT.version || "Active"
+      });
+    }
+    if (win.DOGS && !modsMap.has("dogs") && !modsMap.has("devious-obligate-great-stuff")) {
+      modsMap.set("dogs", {
+        id: "DOGS",
+        name: "Devious-Obligate-Great-Stuff (DOGS)",
+        version: "Active"
+      });
+    }
+    if (win.ClubChaos && !modsMap.has("clubchaos") && !modsMap.has("club chaos")) {
+      modsMap.set("clubchaos", {
+        id: "ClubChaos",
+        name: "Club Chaos",
+        version: "Active"
+      });
+    }
+    if (win.FUSAM && !modsMap.has("fusam")) {
+      modsMap.set("fusam", {
+        id: "FUSAM",
+        name: "FUSAM",
+        version: "Active"
+      });
+    }
+    return Array.from(modsMap.values());
+  }
+  function isModLoaded(identifier) {
+    if (!identifier) return false;
+    const target = identifier.toLowerCase().trim();
+    const loaded = getLoadedMods();
+    for (const mod of loaded) {
+      const modName = mod.name.toLowerCase();
+      const modId = mod.id.toLowerCase();
+      const modFull = (mod.fullName || "").toLowerCase();
+      if (modName === target || modId === target || modFull === target) {
+        return true;
+      }
+      const curated = CURATED_MOD_CATALOG[identifier] || Object.values(CURATED_MOD_CATALOG).find((c) => c.id.toLowerCase() === target || c.name.toLowerCase() === target);
+      if (curated) {
+        for (const key of curated.detectKeys) {
+          if (modName.includes(key) || modId.includes(key) || modFull.includes(key)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+  function loadCuratedMod(catalogId) {
+    const mod = CURATED_MOD_CATALOG[catalogId];
+    if (!mod) {
+      console.warn(`[QoC] Cannot auto-load unverified mod '${catalogId}'. Only curated catalog mods can be auto-loaded.`);
+      return Promise.resolve(false);
+    }
+    if (isModLoaded(catalogId)) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      try {
+        console.log(`[QoC] Injecting verified mod script for ${mod.name}: ${mod.scriptUrl}`);
+        const script = document.createElement("script");
+        script.src = mod.scriptUrl;
+        script.async = true;
+        script.onload = () => {
+          console.log(`[QoC] Successfully loaded ${mod.name}`);
+          resolve(true);
+        };
+        script.onerror = (err) => {
+          console.error(`[QoC] Failed to load ${mod.name}:`, err);
+          resolve(false);
+        };
+        document.head.appendChild(script);
+      } catch (e) {
+        console.error(`[QoC] Error injecting script for ${mod.name}:`, e);
+        resolve(false);
+      }
+    });
+  }
+
+  // src/modules/compliance.ts
+  var isEvaluating = false;
+  var promptedMods = /* @__PURE__ */ new Set();
+  function checkComplianceAgainstRules(mods, rules) {
+    const missing = [];
+    const forbidden = [];
+    const isLoadedInList = (idOrName) => {
+      const target = idOrName.toLowerCase().trim();
+      return mods.some((m) => {
+        const mId = m.id.toLowerCase();
+        const mName = m.name.toLowerCase();
+        const mFull = (m.fullName || "").toLowerCase();
+        return mId === target || mName === target || mFull === target;
+      });
+    };
+    for (const rule of rules) {
+      const loaded = isLoadedInList(rule.modId) || isLoadedInList(rule.modName);
+      if (rule.type === "required" && !loaded) {
+        missing.push(rule);
+      } else if (rule.type === "forbidden" && loaded) {
+        forbidden.push(rule);
+      }
+    }
+    return {
+      isCompliant: missing.length === 0 && forbidden.length === 0,
+      missing,
+      forbidden
+    };
+  }
+  async function evaluateCompliance() {
+    if (isEvaluating || !modStorage.inspector.enabled) {
+      return { isCompliant: true, missingRequired: [], detectedForbidden: [] };
+    }
+    isEvaluating = true;
+    const missingRequired = [];
+    const detectedForbidden = [];
+    try {
+      const rules = modStorage.inspector.rules;
+      if (!rules || rules.length === 0) {
+        return { isCompliant: true, missingRequired: [], detectedForbidden: [] };
+      }
+      for (const rule of rules) {
+        const loaded = isModLoaded(rule.modId) || isModLoaded(rule.modName);
+        if (rule.type === "required" && !loaded) {
+          missingRequired.push(rule);
+          const isCurated = !!CURATED_MOD_CATALOG[rule.modId];
+          if (modStorage.inspector.autoLoadMode === "Silent" && isCurated) {
+            toastsManager.info({
+              title: `${MOD_NAME} Auto-Loader`,
+              message: `Auto-loading required addon: ${rule.modName}...`,
+              duration: 3500
+            });
+            await loadCuratedMod(rule.modId);
+          } else if (modStorage.inspector.autoLoadMode === "Prompt" && isCurated) {
+            if (!promptedMods.has(rule.modId)) {
+              promptedMods.add(rule.modId);
+              dialogsManager.confirm({
+                message: `[${MOD_NAME}] Mandatory Addon: ${rule.modName} is required by your Owner. Load it now?`
+              }).then((ok) => {
+                if (ok) {
+                  loadCuratedMod(rule.modId);
+                }
+              }).catch(() => {
+              });
+            }
+          } else {
+            toastsManager.warn({
+              title: `${MOD_NAME} Compliance Notice`,
+              message: `Mandatory addon '${rule.modName}' is not loaded. Please load it manually.`,
+              duration: 6e3
+            });
+          }
+        } else if (rule.type === "forbidden" && loaded) {
+          detectedForbidden.push(rule);
+          toastsManager.warn({
+            title: `${MOD_NAME} Policy Violation`,
+            message: `Addon '${rule.modName}' is FORBIDDEN by your Owner (#${rule.enforcedBy}). Please disable it and reload.`,
+            duration: 8e3
+          });
+        }
+      }
+    } finally {
+      isEvaluating = false;
+    }
+    return {
+      isCompliant: missingRequired.length === 0 && detectedForbidden.length === 0,
+      missingRequired,
+      detectedForbidden
+    };
+  }
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/enums/transformation-type.enum.js
+  var TransformationType;
+  (function(TransformationType2) {
+    TransformationType2[TransformationType2["PLAIN_TO_CLASS"] = 0] = "PLAIN_TO_CLASS";
+    TransformationType2[TransformationType2["CLASS_TO_PLAIN"] = 1] = "CLASS_TO_PLAIN";
+    TransformationType2[TransformationType2["CLASS_TO_CLASS"] = 2] = "CLASS_TO_CLASS";
+  })(TransformationType || (TransformationType = {}));
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/MetadataStorage.js
+  var MetadataStorage = (
+    /** @class */
+    (function() {
+      function MetadataStorage3() {
+        this._typeMetadatas = /* @__PURE__ */ new Map();
+        this._transformMetadatas = /* @__PURE__ */ new Map();
+        this._exposeMetadatas = /* @__PURE__ */ new Map();
+        this._excludeMetadatas = /* @__PURE__ */ new Map();
+        this._ancestorsMap = /* @__PURE__ */ new Map();
+      }
+      MetadataStorage3.prototype.addTypeMetadata = function(metadata) {
+        if (!this._typeMetadatas.has(metadata.target)) {
+          this._typeMetadatas.set(metadata.target, /* @__PURE__ */ new Map());
+        }
+        this._typeMetadatas.get(metadata.target).set(metadata.propertyName, metadata);
+      };
+      MetadataStorage3.prototype.addTransformMetadata = function(metadata) {
+        if (!this._transformMetadatas.has(metadata.target)) {
+          this._transformMetadatas.set(metadata.target, /* @__PURE__ */ new Map());
+        }
+        if (!this._transformMetadatas.get(metadata.target).has(metadata.propertyName)) {
+          this._transformMetadatas.get(metadata.target).set(metadata.propertyName, []);
+        }
+        this._transformMetadatas.get(metadata.target).get(metadata.propertyName).push(metadata);
+      };
+      MetadataStorage3.prototype.addExposeMetadata = function(metadata) {
+        if (!this._exposeMetadatas.has(metadata.target)) {
+          this._exposeMetadatas.set(metadata.target, /* @__PURE__ */ new Map());
+        }
+        this._exposeMetadatas.get(metadata.target).set(metadata.propertyName, metadata);
+      };
+      MetadataStorage3.prototype.addExcludeMetadata = function(metadata) {
+        if (!this._excludeMetadatas.has(metadata.target)) {
+          this._excludeMetadatas.set(metadata.target, /* @__PURE__ */ new Map());
+        }
+        this._excludeMetadatas.get(metadata.target).set(metadata.propertyName, metadata);
+      };
+      MetadataStorage3.prototype.findTransformMetadatas = function(target, propertyName, transformationType) {
+        return this.findMetadatas(this._transformMetadatas, target, propertyName).filter(function(metadata) {
+          if (!metadata.options)
+            return true;
+          if (metadata.options.toClassOnly === true && metadata.options.toPlainOnly === true)
+            return true;
+          if (metadata.options.toClassOnly === true) {
+            return transformationType === TransformationType.CLASS_TO_CLASS || transformationType === TransformationType.PLAIN_TO_CLASS;
+          }
+          if (metadata.options.toPlainOnly === true) {
+            return transformationType === TransformationType.CLASS_TO_PLAIN;
+          }
+          return true;
+        });
+      };
+      MetadataStorage3.prototype.findExcludeMetadata = function(target, propertyName) {
+        return this.findMetadata(this._excludeMetadatas, target, propertyName);
+      };
+      MetadataStorage3.prototype.findExposeMetadata = function(target, propertyName) {
+        return this.findMetadata(this._exposeMetadatas, target, propertyName);
+      };
+      MetadataStorage3.prototype.findExposeMetadataByCustomName = function(target, name) {
+        return this.getExposedMetadatas(target).find(function(metadata) {
+          return metadata.options && metadata.options.name === name;
+        });
+      };
+      MetadataStorage3.prototype.findTypeMetadata = function(target, propertyName) {
+        return this.findMetadata(this._typeMetadatas, target, propertyName);
+      };
+      MetadataStorage3.prototype.getStrategy = function(target) {
+        var excludeMap = this._excludeMetadatas.get(target);
+        var exclude = excludeMap && excludeMap.get(void 0);
+        var exposeMap = this._exposeMetadatas.get(target);
+        var expose = exposeMap && exposeMap.get(void 0);
+        if (exclude && expose || !exclude && !expose)
+          return "none";
+        return exclude ? "excludeAll" : "exposeAll";
+      };
+      MetadataStorage3.prototype.getExposedMetadatas = function(target) {
+        return this.getMetadata(this._exposeMetadatas, target);
+      };
+      MetadataStorage3.prototype.getExcludedMetadatas = function(target) {
+        return this.getMetadata(this._excludeMetadatas, target);
+      };
+      MetadataStorage3.prototype.getExposedProperties = function(target, transformationType) {
+        return this.getExposedMetadatas(target).filter(function(metadata) {
+          if (!metadata.options)
+            return true;
+          if (metadata.options.toClassOnly === true && metadata.options.toPlainOnly === true)
+            return true;
+          if (metadata.options.toClassOnly === true) {
+            return transformationType === TransformationType.CLASS_TO_CLASS || transformationType === TransformationType.PLAIN_TO_CLASS;
+          }
+          if (metadata.options.toPlainOnly === true) {
+            return transformationType === TransformationType.CLASS_TO_PLAIN;
+          }
+          return true;
+        }).map(function(metadata) {
+          return metadata.propertyName;
+        });
+      };
+      MetadataStorage3.prototype.getExcludedProperties = function(target, transformationType) {
+        return this.getExcludedMetadatas(target).filter(function(metadata) {
+          if (!metadata.options)
+            return true;
+          if (metadata.options.toClassOnly === true && metadata.options.toPlainOnly === true)
+            return true;
+          if (metadata.options.toClassOnly === true) {
+            return transformationType === TransformationType.CLASS_TO_CLASS || transformationType === TransformationType.PLAIN_TO_CLASS;
+          }
+          if (metadata.options.toPlainOnly === true) {
+            return transformationType === TransformationType.CLASS_TO_PLAIN;
+          }
+          return true;
+        }).map(function(metadata) {
+          return metadata.propertyName;
+        });
+      };
+      MetadataStorage3.prototype.clear = function() {
+        this._typeMetadatas.clear();
+        this._exposeMetadatas.clear();
+        this._excludeMetadatas.clear();
+        this._ancestorsMap.clear();
+      };
+      MetadataStorage3.prototype.getMetadata = function(metadatas, target) {
+        var metadataFromTargetMap = metadatas.get(target);
+        var metadataFromTarget;
+        if (metadataFromTargetMap) {
+          metadataFromTarget = Array.from(metadataFromTargetMap.values()).filter(function(meta) {
+            return meta.propertyName !== void 0;
+          });
+        }
+        var metadataFromAncestors = [];
+        for (var _i = 0, _a = this.getAncestors(target); _i < _a.length; _i++) {
+          var ancestor = _a[_i];
+          var ancestorMetadataMap = metadatas.get(ancestor);
+          if (ancestorMetadataMap) {
+            var metadataFromAncestor = Array.from(ancestorMetadataMap.values()).filter(function(meta) {
+              return meta.propertyName !== void 0;
+            });
+            metadataFromAncestors.push.apply(metadataFromAncestors, metadataFromAncestor);
+          }
+        }
+        return metadataFromAncestors.concat(metadataFromTarget || []);
+      };
+      MetadataStorage3.prototype.findMetadata = function(metadatas, target, propertyName) {
+        var metadataFromTargetMap = metadatas.get(target);
+        if (metadataFromTargetMap) {
+          var metadataFromTarget = metadataFromTargetMap.get(propertyName);
+          if (metadataFromTarget) {
+            return metadataFromTarget;
+          }
+        }
+        for (var _i = 0, _a = this.getAncestors(target); _i < _a.length; _i++) {
+          var ancestor = _a[_i];
+          var ancestorMetadataMap = metadatas.get(ancestor);
+          if (ancestorMetadataMap) {
+            var ancestorResult = ancestorMetadataMap.get(propertyName);
+            if (ancestorResult) {
+              return ancestorResult;
+            }
+          }
+        }
+        return void 0;
+      };
+      MetadataStorage3.prototype.findMetadatas = function(metadatas, target, propertyName) {
+        var metadataFromTargetMap = metadatas.get(target);
+        var metadataFromTarget;
+        if (metadataFromTargetMap) {
+          metadataFromTarget = metadataFromTargetMap.get(propertyName);
+        }
+        var metadataFromAncestorsTarget = [];
+        for (var _i = 0, _a = this.getAncestors(target); _i < _a.length; _i++) {
+          var ancestor = _a[_i];
+          var ancestorMetadataMap = metadatas.get(ancestor);
+          if (ancestorMetadataMap) {
+            if (ancestorMetadataMap.has(propertyName)) {
+              metadataFromAncestorsTarget.push.apply(metadataFromAncestorsTarget, ancestorMetadataMap.get(propertyName));
+            }
+          }
+        }
+        return metadataFromAncestorsTarget.slice().reverse().concat((metadataFromTarget || []).slice().reverse());
+      };
+      MetadataStorage3.prototype.getAncestors = function(target) {
+        if (!target)
+          return [];
+        if (!this._ancestorsMap.has(target)) {
+          var ancestors = [];
+          for (var baseClass = Object.getPrototypeOf(target.prototype.constructor); typeof baseClass.prototype !== "undefined"; baseClass = Object.getPrototypeOf(baseClass.prototype.constructor)) {
+            ancestors.push(baseClass);
+          }
+          this._ancestorsMap.set(target, ancestors);
+        }
+        return this._ancestorsMap.get(target);
+      };
+      return MetadataStorage3;
+    })()
+  );
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/storage.js
+  var defaultMetadataStorage = new MetadataStorage();
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/utils/get-global.util.js
+  function getGlobal() {
+    if (typeof globalThis !== "undefined") {
+      return globalThis;
+    }
+    if (typeof global !== "undefined") {
+      return global;
+    }
+    if (typeof window !== "undefined") {
+      return window;
+    }
+    if (typeof self !== "undefined") {
+      return self;
+    }
+  }
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/utils/is-promise.util.js
+  function isPromise(p) {
+    return p !== null && typeof p === "object" && typeof p.then === "function";
+  }
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/TransformOperationExecutor.js
+  var __spreadArray = function(to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+      if (ar || !(i in from)) {
+        if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+        ar[i] = from[i];
+      }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+  };
+  function instantiateArrayType(arrayType) {
+    var array = new arrayType();
+    if (!(array instanceof Set) && !("push" in array)) {
+      return [];
+    }
+    return array;
+  }
+  var TransformOperationExecutor = (
+    /** @class */
+    (function() {
+      function TransformOperationExecutor2(transformationType, options) {
+        this.transformationType = transformationType;
+        this.options = options;
+        this.recursionStack = /* @__PURE__ */ new Set();
+      }
+      TransformOperationExecutor2.prototype.transform = function(source, value, targetType, arrayType, isMap, level) {
+        var _this = this;
+        if (level === void 0) {
+          level = 0;
+        }
+        if (Array.isArray(value) || value instanceof Set) {
+          var newValue_1 = arrayType && this.transformationType === TransformationType.PLAIN_TO_CLASS ? instantiateArrayType(arrayType) : [];
+          value.forEach(function(subValue, index) {
+            var subSource = source ? source[index] : void 0;
+            if (!_this.options.enableCircularCheck || !_this.isCircular(subValue)) {
+              var realTargetType = void 0;
+              if (typeof targetType !== "function" && targetType && targetType.options && targetType.options.discriminator && targetType.options.discriminator.property && targetType.options.discriminator.subTypes) {
+                if (_this.transformationType === TransformationType.PLAIN_TO_CLASS) {
+                  realTargetType = targetType.options.discriminator.subTypes.find(function(subType) {
+                    return subType.name === subValue[targetType.options.discriminator.property];
+                  });
+                  var options = { newObject: newValue_1, object: subValue, property: void 0 };
+                  var newType = targetType.typeFunction(options);
+                  realTargetType === void 0 ? realTargetType = newType : realTargetType = realTargetType.value;
+                  if (!targetType.options.keepDiscriminatorProperty)
+                    delete subValue[targetType.options.discriminator.property];
+                }
+                if (_this.transformationType === TransformationType.CLASS_TO_CLASS) {
+                  realTargetType = subValue.constructor;
+                }
+                if (_this.transformationType === TransformationType.CLASS_TO_PLAIN) {
+                  subValue[targetType.options.discriminator.property] = targetType.options.discriminator.subTypes.find(function(subType) {
+                    return subType.value === subValue.constructor;
+                  }).name;
+                }
+              } else {
+                realTargetType = targetType;
+              }
+              var value_1 = _this.transform(subSource, subValue, realTargetType, void 0, subValue instanceof Map, level + 1);
+              if (newValue_1 instanceof Set) {
+                newValue_1.add(value_1);
+              } else {
+                newValue_1.push(value_1);
+              }
+            } else if (_this.transformationType === TransformationType.CLASS_TO_CLASS) {
+              if (newValue_1 instanceof Set) {
+                newValue_1.add(subValue);
+              } else {
+                newValue_1.push(subValue);
+              }
+            }
+          });
+          return newValue_1;
+        } else if (targetType === String && !isMap) {
+          if (value === null || value === void 0)
+            return value;
+          return String(value);
+        } else if (targetType === Number && !isMap) {
+          if (value === null || value === void 0)
+            return value;
+          return Number(value);
+        } else if (targetType === Boolean && !isMap) {
+          if (value === null || value === void 0)
+            return value;
+          return Boolean(value);
+        } else if ((targetType === Date || value instanceof Date) && !isMap) {
+          if (value instanceof Date) {
+            return new Date(value.valueOf());
+          }
+          if (value === null || value === void 0)
+            return value;
+          return new Date(value);
+        } else if (!!getGlobal().Buffer && (targetType === Buffer || value instanceof Buffer) && !isMap) {
+          if (value === null || value === void 0)
+            return value;
+          return Buffer.from(value);
+        } else if (isPromise(value) && !isMap) {
+          return new Promise(function(resolve, reject) {
+            value.then(function(data) {
+              return resolve(_this.transform(void 0, data, targetType, void 0, void 0, level + 1));
+            }, reject);
+          });
+        } else if (!isMap && value !== null && typeof value === "object" && typeof value.then === "function") {
+          return value;
+        } else if (typeof value === "object" && value !== null) {
+          if (!targetType && value.constructor !== Object)
+            if (!Array.isArray(value) && value.constructor === Array) {
+            } else {
+              targetType = value.constructor;
+            }
+          if (!targetType && source)
+            targetType = source.constructor;
+          if (this.options.enableCircularCheck) {
+            this.recursionStack.add(value);
+          }
+          var keys = this.getKeys(targetType, value, isMap);
+          var newValue = source ? source : {};
+          if (!source && (this.transformationType === TransformationType.PLAIN_TO_CLASS || this.transformationType === TransformationType.CLASS_TO_CLASS)) {
+            if (isMap) {
+              newValue = /* @__PURE__ */ new Map();
+            } else if (targetType) {
+              newValue = new targetType();
+            } else {
+              newValue = {};
+            }
+          }
+          var _loop_1 = function(key2) {
+            if (key2 === "__proto__" || key2 === "constructor") {
+              return "continue";
+            }
+            var valueKey = key2;
+            var newValueKey = key2, propertyName = key2;
+            if (!this_1.options.ignoreDecorators && targetType) {
+              if (this_1.transformationType === TransformationType.PLAIN_TO_CLASS) {
+                var exposeMetadata = defaultMetadataStorage.findExposeMetadataByCustomName(targetType, key2);
+                if (exposeMetadata) {
+                  propertyName = exposeMetadata.propertyName;
+                  newValueKey = exposeMetadata.propertyName;
+                }
+              } else if (this_1.transformationType === TransformationType.CLASS_TO_PLAIN || this_1.transformationType === TransformationType.CLASS_TO_CLASS) {
+                var exposeMetadata = defaultMetadataStorage.findExposeMetadata(targetType, key2);
+                if (exposeMetadata && exposeMetadata.options && exposeMetadata.options.name) {
+                  newValueKey = exposeMetadata.options.name;
+                }
+              }
+            }
+            var subValue = void 0;
+            if (this_1.transformationType === TransformationType.PLAIN_TO_CLASS) {
+              subValue = value[valueKey];
+            } else {
+              if (value instanceof Map) {
+                subValue = value.get(valueKey);
+              } else if (value[valueKey] instanceof Function) {
+                subValue = value[valueKey]();
+              } else {
+                subValue = value[valueKey];
+              }
+            }
+            var type = void 0, isSubValueMap = subValue instanceof Map;
+            if (targetType && isMap) {
+              type = targetType;
+            } else if (targetType) {
+              var metadata_1 = defaultMetadataStorage.findTypeMetadata(targetType, propertyName);
+              if (metadata_1) {
+                var options = { newObject: newValue, object: value, property: propertyName };
+                var newType = metadata_1.typeFunction ? metadata_1.typeFunction(options) : metadata_1.reflectedType;
+                if (metadata_1.options && metadata_1.options.discriminator && metadata_1.options.discriminator.property && metadata_1.options.discriminator.subTypes) {
+                  if (!(value[valueKey] instanceof Array)) {
+                    if (this_1.transformationType === TransformationType.PLAIN_TO_CLASS) {
+                      type = metadata_1.options.discriminator.subTypes.find(function(subType) {
+                        if (subValue && subValue instanceof Object && metadata_1.options.discriminator.property in subValue) {
+                          return subType.name === subValue[metadata_1.options.discriminator.property];
+                        }
+                      });
+                      type === void 0 ? type = newType : type = type.value;
+                      if (!metadata_1.options.keepDiscriminatorProperty) {
+                        if (subValue && subValue instanceof Object && metadata_1.options.discriminator.property in subValue) {
+                          delete subValue[metadata_1.options.discriminator.property];
+                        }
+                      }
+                    }
+                    if (this_1.transformationType === TransformationType.CLASS_TO_CLASS) {
+                      type = subValue.constructor;
+                    }
+                    if (this_1.transformationType === TransformationType.CLASS_TO_PLAIN) {
+                      if (subValue) {
+                        subValue[metadata_1.options.discriminator.property] = metadata_1.options.discriminator.subTypes.find(function(subType) {
+                          return subType.value === subValue.constructor;
+                        }).name;
+                      }
+                    }
+                  } else {
+                    type = metadata_1;
+                  }
+                } else {
+                  type = newType;
+                }
+                isSubValueMap = isSubValueMap || metadata_1.reflectedType === Map;
+              } else if (this_1.options.targetMaps) {
+                this_1.options.targetMaps.filter(function(map) {
+                  return map.target === targetType && !!map.properties[propertyName];
+                }).forEach(function(map) {
+                  return type = map.properties[propertyName];
+                });
+              } else if (this_1.options.enableImplicitConversion && this_1.transformationType === TransformationType.PLAIN_TO_CLASS) {
+                var reflectedType = Reflect.getMetadata("design:type", targetType.prototype, propertyName);
+                if (reflectedType) {
+                  type = reflectedType;
+                }
+              }
+            }
+            var arrayType_1 = Array.isArray(value[valueKey]) ? this_1.getReflectedType(targetType, propertyName) : void 0;
+            var subSource = source ? source[valueKey] : void 0;
+            if (newValue.constructor.prototype) {
+              var descriptor = Object.getOwnPropertyDescriptor(newValue.constructor.prototype, newValueKey);
+              if ((this_1.transformationType === TransformationType.PLAIN_TO_CLASS || this_1.transformationType === TransformationType.CLASS_TO_CLASS) && // eslint-disable-next-line @typescript-eslint/unbound-method
+              (descriptor && !descriptor.set || newValue[newValueKey] instanceof Function))
+                return "continue";
+            }
+            if (!this_1.options.enableCircularCheck || !this_1.isCircular(subValue)) {
+              var transformKey = this_1.transformationType === TransformationType.PLAIN_TO_CLASS ? newValueKey : key2;
+              var finalValue = void 0;
+              if (this_1.transformationType === TransformationType.CLASS_TO_PLAIN) {
+                finalValue = value[transformKey];
+                finalValue = this_1.applyCustomTransformations(finalValue, targetType, transformKey, value, this_1.transformationType);
+                finalValue = value[transformKey] === finalValue ? subValue : finalValue;
+                finalValue = this_1.transform(subSource, finalValue, type, arrayType_1, isSubValueMap, level + 1);
+              } else {
+                if (subValue === void 0 && this_1.options.exposeDefaultValues) {
+                  finalValue = newValue[newValueKey];
+                } else {
+                  finalValue = this_1.transform(subSource, subValue, type, arrayType_1, isSubValueMap, level + 1);
+                  finalValue = this_1.applyCustomTransformations(finalValue, targetType, transformKey, value, this_1.transformationType);
+                }
+              }
+              if (finalValue !== void 0 || this_1.options.exposeUnsetFields) {
+                if (newValue instanceof Map) {
+                  newValue.set(newValueKey, finalValue);
+                } else {
+                  newValue[newValueKey] = finalValue;
+                }
+              }
+            } else if (this_1.transformationType === TransformationType.CLASS_TO_CLASS) {
+              var finalValue = subValue;
+              finalValue = this_1.applyCustomTransformations(finalValue, targetType, key2, value, this_1.transformationType);
+              if (finalValue !== void 0 || this_1.options.exposeUnsetFields) {
+                if (newValue instanceof Map) {
+                  newValue.set(newValueKey, finalValue);
+                } else {
+                  newValue[newValueKey] = finalValue;
+                }
+              }
+            }
+          };
+          var this_1 = this;
+          for (var _i = 0, keys_1 = keys; _i < keys_1.length; _i++) {
+            var key = keys_1[_i];
+            _loop_1(key);
+          }
+          if (this.options.enableCircularCheck) {
+            this.recursionStack.delete(value);
+          }
+          return newValue;
+        } else {
+          return value;
+        }
+      };
+      TransformOperationExecutor2.prototype.applyCustomTransformations = function(value, target, key, obj, transformationType) {
+        var _this = this;
+        var metadatas = defaultMetadataStorage.findTransformMetadatas(target, key, this.transformationType);
+        if (this.options.version !== void 0) {
+          metadatas = metadatas.filter(function(metadata) {
+            if (!metadata.options)
+              return true;
+            return _this.checkVersion(metadata.options.since, metadata.options.until);
+          });
+        }
+        if (this.options.groups && this.options.groups.length) {
+          metadatas = metadatas.filter(function(metadata) {
+            if (!metadata.options)
+              return true;
+            return _this.checkGroups(metadata.options.groups);
+          });
+        } else {
+          metadatas = metadatas.filter(function(metadata) {
+            return !metadata.options || !metadata.options.groups || !metadata.options.groups.length;
+          });
+        }
+        metadatas.forEach(function(metadata) {
+          value = metadata.transformFn({ value, key, obj, type: transformationType, options: _this.options });
+        });
+        return value;
+      };
+      TransformOperationExecutor2.prototype.isCircular = function(object) {
+        return this.recursionStack.has(object);
+      };
+      TransformOperationExecutor2.prototype.getReflectedType = function(target, propertyName) {
+        if (!target)
+          return void 0;
+        var meta = defaultMetadataStorage.findTypeMetadata(target, propertyName);
+        return meta ? meta.reflectedType : void 0;
+      };
+      TransformOperationExecutor2.prototype.getKeys = function(target, object, isMap) {
+        var _this = this;
+        var strategy = defaultMetadataStorage.getStrategy(target);
+        if (strategy === "none")
+          strategy = this.options.strategy || "exposeAll";
+        var keys = [];
+        if (strategy === "exposeAll" || isMap) {
+          if (object instanceof Map) {
+            keys = Array.from(object.keys());
+          } else {
+            keys = Object.keys(object);
+          }
+        }
+        if (isMap) {
+          return keys;
+        }
+        if (this.options.ignoreDecorators && this.options.excludeExtraneousValues && target) {
+          var exposedProperties = defaultMetadataStorage.getExposedProperties(target, this.transformationType);
+          var excludedProperties = defaultMetadataStorage.getExcludedProperties(target, this.transformationType);
+          keys = __spreadArray(__spreadArray([], exposedProperties, true), excludedProperties, true);
+        }
+        if (!this.options.ignoreDecorators && target) {
+          var exposedProperties = defaultMetadataStorage.getExposedProperties(target, this.transformationType);
+          if (this.transformationType === TransformationType.PLAIN_TO_CLASS) {
+            exposedProperties = exposedProperties.map(function(key) {
+              var exposeMetadata = defaultMetadataStorage.findExposeMetadata(target, key);
+              if (exposeMetadata && exposeMetadata.options && exposeMetadata.options.name) {
+                return exposeMetadata.options.name;
+              }
+              return key;
+            });
+          }
+          if (this.options.excludeExtraneousValues) {
+            keys = exposedProperties;
+          } else {
+            keys = keys.concat(exposedProperties);
+          }
+          var excludedProperties_1 = defaultMetadataStorage.getExcludedProperties(target, this.transformationType);
+          if (excludedProperties_1.length > 0) {
+            keys = keys.filter(function(key) {
+              return !excludedProperties_1.includes(key);
+            });
+          }
+          if (this.options.version !== void 0) {
+            keys = keys.filter(function(key) {
+              var exposeMetadata = defaultMetadataStorage.findExposeMetadata(target, key);
+              if (!exposeMetadata || !exposeMetadata.options)
+                return true;
+              return _this.checkVersion(exposeMetadata.options.since, exposeMetadata.options.until);
+            });
+          }
+          if (this.options.groups && this.options.groups.length) {
+            keys = keys.filter(function(key) {
+              var exposeMetadata = defaultMetadataStorage.findExposeMetadata(target, key);
+              if (!exposeMetadata || !exposeMetadata.options)
+                return true;
+              return _this.checkGroups(exposeMetadata.options.groups);
+            });
+          } else {
+            keys = keys.filter(function(key) {
+              var exposeMetadata = defaultMetadataStorage.findExposeMetadata(target, key);
+              return !exposeMetadata || !exposeMetadata.options || !exposeMetadata.options.groups || !exposeMetadata.options.groups.length;
+            });
+          }
+        }
+        if (this.options.excludePrefixes && this.options.excludePrefixes.length) {
+          keys = keys.filter(function(key) {
+            return _this.options.excludePrefixes.every(function(prefix) {
+              return key.substr(0, prefix.length) !== prefix;
+            });
+          });
+        }
+        keys = keys.filter(function(key, index, self2) {
+          return self2.indexOf(key) === index;
+        });
+        return keys;
+      };
+      TransformOperationExecutor2.prototype.checkVersion = function(since, until) {
+        var decision = true;
+        if (decision && since)
+          decision = this.options.version >= since;
+        if (decision && until)
+          decision = this.options.version < until;
+        return decision;
+      };
+      TransformOperationExecutor2.prototype.checkGroups = function(groups) {
+        if (!groups)
+          return true;
+        return this.options.groups.some(function(optionGroup) {
+          return groups.includes(optionGroup);
+        });
+      };
+      return TransformOperationExecutor2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/constants/default-options.constant.js
+  var defaultOptions = {
+    enableCircularCheck: false,
+    enableImplicitConversion: false,
+    excludeExtraneousValues: false,
+    excludePrefixes: void 0,
+    exposeDefaultValues: false,
+    exposeUnsetFields: true,
+    groups: void 0,
+    ignoreDecorators: false,
+    strategy: void 0,
+    targetMaps: void 0,
+    version: void 0
+  };
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/ClassTransformer.js
+  var __assign = function() {
+    __assign = Object.assign || function(t) {
+      for (var s, i = 1, n = arguments.length; i < n; i++) {
+        s = arguments[i];
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+          t[p] = s[p];
+      }
+      return t;
+    };
+    return __assign.apply(this, arguments);
+  };
+  var ClassTransformer = (
+    /** @class */
+    (function() {
+      function ClassTransformer2() {
+      }
+      ClassTransformer2.prototype.instanceToPlain = function(object, options) {
+        var executor = new TransformOperationExecutor(TransformationType.CLASS_TO_PLAIN, __assign(__assign({}, defaultOptions), options));
+        return executor.transform(void 0, object, void 0, void 0, void 0, void 0);
+      };
+      ClassTransformer2.prototype.classToPlainFromExist = function(object, plainObject, options) {
+        var executor = new TransformOperationExecutor(TransformationType.CLASS_TO_PLAIN, __assign(__assign({}, defaultOptions), options));
+        return executor.transform(plainObject, object, void 0, void 0, void 0, void 0);
+      };
+      ClassTransformer2.prototype.plainToInstance = function(cls, plain, options) {
+        var executor = new TransformOperationExecutor(TransformationType.PLAIN_TO_CLASS, __assign(__assign({}, defaultOptions), options));
+        return executor.transform(void 0, plain, cls, void 0, void 0, void 0);
+      };
+      ClassTransformer2.prototype.plainToClassFromExist = function(clsObject, plain, options) {
+        var executor = new TransformOperationExecutor(TransformationType.PLAIN_TO_CLASS, __assign(__assign({}, defaultOptions), options));
+        return executor.transform(clsObject, plain, void 0, void 0, void 0, void 0);
+      };
+      ClassTransformer2.prototype.instanceToInstance = function(object, options) {
+        var executor = new TransformOperationExecutor(TransformationType.CLASS_TO_CLASS, __assign(__assign({}, defaultOptions), options));
+        return executor.transform(void 0, object, void 0, void 0, void 0, void 0);
+      };
+      ClassTransformer2.prototype.classToClassFromExist = function(object, fromObject, options) {
+        var executor = new TransformOperationExecutor(TransformationType.CLASS_TO_CLASS, __assign(__assign({}, defaultOptions), options));
+        return executor.transform(fromObject, object, void 0, void 0, void 0, void 0);
+      };
+      ClassTransformer2.prototype.serialize = function(object, options) {
+        return JSON.stringify(this.instanceToPlain(object, options));
+      };
+      ClassTransformer2.prototype.deserialize = function(cls, json, options) {
+        var jsonObject = JSON.parse(json);
+        return this.plainToInstance(cls, jsonObject, options);
+      };
+      ClassTransformer2.prototype.deserializeArray = function(cls, json, options) {
+        var jsonObject = JSON.parse(json);
+        return this.plainToInstance(cls, jsonObject, options);
+      };
+      return ClassTransformer2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-transformer@0.5.1/node_modules/class-transformer/esm5/index.js
+  var classTransformer = new ClassTransformer();
+  function plainToInstance(cls, plain, options) {
+    return classTransformer.plainToInstance(cls, plain, options);
+  }
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/metadata/ValidationMetadata.js
+  var ValidationMetadata = (
+    /** @class */
+    /* @__PURE__ */ (function() {
+      function ValidationMetadata2(args) {
+        this.groups = [];
+        this.each = false;
+        this.context = void 0;
+        this.type = args.type;
+        this.name = args.name;
+        this.target = args.target;
+        this.propertyName = args.propertyName;
+        this.constraints = args === null || args === void 0 ? void 0 : args.constraints;
+        this.constraintCls = args.constraintCls;
+        this.validationTypeOptions = args.validationTypeOptions;
+        if (args.validationOptions) {
+          this.message = args.validationOptions.message;
+          this.groups = args.validationOptions.groups;
+          this.always = args.validationOptions.always;
+          this.each = args.validationOptions.each;
+          this.context = args.validationOptions.context;
+        }
+      }
+      return ValidationMetadata2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/validation-schema/ValidationSchemaToMetadataTransformer.js
+  var ValidationSchemaToMetadataTransformer = (
+    /** @class */
+    (function() {
+      function ValidationSchemaToMetadataTransformer2() {
+      }
+      ValidationSchemaToMetadataTransformer2.prototype.transform = function(schema) {
+        var metadatas = [];
+        Object.keys(schema.properties).forEach(function(property) {
+          schema.properties[property].forEach(function(validation) {
+            var validationOptions = {
+              message: validation.message,
+              groups: validation.groups,
+              always: validation.always,
+              each: validation.each
+            };
+            var args = {
+              type: validation.type,
+              name: validation.name,
+              target: schema.name,
+              propertyName: property,
+              constraints: validation.constraints,
+              validationTypeOptions: validation.options,
+              validationOptions
+            };
+            metadatas.push(new ValidationMetadata(args));
+          });
+        });
+        return metadatas;
+      };
+      return ValidationSchemaToMetadataTransformer2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/utils/convert-to-array.util.js
+  function convertToArray(val) {
+    if (val instanceof Map) {
+      return Array.from(val.values());
+    }
+    return Array.isArray(val) ? val : Array.from(val);
+  }
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/utils/get-global.util.js
+  function getGlobal2() {
+    if (typeof globalThis !== "undefined") {
+      return globalThis;
+    }
+    if (typeof global !== "undefined") {
+      return global;
+    }
+    if (typeof window !== "undefined") {
+      return window;
+    }
+    if (typeof self !== "undefined") {
+      return self;
+    }
+  }
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/utils/is-promise.util.js
+  function isPromise2(p) {
+    return p !== null && typeof p === "object" && typeof p.then === "function";
+  }
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/metadata/MetadataStorage.js
+  var __values = function(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+      next: function() {
+        if (o && i >= o.length) o = void 0;
+        return { value: o && o[i++], done: !o };
+      }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+  };
+  var __read = function(o, n) {
+    var m = typeof Symbol === "function" && o[Symbol.iterator];
+    if (!m) return o;
+    var i = m.call(o), r, ar = [], e;
+    try {
+      while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
+    } catch (error) {
+      e = { error };
+    } finally {
+      try {
+        if (r && !r.done && (m = i["return"])) m.call(i);
+      } finally {
+        if (e) throw e.error;
+      }
+    }
+    return ar;
+  };
+  var __spreadArray2 = function(to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+      if (ar || !(i in from)) {
+        if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+        ar[i] = from[i];
+      }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+  };
+  var MetadataStorage2 = (
+    /** @class */
+    (function() {
+      function MetadataStorage3() {
+        this.validationMetadatas = /* @__PURE__ */ new Map();
+        this.constraintMetadatas = /* @__PURE__ */ new Map();
+      }
+      Object.defineProperty(MetadataStorage3.prototype, "hasValidationMetaData", {
+        get: function() {
+          return !!this.validationMetadatas.size;
+        },
+        enumerable: false,
+        configurable: true
+      });
+      MetadataStorage3.prototype.addValidationSchema = function(schema) {
+        var _this = this;
+        var validationMetadatas = new ValidationSchemaToMetadataTransformer().transform(schema);
+        validationMetadatas.forEach(function(validationMetadata) {
+          return _this.addValidationMetadata(validationMetadata);
+        });
+      };
+      MetadataStorage3.prototype.addValidationMetadata = function(metadata) {
+        var existingMetadata = this.validationMetadatas.get(metadata.target);
+        if (existingMetadata) {
+          existingMetadata.push(metadata);
+        } else {
+          this.validationMetadatas.set(metadata.target, [metadata]);
+        }
+      };
+      MetadataStorage3.prototype.addConstraintMetadata = function(metadata) {
+        var existingMetadata = this.constraintMetadatas.get(metadata.target);
+        if (existingMetadata) {
+          existingMetadata.push(metadata);
+        } else {
+          this.constraintMetadatas.set(metadata.target, [metadata]);
+        }
+      };
+      MetadataStorage3.prototype.groupByPropertyName = function(metadata) {
+        var grouped = {};
+        metadata.forEach(function(metadata2) {
+          if (!grouped[metadata2.propertyName])
+            grouped[metadata2.propertyName] = [];
+          grouped[metadata2.propertyName].push(metadata2);
+        });
+        return grouped;
+      };
+      MetadataStorage3.prototype.getTargetValidationMetadatas = function(targetConstructor, targetSchema, always, strictGroups, groups) {
+        var e_1, _a;
+        var includeMetadataBecauseOfAlwaysOption = function(metadata) {
+          if (typeof metadata.always !== "undefined")
+            return metadata.always;
+          if (metadata.groups && metadata.groups.length)
+            return false;
+          return always;
+        };
+        var excludeMetadataBecauseOfStrictGroupsOption = function(metadata) {
+          if (strictGroups) {
+            if (!groups || !groups.length) {
+              if (metadata.groups && metadata.groups.length)
+                return true;
+            }
+          }
+          return false;
+        };
+        var filteredForOriginalMetadatasSearch = this.validationMetadatas.get(targetConstructor) || [];
+        var originalMetadatas = filteredForOriginalMetadatasSearch.filter(function(metadata) {
+          if (metadata.target !== targetConstructor && metadata.target !== targetSchema)
+            return false;
+          if (includeMetadataBecauseOfAlwaysOption(metadata))
+            return true;
+          if (excludeMetadataBecauseOfStrictGroupsOption(metadata))
+            return false;
+          if (groups && groups.length > 0)
+            return metadata.groups && !!metadata.groups.find(function(group) {
+              return groups.indexOf(group) !== -1;
+            });
+          return true;
+        });
+        var filteredForInheritedMetadatasSearch = [];
+        try {
+          for (var _b = __values(this.validationMetadatas.entries()), _c = _b.next(); !_c.done; _c = _b.next()) {
+            var _d = __read(_c.value, 2), key = _d[0], value = _d[1];
+            if (targetConstructor.prototype instanceof key) {
+              filteredForInheritedMetadatasSearch.push.apply(filteredForInheritedMetadatasSearch, __spreadArray2([], __read(value), false));
+            }
+          }
+        } catch (e_1_1) {
+          e_1 = { error: e_1_1 };
+        } finally {
+          try {
+            if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+          } finally {
+            if (e_1) throw e_1.error;
+          }
+        }
+        var inheritedMetadatas = filteredForInheritedMetadatasSearch.filter(function(metadata) {
+          if (typeof metadata.target === "string")
+            return false;
+          if (metadata.target === targetConstructor)
+            return false;
+          if (metadata.target instanceof Function && !(targetConstructor.prototype instanceof metadata.target))
+            return false;
+          if (includeMetadataBecauseOfAlwaysOption(metadata))
+            return true;
+          if (excludeMetadataBecauseOfStrictGroupsOption(metadata))
+            return false;
+          if (groups && groups.length > 0)
+            return metadata.groups && !!metadata.groups.find(function(group) {
+              return groups.indexOf(group) !== -1;
+            });
+          return true;
+        });
+        var uniqueInheritedMetadatas = inheritedMetadatas.filter(function(inheritedMetadata) {
+          return !originalMetadatas.find(function(originalMetadata) {
+            return originalMetadata.propertyName === inheritedMetadata.propertyName && originalMetadata.type === inheritedMetadata.type;
+          });
+        });
+        return originalMetadatas.concat(uniqueInheritedMetadatas);
+      };
+      MetadataStorage3.prototype.getTargetValidatorConstraints = function(target) {
+        return this.constraintMetadatas.get(target) || [];
+      };
+      return MetadataStorage3;
+    })()
+  );
+  function getMetadataStorage() {
+    var global2 = getGlobal2();
+    if (!global2.classValidatorMetadataStorage) {
+      global2.classValidatorMetadataStorage = new MetadataStorage2();
+    }
+    return global2.classValidatorMetadataStorage;
+  }
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/validation/ValidationError.js
+  var ValidationError = (
+    /** @class */
+    (function() {
+      function ValidationError2() {
+      }
+      ValidationError2.prototype.toString = function(shouldDecorate, hasParent, parentPath, showConstraintMessages) {
+        var _this = this;
+        if (shouldDecorate === void 0) {
+          shouldDecorate = false;
+        }
+        if (hasParent === void 0) {
+          hasParent = false;
+        }
+        if (parentPath === void 0) {
+          parentPath = "";
+        }
+        if (showConstraintMessages === void 0) {
+          showConstraintMessages = false;
+        }
+        var boldStart = shouldDecorate ? "\x1B[1m" : "";
+        var boldEnd = shouldDecorate ? "\x1B[22m" : "";
+        var constraintsToString = function() {
+          var _a;
+          return (showConstraintMessages ? Object.values : Object.keys)((_a = _this.constraints) !== null && _a !== void 0 ? _a : {}).join(", ");
+        };
+        var propConstraintFailed = function(propertyName) {
+          return " - property ".concat(boldStart).concat(parentPath).concat(propertyName).concat(boldEnd, " has failed the following constraints: ").concat(boldStart).concat(constraintsToString()).concat(boldEnd, " \n");
+        };
+        if (!hasParent) {
+          return "An instance of ".concat(boldStart).concat(this.target ? this.target.constructor.name : "an object").concat(boldEnd, " has failed the validation:\n") + (this.constraints ? propConstraintFailed(this.property) : "") + (this.children ? this.children.map(function(childError) {
+            return childError.toString(shouldDecorate, true, _this.property, showConstraintMessages);
+          }).join("") : "");
+        } else {
+          var formattedProperty_1 = Number.isInteger(+this.property) ? "[".concat(this.property, "]") : "".concat(parentPath ? "." : "").concat(this.property);
+          if (this.constraints) {
+            return propConstraintFailed(formattedProperty_1);
+          } else {
+            return this.children ? this.children.map(function(childError) {
+              return childError.toString(shouldDecorate, true, "".concat(parentPath).concat(formattedProperty_1), showConstraintMessages);
+            }).join("") : "";
+          }
+        }
+      };
+      return ValidationError2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/validation/ValidationTypes.js
+  var ValidationTypes = (
+    /** @class */
+    (function() {
+      function ValidationTypes2() {
+      }
+      ValidationTypes2.isValid = function(type) {
+        var _this = this;
+        return type !== "isValid" && type !== "getMessage" && Object.keys(this).map(function(key) {
+          return _this[key];
+        }).indexOf(type) !== -1;
+      };
+      ValidationTypes2.CUSTOM_VALIDATION = "customValidation";
+      ValidationTypes2.NESTED_VALIDATION = "nestedValidation";
+      ValidationTypes2.PROMISE_VALIDATION = "promiseValidation";
+      ValidationTypes2.CONDITIONAL_VALIDATION = "conditionalValidation";
+      ValidationTypes2.WHITELIST = "whitelistValidation";
+      ValidationTypes2.IS_DEFINED = "isDefined";
+      return ValidationTypes2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/validation/ValidationUtils.js
+  function constraintToString(constraint) {
+    if (Array.isArray(constraint)) {
+      return constraint.join(", ");
+    }
+    if (typeof constraint === "symbol") {
+      constraint = constraint.description;
+    }
+    return "".concat(constraint);
+  }
+  var ValidationUtils = (
+    /** @class */
+    (function() {
+      function ValidationUtils2() {
+      }
+      ValidationUtils2.replaceMessageSpecialTokens = function(message, validationArguments) {
+        var messageString;
+        if (message instanceof Function) {
+          messageString = message(validationArguments);
+        } else if (typeof message === "string") {
+          messageString = message;
+        }
+        if (messageString && Array.isArray(validationArguments.constraints)) {
+          validationArguments.constraints.forEach(function(constraint, index) {
+            messageString = messageString.replace(new RegExp("\\$constraint".concat(index + 1), "g"), constraintToString(constraint));
+          });
+        }
+        if (messageString && validationArguments.value !== void 0 && validationArguments.value !== null && ["string", "boolean", "number"].includes(typeof validationArguments.value))
+          messageString = messageString.replace(/\$value/g, validationArguments.value);
+        if (messageString)
+          messageString = messageString.replace(/\$property/g, validationArguments.property);
+        if (messageString)
+          messageString = messageString.replace(/\$target/g, validationArguments.targetName);
+        return messageString;
+      };
+      return ValidationUtils2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/validation/ValidationExecutor.js
+  var __read2 = function(o, n) {
+    var m = typeof Symbol === "function" && o[Symbol.iterator];
+    if (!m) return o;
+    var i = m.call(o), r, ar = [], e;
+    try {
+      while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
+    } catch (error) {
+      e = { error };
+    } finally {
+      try {
+        if (r && !r.done && (m = i["return"])) m.call(i);
+      } finally {
+        if (e) throw e.error;
+      }
+    }
+    return ar;
+  };
+  var ValidationExecutor = (
+    /** @class */
+    (function() {
+      function ValidationExecutor2(validator, validatorOptions) {
+        this.validator = validator;
+        this.validatorOptions = validatorOptions;
+        this.awaitingPromises = [];
+        this.ignoreAsyncValidations = false;
+        this.metadataStorage = getMetadataStorage();
+      }
+      ValidationExecutor2.prototype.execute = function(object, targetSchema, validationErrors) {
+        var _this = this;
+        var _a, _b;
+        if (!this.metadataStorage.hasValidationMetaData && ((_a = this.validatorOptions) === null || _a === void 0 ? void 0 : _a.enableDebugMessages) === true) {
+          console.warn("No validation metadata found. No validation will be  performed. There are multiple possible reasons:\n  - There may be multiple class-validator versions installed. You will need to flatten your dependencies to fix the issue.\n  - This validation runs before any file with validation decorator was parsed by NodeJS.");
+        }
+        var groups = this.validatorOptions ? this.validatorOptions.groups : void 0;
+        var strictGroups = this.validatorOptions && this.validatorOptions.strictGroups || false;
+        var always = this.validatorOptions && this.validatorOptions.always || false;
+        var forbidUnknownValues = ((_b = this.validatorOptions) === null || _b === void 0 ? void 0 : _b.forbidUnknownValues) === void 0 || this.validatorOptions.forbidUnknownValues !== false;
+        var targetMetadatas = this.metadataStorage.getTargetValidationMetadatas(object.constructor, targetSchema, always, strictGroups, groups);
+        var groupedMetadatas = this.metadataStorage.groupByPropertyName(targetMetadatas);
+        if (forbidUnknownValues && !targetMetadatas.length) {
+          var validationError = new ValidationError();
+          if (!this.validatorOptions || !this.validatorOptions.validationError || this.validatorOptions.validationError.target === void 0 || this.validatorOptions.validationError.target === true)
+            validationError.target = object;
+          validationError.value = void 0;
+          validationError.property = void 0;
+          validationError.children = [];
+          validationError.constraints = { unknownValue: "an unknown value was passed to the validate function" };
+          validationErrors.push(validationError);
+          return;
+        }
+        if (this.validatorOptions && this.validatorOptions.whitelist)
+          this.whitelist(object, groupedMetadatas, validationErrors);
+        Object.keys(groupedMetadatas).forEach(function(propertyName) {
+          var value = object[propertyName];
+          var definedMetadatas = groupedMetadatas[propertyName].filter(function(metadata) {
+            return metadata.type === ValidationTypes.IS_DEFINED;
+          });
+          var metadatas = groupedMetadatas[propertyName].filter(function(metadata) {
+            return metadata.type !== ValidationTypes.IS_DEFINED && metadata.type !== ValidationTypes.WHITELIST;
+          });
+          if (value instanceof Promise && metadatas.find(function(metadata) {
+            return metadata.type === ValidationTypes.PROMISE_VALIDATION;
+          })) {
+            _this.awaitingPromises.push(value.then(function(resolvedValue) {
+              _this.performValidations(object, resolvedValue, propertyName, definedMetadatas, metadatas, validationErrors);
+            }));
+          } else {
+            _this.performValidations(object, value, propertyName, definedMetadatas, metadatas, validationErrors);
+          }
+        });
+      };
+      ValidationExecutor2.prototype.whitelist = function(object, groupedMetadatas, validationErrors) {
+        var _this = this;
+        var notAllowedProperties = [];
+        Object.keys(object).forEach(function(propertyName) {
+          if (!groupedMetadatas[propertyName] || groupedMetadatas[propertyName].length === 0)
+            notAllowedProperties.push(propertyName);
+        });
+        if (notAllowedProperties.length > 0) {
+          if (this.validatorOptions && this.validatorOptions.forbidNonWhitelisted) {
+            notAllowedProperties.forEach(function(property) {
+              var _a;
+              var validationError = _this.generateValidationError(object, object[property], property);
+              validationError.constraints = (_a = {}, _a[ValidationTypes.WHITELIST] = "property ".concat(property, " should not exist"), _a);
+              validationError.children = void 0;
+              validationErrors.push(validationError);
+            });
+          } else {
+            notAllowedProperties.forEach(function(property) {
+              return delete object[property];
+            });
+          }
+        }
+      };
+      ValidationExecutor2.prototype.stripEmptyErrors = function(errors) {
+        var _this = this;
+        return errors.filter(function(error) {
+          if (error.children) {
+            error.children = _this.stripEmptyErrors(error.children);
+          }
+          if (Object.keys(error.constraints).length === 0) {
+            if (error.children.length === 0) {
+              return false;
+            } else {
+              delete error.constraints;
+            }
+          }
+          return true;
+        });
+      };
+      ValidationExecutor2.prototype.performValidations = function(object, value, propertyName, definedMetadatas, metadatas, validationErrors) {
+        var customValidationMetadatas = metadatas.filter(function(metadata) {
+          return metadata.type === ValidationTypes.CUSTOM_VALIDATION;
+        });
+        var nestedValidationMetadatas = metadatas.filter(function(metadata) {
+          return metadata.type === ValidationTypes.NESTED_VALIDATION;
+        });
+        var conditionalValidationMetadatas = metadatas.filter(function(metadata) {
+          return metadata.type === ValidationTypes.CONDITIONAL_VALIDATION;
+        });
+        var validationError = this.generateValidationError(object, value, propertyName);
+        validationErrors.push(validationError);
+        var canValidate = this.conditionalValidations(object, value, conditionalValidationMetadatas);
+        if (!canValidate) {
+          return;
+        }
+        this.customValidations(object, value, definedMetadatas, validationError);
+        this.mapContexts(object, value, definedMetadatas, validationError);
+        if (value === void 0 && this.validatorOptions && this.validatorOptions.skipUndefinedProperties === true) {
+          return;
+        }
+        if (value === null && this.validatorOptions && this.validatorOptions.skipNullProperties === true) {
+          return;
+        }
+        if ((value === null || value === void 0) && this.validatorOptions && this.validatorOptions.skipMissingProperties === true) {
+          return;
+        }
+        this.customValidations(object, value, customValidationMetadatas, validationError);
+        this.nestedValidations(value, nestedValidationMetadatas, validationError);
+        this.mapContexts(object, value, metadatas, validationError);
+        this.mapContexts(object, value, customValidationMetadatas, validationError);
+      };
+      ValidationExecutor2.prototype.generateValidationError = function(object, value, propertyName) {
+        var validationError = new ValidationError();
+        if (!this.validatorOptions || !this.validatorOptions.validationError || this.validatorOptions.validationError.target === void 0 || this.validatorOptions.validationError.target === true)
+          validationError.target = object;
+        if (!this.validatorOptions || !this.validatorOptions.validationError || this.validatorOptions.validationError.value === void 0 || this.validatorOptions.validationError.value === true)
+          validationError.value = value;
+        validationError.property = propertyName;
+        validationError.children = [];
+        validationError.constraints = {};
+        return validationError;
+      };
+      ValidationExecutor2.prototype.conditionalValidations = function(object, value, metadatas) {
+        return metadatas.map(function(metadata) {
+          return metadata.constraints[0](object, value);
+        }).reduce(function(resultA, resultB) {
+          return resultA && resultB;
+        }, true);
+      };
+      ValidationExecutor2.prototype.customValidations = function(object, value, metadatas, error) {
+        var _this = this;
+        metadatas.forEach(function(metadata) {
+          _this.metadataStorage.getTargetValidatorConstraints(metadata.constraintCls).forEach(function(customConstraintMetadata) {
+            if (customConstraintMetadata.async && _this.ignoreAsyncValidations)
+              return;
+            if (_this.validatorOptions && _this.validatorOptions.stopAtFirstError && Object.keys(error.constraints || {}).length > 0)
+              return;
+            var validationArguments = {
+              targetName: object.constructor ? object.constructor.name : void 0,
+              property: metadata.propertyName,
+              object,
+              value,
+              constraints: metadata.constraints
+            };
+            if (!metadata.each || !(Array.isArray(value) || value instanceof Set || value instanceof Map)) {
+              var validatedValue = customConstraintMetadata.instance.validate(value, validationArguments);
+              if (isPromise2(validatedValue)) {
+                var promise = validatedValue.then(function(isValid) {
+                  if (!isValid) {
+                    var _a2 = __read2(_this.createValidationError(object, value, metadata, customConstraintMetadata), 2), type2 = _a2[0], message2 = _a2[1];
+                    error.constraints[type2] = message2;
+                    if (metadata.context) {
+                      if (!error.contexts) {
+                        error.contexts = {};
+                      }
+                      error.contexts[type2] = Object.assign(error.contexts[type2] || {}, metadata.context);
+                    }
+                  }
+                });
+                _this.awaitingPromises.push(promise);
+              } else {
+                if (!validatedValue) {
+                  var _a = __read2(_this.createValidationError(object, value, metadata, customConstraintMetadata), 2), type = _a[0], message = _a[1];
+                  error.constraints[type] = message;
+                }
+              }
+              return;
+            }
+            var arrayValue = convertToArray(value);
+            var validatedSubValues = arrayValue.map(function(subValue) {
+              return customConstraintMetadata.instance.validate(subValue, validationArguments);
+            });
+            var validationIsAsync = validatedSubValues.some(function(validatedSubValue) {
+              return isPromise2(validatedSubValue);
+            });
+            if (validationIsAsync) {
+              var asyncValidatedSubValues = validatedSubValues.map(function(validatedSubValue) {
+                return isPromise2(validatedSubValue) ? validatedSubValue : Promise.resolve(validatedSubValue);
+              });
+              var asyncValidationIsFinishedPromise = Promise.all(asyncValidatedSubValues).then(function(flatValidatedValues) {
+                var validationResult2 = flatValidatedValues.every(function(isValid) {
+                  return isValid;
+                });
+                if (!validationResult2) {
+                  var _a2 = __read2(_this.createValidationError(object, value, metadata, customConstraintMetadata), 2), type2 = _a2[0], message2 = _a2[1];
+                  error.constraints[type2] = message2;
+                  if (metadata.context) {
+                    if (!error.contexts) {
+                      error.contexts = {};
+                    }
+                    error.contexts[type2] = Object.assign(error.contexts[type2] || {}, metadata.context);
+                  }
+                }
+              });
+              _this.awaitingPromises.push(asyncValidationIsFinishedPromise);
+              return;
+            }
+            var validationResult = validatedSubValues.every(function(isValid) {
+              return isValid;
+            });
+            if (!validationResult) {
+              var _b = __read2(_this.createValidationError(object, value, metadata, customConstraintMetadata), 2), type = _b[0], message = _b[1];
+              error.constraints[type] = message;
+            }
+          });
+        });
+      };
+      ValidationExecutor2.prototype.nestedValidations = function(value, metadatas, error) {
+        var _this = this;
+        if (value === void 0) {
+          return;
+        }
+        metadatas.forEach(function(metadata) {
+          if (metadata.type !== ValidationTypes.NESTED_VALIDATION && metadata.type !== ValidationTypes.PROMISE_VALIDATION) {
+            return;
+          } else if (_this.validatorOptions && _this.validatorOptions.stopAtFirstError && Object.keys(error.constraints || {}).length > 0) {
+            return;
+          }
+          if (Array.isArray(value) || value instanceof Set || value instanceof Map) {
+            var arrayLikeValue = value instanceof Set ? Array.from(value) : value;
+            arrayLikeValue.forEach(function(subValue, index) {
+              _this.performValidations(value, subValue, index.toString(), [], metadatas, error.children);
+            });
+          } else if (value instanceof Object) {
+            var targetSchema = typeof metadata.target === "string" ? metadata.target : metadata.target.name;
+            _this.execute(value, targetSchema, error.children);
+          } else {
+            var _a = __read2(_this.createValidationError(metadata.target, value, metadata), 2), type = _a[0], message = _a[1];
+            error.constraints[type] = message;
+          }
+        });
+      };
+      ValidationExecutor2.prototype.mapContexts = function(object, value, metadatas, error) {
+        var _this = this;
+        return metadatas.forEach(function(metadata) {
+          if (metadata.context) {
+            var customConstraint = void 0;
+            if (metadata.type === ValidationTypes.CUSTOM_VALIDATION) {
+              var customConstraints = _this.metadataStorage.getTargetValidatorConstraints(metadata.constraintCls);
+              customConstraint = customConstraints[0];
+            }
+            var type = _this.getConstraintType(metadata, customConstraint);
+            if (error.constraints[type]) {
+              if (!error.contexts) {
+                error.contexts = {};
+              }
+              error.contexts[type] = Object.assign(error.contexts[type] || {}, metadata.context);
+            }
+          }
+        });
+      };
+      ValidationExecutor2.prototype.createValidationError = function(object, value, metadata, customValidatorMetadata) {
+        var targetName = object.constructor ? object.constructor.name : void 0;
+        var type = this.getConstraintType(metadata, customValidatorMetadata);
+        var validationArguments = {
+          targetName,
+          property: metadata.propertyName,
+          object,
+          value,
+          constraints: metadata.constraints
+        };
+        var message = metadata.message || "";
+        if (!metadata.message && (!this.validatorOptions || this.validatorOptions && !this.validatorOptions.dismissDefaultMessages)) {
+          if (customValidatorMetadata && customValidatorMetadata.instance.defaultMessage instanceof Function) {
+            message = customValidatorMetadata.instance.defaultMessage(validationArguments);
+          }
+        }
+        var messageString = ValidationUtils.replaceMessageSpecialTokens(message, validationArguments);
+        return [type, messageString];
+      };
+      ValidationExecutor2.prototype.getConstraintType = function(metadata, customValidatorMetadata) {
+        var type = customValidatorMetadata && customValidatorMetadata.name ? customValidatorMetadata.name : metadata.type;
+        return type;
+      };
+      return ValidationExecutor2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/validation/Validator.js
+  var __awaiter = function(thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P ? value : new P(function(resolve) {
+        resolve(value);
+      });
+    }
+    return new (P || (P = Promise))(function(resolve, reject) {
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+  };
+  var __generator = function(thisArg, body) {
+    var _ = { label: 0, sent: function() {
+      if (t[0] & 1) throw t[1];
+      return t[1];
+    }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
+      return this;
+    }), g;
+    function verb(n) {
+      return function(v) {
+        return step([n, v]);
+      };
+    }
+    function step(op) {
+      if (f) throw new TypeError("Generator is already executing.");
+      while (g && (g = 0, op[0] && (_ = 0)), _) try {
+        if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+        if (y = 0, t) op = [op[0] & 2, t.value];
+        switch (op[0]) {
+          case 0:
+          case 1:
+            t = op;
+            break;
+          case 4:
+            _.label++;
+            return { value: op[1], done: false };
+          case 5:
+            _.label++;
+            y = op[1];
+            op = [0];
+            continue;
+          case 7:
+            op = _.ops.pop();
+            _.trys.pop();
+            continue;
+          default:
+            if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+              _ = 0;
+              continue;
+            }
+            if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
+              _.label = op[1];
+              break;
+            }
+            if (op[0] === 6 && _.label < t[1]) {
+              _.label = t[1];
+              t = op;
+              break;
+            }
+            if (t && _.label < t[2]) {
+              _.label = t[2];
+              _.ops.push(op);
+              break;
+            }
+            if (t[2]) _.ops.pop();
+            _.trys.pop();
+            continue;
+        }
+        op = body.call(thisArg, _);
+      } catch (e) {
+        op = [6, e];
+        y = 0;
+      } finally {
+        f = t = 0;
+      }
+      if (op[0] & 5) throw op[1];
+      return { value: op[0] ? op[1] : void 0, done: true };
+    }
+  };
+  var Validator = (
+    /** @class */
+    (function() {
+      function Validator2() {
+      }
+      Validator2.prototype.validate = function(objectOrSchemaName, objectOrValidationOptions, maybeValidatorOptions) {
+        return this.coreValidate(objectOrSchemaName, objectOrValidationOptions, maybeValidatorOptions);
+      };
+      Validator2.prototype.validateOrReject = function(objectOrSchemaName, objectOrValidationOptions, maybeValidatorOptions) {
+        return __awaiter(this, void 0, void 0, function() {
+          var errors;
+          return __generator(this, function(_a) {
+            switch (_a.label) {
+              case 0:
+                return [4, this.coreValidate(objectOrSchemaName, objectOrValidationOptions, maybeValidatorOptions)];
+              case 1:
+                errors = _a.sent();
+                if (errors.length)
+                  return [2, Promise.reject(errors)];
+                return [
+                  2
+                  /*return*/
+                ];
+            }
+          });
+        });
+      };
+      Validator2.prototype.validateSync = function(objectOrSchemaName, objectOrValidationOptions, maybeValidatorOptions) {
+        var object = typeof objectOrSchemaName === "string" ? objectOrValidationOptions : objectOrSchemaName;
+        var options = typeof objectOrSchemaName === "string" ? maybeValidatorOptions : objectOrValidationOptions;
+        var schema = typeof objectOrSchemaName === "string" ? objectOrSchemaName : void 0;
+        var executor = new ValidationExecutor(this, options);
+        executor.ignoreAsyncValidations = true;
+        var validationErrors = [];
+        executor.execute(object, schema, validationErrors);
+        return executor.stripEmptyErrors(validationErrors);
+      };
+      Validator2.prototype.coreValidate = function(objectOrSchemaName, objectOrValidationOptions, maybeValidatorOptions) {
+        var object = typeof objectOrSchemaName === "string" ? objectOrValidationOptions : objectOrSchemaName;
+        var options = typeof objectOrSchemaName === "string" ? maybeValidatorOptions : objectOrValidationOptions;
+        var schema = typeof objectOrSchemaName === "string" ? objectOrSchemaName : void 0;
+        var executor = new ValidationExecutor(this, options);
+        var validationErrors = [];
+        executor.execute(object, schema, validationErrors);
+        return Promise.all(executor.awaitingPromises).then(function() {
+          return executor.stripEmptyErrors(validationErrors);
+        });
+      };
+      return Validator2;
+    })()
+  );
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/container.js
+  var defaultContainer = new /** @class */
+  ((function() {
+    function class_1() {
+      this.instances = [];
+    }
+    class_1.prototype.get = function(someClass) {
+      var instance = this.instances.find(function(instance2) {
+        return instance2.type === someClass;
+      });
+      if (!instance) {
+        instance = { type: someClass, object: new someClass() };
+        this.instances.push(instance);
+      }
+      return instance.object;
+    };
+    return class_1;
+  })())();
+  var userContainer;
+  var userContainerOptions;
+  function getFromContainer(someClass) {
+    if (userContainer) {
+      try {
+        var instance = userContainer.get(someClass);
+        if (instance)
+          return instance;
+        if (!userContainerOptions || !userContainerOptions.fallback)
+          return instance;
+      } catch (error) {
+        if (!userContainerOptions || !userContainerOptions.fallbackOnErrors)
+          throw error;
+      }
+    }
+    return defaultContainer.get(someClass);
+  }
+
+  // node_modules/.pnpm/class-validator@0.14.4/node_modules/class-validator/esm5/index.js
+  function validate(schemaNameOrObject, objectOrValidationOptions, maybeValidatorOptions) {
+    if (typeof schemaNameOrObject === "string") {
+      return getFromContainer(Validator).validate(schemaNameOrObject, objectOrValidationOptions, maybeValidatorOptions);
+    } else {
+      return getFromContainer(Validator).validate(schemaNameOrObject, objectOrValidationOptions);
+    }
+  }
+
+  // node_modules/.pnpm/zois-core@2.2.1/node_modules/zois-core/dist/validation.js
+  async function validateData(data, dtoClass) {
+    try {
+      const dtoInstance = plainToInstance(dtoClass, data);
+      const errors = await validate(dtoInstance);
+      if (errors.length > 0) {
+        const errorMessages = errors.flatMap(
+          (error) => Object.values(error.constraints || {})
+        );
+        return {
+          isValid: false,
+          errors: errorMessages
+        };
+      }
+      return {
+        isValid: true,
+        validatedData: dtoInstance
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        errors: ["Validation error: " + error.message]
+      };
+    }
+  }
+
+  // node_modules/.pnpm/zois-core@2.2.1/node_modules/zois-core/dist/messaging.js
+  function isZoiChatRoomMessage(m) {
+    return m.Content === MOD_DATA.key;
+  }
+  function isClassConstructor(c) {
+    return typeof c === "function" && c.prototype?.constructor == c;
+  }
+  var MessagesManager = class {
+    /**
+     * Sends beep message to a specific player.
+     * @param data - The data to send in the beep.
+     * @param targetId - The member number of the target player.
+     */
+    sendBeep(data, targetId) {
+      const beep = {
+        IsSecret: true,
+        BeepType: "Leash",
+        MemberNumber: targetId,
+        Message: JSON.stringify({
+          ...data
+        })
+      };
+      ServerSend("AccountBeep", beep);
+    }
+    /**
+     * Sends hidden packet message to the chat room or a specific player.
+     * @param msg - The message identifier.
+     * @param _data - Optional data payload to include.
+     * @param targetNumber - Optional target player member number.
+     */
+    sendPacket(msg, _data, targetNumber) {
+      const data = {
+        Content: MOD_DATA.key,
+        Dictionary: {
+          msg
+        },
+        Type: "Hidden"
+      };
+      if (_data) data.Dictionary.data = _data;
+      if (targetNumber) data.Target = targetNumber;
+      ServerSend("ChatRoomChat", data);
+    }
+    /**
+     * Sends a custom action message to the chat room with automatic pronoun replacement.
+     * 
+     * Replaces placeholders such as `<Possessive>`, `<Intensive>`, `<SelfIntensive>`, and `<Pronoun>`.
+     * @param msg - The action message text.
+     * @param target - Optional target player member number.
+     * @param dictionary - Optional additional dictionary entries.
+     */
+    sendAction(msg, target = void 0, dictionary = []) {
+      if (!msg || !ServerPlayerIsInChatRoom()) return;
+      const isFemale = CharacterPronounDescription(Player) === "She/Her";
+      const capPossessive = isFemale ? "Her" : "His";
+      const capIntensive = isFemale ? "Her" : "Him";
+      const capSelfIntensive = isFemale ? "Herself" : "Himself";
+      const capPronoun = isFemale ? "She" : "He";
+      msg = msg.replaceAll("<Possessive>", capPossessive).replaceAll("<possessive>", capPossessive.toLocaleLowerCase()).replaceAll("<Intensive>", capIntensive).replaceAll("<intensive>", capIntensive.toLocaleLowerCase()).replaceAll("<SelfIntensive>", capSelfIntensive).replaceAll("<selfIntensive>", capSelfIntensive.toLocaleLowerCase()).replaceAll("<Pronoun>", capPronoun).replaceAll("<pronoun>", capPronoun.toLocaleLowerCase());
+      ServerSend("ChatRoomChat", {
+        Content: "Beep",
+        Type: "Action",
+        Target: target ?? void 0,
+        Dictionary: [
+          // EN
+          { Tag: "Beep", Text: "msg" },
+          // CN
+          { Tag: "\u53D1\u9001\u79C1\u804A", Text: "msg" },
+          // DE
+          { Tag: "Biep", Text: "msg" },
+          // FR
+          { Tag: "Sonner", Text: "msg" },
+          // RU
+          { Tag: "\u0417\u0432\u0443\u043A\u043E\u0432\u043E\u0439 \u0441\u0438\u0433\u043D\u0430\u043B", Text: "msg" },
+          { Tag: "msg", Text: msg },
+          ...dictionary
+        ]
+      });
+    }
+    /**
+     * Sends a request to a target player and waits for a response.
+     * 
+     * Supports both packet and beep transport. Automatically times out after 6 seconds.
+     * @param options - Request configuration.
+     * @param options.message - The request message identifier.
+     * @param options.data - Optional data to send with the request.
+     * @param options.target - Target player member number.
+     * @param options.type - Transport type: `"packet"` or `"beep"`.
+     * @returns A promise that resolves with the response data or an error flag.
+     */
+    sendRequest({
+      message,
+      data = {},
+      target,
+      type = "packet",
+      responseDto
+    }) {
+      const requestId = crypto.randomUUID();
+      return new Promise((resolve) => {
+        let deleteHook;
+        if (type === "packet") {
+          messagesManager.sendPacket("request", {
+            requestId,
+            message,
+            data
+          }, target);
+          deleteHook = hookFunction("ChatRoomMessage", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+            const _message = args[0];
+            const sender = getPlayer(_message.Sender);
+            if (!sender) return next(args);
+            if (isZoiChatRoomMessage(_message) && !sender.IsPlayer()) {
+              const msg = _message.Dictionary.msg;
+              const data2 = _message.Dictionary.data;
+              if (msg === "requestResponse" && data2.requestId === requestId) {
+                deleteHook();
+                if (responseDto) {
+                  const validationResult = await validateData(data2.data, responseDto);
+                  if (!validationResult.isValid) {
+                    logger.warn(`DTO Failure:`, validationResult);
+                    resolve({
+                      isError: true
+                    });
+                  }
+                }
+                resolve({
+                  data: data2.data,
+                  isError: false
+                });
+              }
+            }
+            return next(args);
+          });
+        } else {
+          messagesManager.sendBeep({
+            type: `${MOD_DATA.key}_request`,
+            requestId,
+            message,
+            data
+          }, target);
+          deleteHook = hookFunction("ServerAccountBeep", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+            const beep = args[0];
+            if (beep.BeepType !== "Leash") return next(args);
+            let data2;
+            try {
+              data2 = JSON.parse(beep.Message);
+            } catch {
+              return next(args);
+            }
+            if (data2.type === `${MOD_DATA.key}_requestResponse` && data2.requestId === requestId) {
+              deleteHook();
+              if (responseDto) {
+                const validationResult = await validateData(data2.data, responseDto);
+                if (!validationResult.isValid) {
+                  logger.warn(`DTO Failure:`, validationResult);
+                  resolve({
+                    isError: true
+                  });
+                }
+              }
+              resolve({
+                data: data2.data,
+                isError: false
+              });
+            }
+            return next(args);
+          });
+        }
+        setTimeout(() => {
+          deleteHook();
+          resolve({
+            isError: true
+          });
+        }, 6e3);
+      });
+    }
+    /**
+     * Displays a local message in the chat log (visible only to the current player).
+     * @param message - The message content as a string or DOM node.
+     */
+    sendLocal(message) {
+      if (!ServerPlayerIsInChatRoom()) return;
+      const div = document.createElement("div");
+      div.setAttribute("class", "ChatMessage ChatMessageLocalMessage");
+      div.setAttribute("data-time", ChatRoomCurrentTime());
+      div.setAttribute("data-sender", `${Player.MemberNumber}`);
+      setFontFamily(div, MOD_DATA.fontFamily);
+      div.style.background = MOD_DATA.chatMessageBackground ?? "#55edc095";
+      div.style.color = MOD_DATA.chatMessageColor ?? "black";
+      div.style.margin = "0.15em 0";
+      if (typeof message === "string") div.innerHTML = message;
+      else div.appendChild(message);
+      document.querySelector("#TextAreaChatLog")?.appendChild(div);
+      ElementScrollToEnd("TextAreaChatLog");
+    }
+    /**
+     * Sends a regular chat message to the chat room.
+     * @param message - The chat message content.
+     */
+    sendChat(message) {
+      ServerSend("ChatRoomChat", { Type: "Chat", Content: message });
+    }
+    onRequest(message, dtoOrListener, listener) {
+      let _listener;
+      let dto;
+      if (isClassConstructor(dtoOrListener)) {
+        dto = dtoOrListener;
+        _listener = listener;
+      } else {
+        _listener = dtoOrListener;
+      }
+      const rm1 = hookFunction("ChatRoomMessage", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+        const _message = args[0];
+        const sender = getPlayer(_message.Sender);
+        if (!sender) return next(args);
+        if (isZoiChatRoomMessage(_message) && !sender.IsPlayer()) {
+          const msg = _message.Dictionary?.msg;
+          const data = _message.Dictionary?.data;
+          if (msg === "request" && data.message === message) {
+            if (typeof data.requestId !== "string" || typeof data.message !== "string") return;
+            if (dto) {
+              const validationResult = await validateData(data.data, dto);
+              if (!validationResult.isValid) {
+                logger.warn(`DTO Failure:`, validationResult);
+                return;
+              }
+            }
+            const _data = _listener?.(data.data, sender);
+            if (_data !== void 0) {
+              messagesManager.sendPacket("requestResponse", {
+                requestId: data.requestId,
+                message: data.message,
+                data: _data
+              }, sender.MemberNumber);
+            }
+          }
+        }
+        return next(args);
+      });
+      const rm2 = hookFunction("ServerAccountBeep", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+        const beep = args[0];
+        if (beep.BeepType !== "Leash") return next(args);
+        let data;
+        try {
+          data = JSON.parse(beep.Message);
+        } catch {
+          return next(args);
+        }
+        if (data.type === `${MOD_DATA.key}_request` && data.message === message) {
+          if (typeof data.requestId !== "string") return;
+          const validationResult = await validateData(data.data, dto);
+          if (dto && !validationResult.isValid) {
+            logger.warn(`DTO Failure:`, validationResult);
+            return next(args);
+          }
+          const _data = _listener?.(data.data, beep.MemberNumber, beep.MemberName);
+          if (_data !== void 0) {
+            messagesManager.sendBeep({
+              type: `${MOD_DATA.key}_requestResponse`,
+              requestId: data.requestId,
+              message: data.message,
+              data: _data
+            }, beep.MemberNumber);
+          }
+        }
+        return next(args);
+      });
+      return () => {
+        rm1();
+        rm2();
+      };
+    }
+    onPacket(message, dtoOrListener, listener) {
+      return hookFunction("ChatRoomMessage", HookPriority.ADD_BEHAVIOR, async (args, next) => {
+        let _listener;
+        let dto;
+        if (isClassConstructor(dtoOrListener)) {
+          dto = dtoOrListener;
+          _listener = listener;
+        } else {
+          _listener = dtoOrListener;
+        }
+        const _message = args[0];
+        const sender = getPlayer(_message.Sender);
+        if (!sender) return next(args);
+        if (isZoiChatRoomMessage(_message) && _message.Dictionary.msg === message && !sender.IsPlayer()) {
+          const validationResult = await validateData(_message.Dictionary.data, dto);
+          if (dto && !validationResult.isValid) {
+            logger.warn(`DTO Failure:`, validationResult);
+            return next(args);
+          }
+          _listener?.(_message.Dictionary.data, sender);
+        }
+        return next(args);
+      });
+    }
+  };
+  var messagesManager = new MessagesManager();
+
+  // src/modules/networkSync.ts
+  async function canSenderInspect(senderId, senderName) {
+    if (!modStorage.inspector.enabled) {
+      return { allowed: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
+    }
+    const perm = modStorage.inspector.viewPermission;
+    if (perm === "Disabled") {
+      return { allowed: false, reason: "Player has disabled addon inspection." };
+    }
+    if (typeof Player !== "undefined" && Player.IsOwnedByMemberNumber(senderId)) {
+      return { allowed: true };
+    }
+    if (perm === "Owner") {
+      return { allowed: false, reason: "Player allows only their Owner to inspect addons." };
+    }
+    if (perm === "Lovers") {
+      if (typeof Player !== "undefined" && Player.IsLoverOfMemberNumber(senderId)) {
+        return { allowed: true };
+      }
+      return { allowed: false, reason: "Player allows only Lovers or Owner to inspect addons." };
+    }
+    if (perm === "Whitelist") {
+      if (typeof Player !== "undefined" && (Player.WhiteList.includes(senderId) || Player.IsLoverOfMemberNumber(senderId))) {
+        return { allowed: true };
+      }
+      return { allowed: false, reason: "Player allows only Whitelisted members or Lovers/Owner to inspect addons." };
+    }
+    if (perm === "Anyone") {
+      return { allowed: true };
+    }
+    if (perm === "Prompt") {
+      const name = senderName || `Member #${senderId}`;
+      try {
+        const confirmed = await dialogsManager.confirm({
+          message: `${name} wants to inspect your loaded addons. Allow?`
+        });
+        if (confirmed) {
+          return { allowed: true };
+        } else {
+          return { allowed: false, reason: "Inspection request declined by player." };
+        }
+      } catch {
+        return { allowed: false, reason: "Inspection request timed out or was dismissed." };
+      }
+    }
+    return { allowed: false, reason: "Permission denied." };
+  }
+  function canSenderEnforceRules(senderId) {
+    if (!modStorage.inspector.enabled) {
+      return { allowed: false, reason: "Quality of Club Addon Inspector is disabled." };
+    }
+    if (!modStorage.inspector.allowOwnerRules) {
+      return { allowed: false, reason: "Player has disabled external rule enforcement in QoC settings." };
+    }
+    const isOwner = typeof Player !== "undefined" && Player.IsOwnedByMemberNumber(senderId);
+    if (isOwner) {
+      return { allowed: true };
+    }
+    if (modStorage.inspector.allowLoversRules) {
+      const isLover = typeof Player !== "undefined" && Player.IsLoverOfMemberNumber(senderId);
+      const isWhitelisted = typeof Player !== "undefined" && Player.WhiteList.includes(senderId);
+      if (isLover || isWhitelisted) {
+        return { allowed: true };
+      }
+    }
+    return { allowed: false, reason: "You do not have rule enforcement authority over this player." };
+  }
+  function hasRuleAuthorityOver(target) {
+    if (typeof Player === "undefined") return false;
+    const targetChar = typeof target === "number" ? typeof Character !== "undefined" ? Character.find((c) => c.MemberNumber === target) : null : target;
+    if (!targetChar) {
+      return false;
+    }
+    if (targetChar.IsPlayer && targetChar.IsPlayer()) {
+      return true;
+    }
+    if (typeof targetChar.IsOwnedByPlayer === "function" && targetChar.IsOwnedByPlayer()) {
+      return true;
+    }
+    if (targetChar.Ownership && targetChar.Ownership.MemberNumber === Player.MemberNumber) {
+      return true;
+    }
+    if (targetChar.Owner && targetChar.Owner === Player.Name) {
+      return true;
+    }
+    if (typeof targetChar.IsLoverOfPlayer === "function" && targetChar.IsLoverOfPlayer()) {
+      return true;
+    }
+    return false;
+  }
+  function initNetworkSync() {
+    messagesManager.onRequest("qoc_inspect", async (data, sender, senderName) => {
+      const senderId = typeof sender === "number" ? sender : sender.MemberNumber ?? -1;
+      const permCheck = await canSenderInspect(senderId, senderName);
+      if (!permCheck.allowed) {
+        return {
+          allowed: false,
+          reason: permCheck.reason
+        };
+      }
+      return {
+        allowed: true,
+        mods: getLoadedMods(),
+        rules: modStorage.inspector.rules,
+        version: version2
+      };
+    });
+    messagesManager.onRequest("qoc_setRules", (data, sender, senderName) => {
+      const senderId = typeof sender === "number" ? sender : sender.MemberNumber ?? -1;
+      const authCheck = canSenderEnforceRules(senderId);
+      if (!authCheck.allowed) {
+        return {
+          success: false,
+          reason: authCheck.reason
+        };
+      }
+      const newRules = Array.isArray(data?.rules) ? data.rules : [];
+      modStorage.inspector.rules = newRules;
+      syncStorage();
+      evaluateCompliance();
+      toastsManager.info({
+        title: `${MOD_NAME} Rules Updated`,
+        message: `Addon rules updated by ${senderName || `Member #${senderId}`}.`,
+        duration: 5e3
+      });
+      return {
+        success: true
+      };
+    });
+    hookFunction("ChatRoomSync", HookPriority.OBSERVE, (args, next) => {
+      const ret = next(args);
+      evaluateCompliance();
+      return ret;
+    });
+  }
+  async function requestInspect(targetMemberNumber) {
+    try {
+      const res = await messagesManager.sendRequest({
+        message: "qoc_inspect",
+        target: targetMemberNumber,
+        type: "packet"
+      });
+      if (res.isError || !res.data) {
+        return {
+          success: false,
+          error: "Target player did not respond. They may not have Quality of Club loaded."
+        };
+      }
+      if (!res.data.allowed) {
+        return {
+          success: false,
+          error: res.data.reason || "Inspection permission denied by target player."
+        };
+      }
+      return {
+        success: true,
+        data: res.data
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err?.message || "Failed to communicate with target player."
+      };
+    }
+  }
+  async function requestSetRules(targetMemberNumber, rules) {
+    try {
+      const res = await messagesManager.sendRequest({
+        message: "qoc_setRules",
+        data: { rules },
+        target: targetMemberNumber,
+        type: "packet"
+      });
+      if (res.isError || !res.data) {
+        return {
+          success: false,
+          error: "Target player did not respond. Rules could not be synced."
+        };
+      }
+      if (!res.data.success) {
+        return {
+          success: false,
+          error: res.data.reason || "Target rejected rule update."
+        };
+      }
+      return {
+        success: true
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err?.message || "Failed to send rule update to target."
+      };
+    }
+  }
+
+  // src/subscreens/inspectorSubscreen.ts
+  var InspectorSubscreen = class extends BaseSubscreen {
+    target = null;
+    isSelf = true;
+    targetData = null;
+    isLoading = false;
+    errorMessage = null;
+    // Working copy of rules being edited on a target
+    targetRulesCopy = [];
+    customModInputText = "";
+    // DOM containers
+    activeContainers = [];
+    constructor(target = null) {
+      super();
+      this.target = target;
+      this.isSelf = !target || typeof target.IsPlayer === "function" && target.IsPlayer();
+    }
+    get name() {
+      if (this.isSelf) {
+        return `${MOD_NAME} - My Addons & Policy`;
+      }
+      const targetName = this.target?.Name || `Member #${this.target?.MemberNumber}`;
+      return `${MOD_NAME} - Inspecting ${targetName}`;
+    }
+    onRun() {
+      DrawRect(0, 0, 2e3, 1e3, "#191f2b");
+    }
+    onLoad() {
+      if (this.isSelf) {
+        this.setupSelfTabs();
+      } else {
+        this.setupTargetTabs();
+        this.loadTargetData();
+      }
+    }
+    onExit() {
+      this.cleanupContainers();
+      setSubscreen(null);
+      if (this.target && typeof InformationSheetLoadCharacter === "function") {
+        try {
+          InformationSheetLoadCharacter(this.target);
+        } catch {
+        }
+      } else if (typeof InformationSheetLoad === "function") {
+        try {
+          InformationSheetLoad();
+        } catch {
+        }
+      }
+    }
+    cleanupContainers() {
+      for (const el of this.activeContainers) {
+        try {
+          el.remove();
+        } catch {
+        }
+      }
+      this.activeContainers = [];
+    }
+    registerContainer(el) {
+      this.activeContainers.push(el);
+      document.body.appendChild(el);
+      return el;
+    }
+    // ==========================================
+    // SELF MODE TABS
+    // ==========================================
+    setupSelfTabs() {
+      this.createTabs({
+        x: 100,
+        y: 130,
+        width: 1800,
+        currentTabName: "My Addons",
+        tabs: [
+          {
+            name: "My Addons",
+            load: () => this.renderMyAddonsTab(),
+            unload: () => this.cleanupContainers()
+          },
+          {
+            name: "Rules On Me",
+            load: () => this.renderMyRulesTab(),
+            unload: () => this.cleanupContainers()
+          },
+          {
+            name: "Permissions & Settings",
+            load: () => this.renderMySettingsTab(),
+            unload: () => this.cleanupContainers()
+          }
+        ]
+      });
+    }
+    renderMyAddonsTab() {
+      const loadedMods = getLoadedMods();
+      this.createText({
+        x: 120,
+        y: 220,
+        fontSize: 4,
+        text: `Currently Detected Addons (${loadedMods.length})`
+      });
+      const listContainer = document.createElement("div");
+      listContainer.style.cssText = `
+            position: absolute;
+            left: ${getRelativeX(120)}px;
+            top: ${getRelativeY(270)}px;
+            width: ${getRelativeWidth(1760)}px;
+            height: ${getRelativeHeight(600)}px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 15px;
+            box-sizing: border-box;
+            z-index: 5;
+        `;
+      this.registerContainer(listContainer);
+      if (loadedMods.length === 0) {
+        const emptyMsg = document.createElement("div");
+        emptyMsg.style.cssText = "color: #aaa; font-size: 18px; padding: 20px;";
+        emptyMsg.textContent = "No external addons detected in this browser session.";
+        listContainer.appendChild(emptyMsg);
+        return;
+      }
+      for (const mod of loadedMods) {
+        const card = document.createElement("div");
+        card.style.cssText = `
+                background: rgba(30, 36, 48, 0.85);
+                border: 1px solid rgba(80, 100, 140, 0.4);
+                border-radius: 8px;
+                padding: 14px 20px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                color: #e0e6ed;
+                font-family: inherit;
+            `;
+        const left = document.createElement("div");
+        left.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+        const title = document.createElement("div");
+        title.style.cssText = "font-size: 17px; font-weight: bold; color: #64b5f6;";
+        title.textContent = mod.name;
+        const sub = document.createElement("div");
+        sub.style.cssText = "font-size: 13px; color: #8fa0b5;";
+        sub.textContent = `ID: ${mod.id}${mod.repository ? ` \u2022 Repo: ${mod.repository}` : ""}`;
+        left.appendChild(title);
+        left.appendChild(sub);
+        const right = document.createElement("div");
+        right.style.cssText = "display: flex; align-items: center; gap: 12px;";
+        const versionBadge = document.createElement("span");
+        versionBadge.style.cssText = `
+                background: rgba(41, 121, 255, 0.2);
+                border: 1px solid #2979ff;
+                color: #82b1ff;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: 500;
+            `;
+        versionBadge.textContent = `v${mod.version || "1.0.0"}`;
+        const activeBadge = document.createElement("span");
+        activeBadge.style.cssText = `
+                background: rgba(46, 125, 50, 0.25);
+                border: 1px solid #4caf50;
+                color: #81c784;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: bold;
+            `;
+        activeBadge.textContent = "ACTIVE";
+        right.appendChild(versionBadge);
+        right.appendChild(activeBadge);
+        card.appendChild(left);
+        card.appendChild(right);
+        listContainer.appendChild(card);
+      }
+    }
+    renderMyRulesTab() {
+      const rules = modStorage.inspector.rules;
+      const loadedMods = getLoadedMods();
+      const compliance = checkComplianceAgainstRules(loadedMods, rules);
+      this.createText({
+        x: 120,
+        y: 220,
+        fontSize: 4,
+        text: `Enforced Rules on You (${rules.length})`
+      });
+      const statusBanner = document.createElement("div");
+      statusBanner.style.cssText = `
+            position: absolute;
+            left: ${getRelativeX(120)}px;
+            top: ${getRelativeY(270)}px;
+            width: ${getRelativeWidth(1760)}px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-weight: bold;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: ${compliance.isCompliant ? "rgba(46, 125, 50, 0.25)" : "rgba(198, 40, 40, 0.3)"};
+            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
+            color: ${compliance.isCompliant ? "#a5d6a7" : "#ffcdd2"};
+            z-index: 5;
+        `;
+      statusBanner.textContent = compliance.isCompliant ? "\u2713 COMPLIANT: All mandatory addons are loaded, and no forbidden addons are detected." : `\u26A0\uFE0F NON-COMPLIANT: ${compliance.missing.length} missing mandatory addons, ${compliance.forbidden.length} forbidden addons detected.`;
+      this.registerContainer(statusBanner);
+      const listContainer = document.createElement("div");
+      listContainer.style.cssText = `
+            position: absolute;
+            left: ${getRelativeX(120)}px;
+            top: ${getRelativeY(340)}px;
+            width: ${getRelativeWidth(1760)}px;
+            height: ${getRelativeHeight(530)}px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 5;
+        `;
+      this.registerContainer(listContainer);
+      if (rules.length === 0) {
+        const emptyMsg = document.createElement("div");
+        emptyMsg.style.cssText = "color: #90a4ae; font-size: 16px; padding: 25px;";
+        emptyMsg.textContent = "No addon rules are currently locked on you by your Owner or yourself.";
+        listContainer.appendChild(emptyMsg);
+        return;
+      }
+      for (const rule of rules) {
+        const card = document.createElement("div");
+        const isMandatory = rule.type === "required";
+        card.style.cssText = `
+                background: rgba(30, 36, 48, 0.85);
+                border-left: 5px solid ${isMandatory ? "#4caf50" : "#ef5350"};
+                border-top: 1px solid rgba(80, 100, 140, 0.3);
+                border-right: 1px solid rgba(80, 100, 140, 0.3);
+                border-bottom: 1px solid rgba(80, 100, 140, 0.3);
+                border-radius: 6px;
+                padding: 12px 18px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                color: #e0e6ed;
+            `;
+        const left = document.createElement("div");
+        left.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
+        const title = document.createElement("div");
+        title.style.cssText = "font-size: 16px; font-weight: bold;";
+        title.textContent = rule.modName;
+        const meta = document.createElement("div");
+        meta.style.cssText = "font-size: 12px; color: #8fa0b5;";
+        meta.textContent = `Enforced by: Member #${rule.enforcedBy}${rule.enforcedByName ? ` (${rule.enforcedByName})` : ""}`;
+        left.appendChild(title);
+        left.appendChild(meta);
+        const badge = document.createElement("span");
+        badge.style.cssText = `
+                background: ${isMandatory ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"};
+                color: ${isMandatory ? "#81c784" : "#e57373"};
+                border: 1px solid ${isMandatory ? "#4caf50" : "#f44336"};
+                padding: 5px 12px;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: bold;
+            `;
+        badge.textContent = isMandatory ? "MANDATORY" : "FORBIDDEN";
+        card.appendChild(left);
+        card.appendChild(badge);
+        listContainer.appendChild(card);
+      }
+    }
+    renderMySettingsTab() {
+      this.createText({
+        x: 120,
+        y: 220,
+        fontSize: 4,
+        text: "Consent & Inspection Settings"
+      });
+      this.createCheckbox({
+        x: 120,
+        y: 275,
+        width: 800,
+        height: 45,
+        text: "Allow Owner to lock mandatory / forbidden addon rules on me",
+        isChecked: modStorage.inspector.allowOwnerRules,
+        onChange: () => {
+          modStorage.inspector.allowOwnerRules = !modStorage.inspector.allowOwnerRules;
+          saveStorage();
+          syncStorage();
+        }
+      });
+      this.createCheckbox({
+        x: 120,
+        y: 330,
+        width: 800,
+        height: 45,
+        text: "Allow Lovers / Whitelisted partners to lock addon rules",
+        isChecked: modStorage.inspector.allowLoversRules,
+        onChange: () => {
+          modStorage.inspector.allowLoversRules = !modStorage.inspector.allowLoversRules;
+          saveStorage();
+          syncStorage();
+        }
+      });
+      this.createText({
+        x: 120,
+        y: 410,
+        fontSize: 3.5,
+        text: "Mandatory Addon Remediation Behavior:"
+      });
+      const autoLoadModes = [
+        { mode: "Prompt", label: "Prompt First (Recommended)", desc: "Shows a 1-click confirmation popup before loading missing verified addons." },
+        { mode: "Silent", label: "Silent Auto-Load", desc: "Silently injects missing verified addons (BCX, LSCG, etc.) in background." }
+      ];
+      autoLoadModes.forEach((item, idx) => {
+        const isSelected = modStorage.inspector.autoLoadMode === item.mode;
+        const btn = this.createButton({
+          x: 120 + idx * 360,
+          y: 450,
+          width: 340,
+          height: 50,
+          text: `${isSelected ? "\u25CF " : "\u25CB "}${item.label}`,
+          onClick: () => {
+            modStorage.inspector.autoLoadMode = item.mode;
+            saveStorage();
+            syncStorage();
+            this.cleanupContainers();
+            this.renderMySettingsTab();
+          }
+        });
+        btn.style.fontWeight = isSelected ? "bold" : "normal";
+      });
+      this.createText({
+        x: 120,
+        y: 540,
+        fontSize: 3.5,
+        text: "Who may inspect your loaded addons:"
+      });
+      const permissions = [
+        { perm: "Prompt", label: "Prompt Me (Recommended)" },
+        { perm: "Owner", label: "Owner Only" },
+        { perm: "Lovers", label: "Owner & Lovers" },
+        { perm: "Whitelist", label: "Whitelist / Friends" },
+        { perm: "Anyone", label: "Anyone in Room" },
+        { perm: "Disabled", label: "Disabled (Nobody)" }
+      ];
+      permissions.forEach((item, idx) => {
+        const isSelected = modStorage.inspector.viewPermission === item.perm;
+        const col = idx % 3;
+        const row = Math.floor(idx / 3);
+        const btn = this.createButton({
+          x: 120 + col * 320,
+          y: 580 + row * 60,
+          width: 300,
+          height: 48,
+          text: `${isSelected ? "\u25CF " : "\u25CB "}${item.label}`,
+          onClick: () => {
+            modStorage.inspector.viewPermission = item.perm;
+            saveStorage();
+            syncStorage();
+            this.cleanupContainers();
+            this.renderMySettingsTab();
+          }
+        });
+        btn.style.fontWeight = isSelected ? "bold" : "normal";
+      });
+    }
+    // ==========================================
+    // TARGET MODE TABS
+    // ==========================================
+    setupTargetTabs() {
+      const targetName = this.target?.Name || "Target";
+      this.createTabs({
+        x: 100,
+        y: 130,
+        width: 1800,
+        currentTabName: "Target Addons",
+        tabs: [
+          {
+            name: "Target Addons",
+            load: () => this.renderTargetAddonsTab(),
+            unload: () => this.cleanupContainers()
+          },
+          {
+            name: "Enforce Rules",
+            load: () => this.renderTargetRulesTab(),
+            unload: () => this.cleanupContainers()
+          }
+        ]
+      });
+    }
+    async loadTargetData() {
+      if (!this.target || typeof this.target.MemberNumber !== "number") {
+        this.errorMessage = "Invalid target character.";
+        return;
+      }
+      this.isLoading = true;
+      this.errorMessage = null;
+      const res = await requestInspect(this.target.MemberNumber);
+      this.isLoading = false;
+      if (!res.success || !res.data) {
+        this.errorMessage = res.error || "Failed to inspect target.";
+      } else {
+        this.targetData = res.data;
+        this.targetRulesCopy = structuredClone(res.data.rules || []);
+      }
+      this.cleanupContainers();
+      this.renderTargetAddonsTab();
+    }
+    renderTargetAddonsTab() {
+      if (this.isLoading) {
+        this.createText({
+          x: 120,
+          y: 250,
+          fontSize: 4,
+          text: "Querying target player's Quality of Club addon manifest..."
+        });
+        return;
+      }
+      if (this.errorMessage) {
+        this.createText({
+          x: 120,
+          y: 250,
+          fontSize: 4,
+          text: `Inspection Error: ${this.errorMessage}`
+        });
+        const retryBtn = this.createButton({
+          x: 120,
+          y: 320,
+          width: 200,
+          height: 50,
+          text: "Retry Inspection",
+          onClick: () => {
+            this.loadTargetData();
+          }
+        });
+        return;
+      }
+      const mods = this.targetData?.mods || [];
+      const rules = this.targetData?.rules || [];
+      const compliance = checkComplianceAgainstRules(mods, rules);
+      this.createText({
+        x: 120,
+        y: 205,
+        fontSize: 4,
+        text: `Detected Addons on ${this.target?.Name || "Target"} (${mods.length})`
+      });
+      const statusBanner = document.createElement("div");
+      statusBanner.style.cssText = `
+            position: absolute;
+            left: ${getRelativeX(120)}px;
+            top: ${getRelativeY(250)}px;
+            width: ${getRelativeWidth(1760)}px;
+            padding: 10px 18px;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: ${compliance.isCompliant ? "rgba(46, 125, 50, 0.25)" : "rgba(198, 40, 40, 0.3)"};
+            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
+            color: ${compliance.isCompliant ? "#a5d6a7" : "#ffcdd2"};
+            z-index: 5;
+        `;
+      statusBanner.textContent = compliance.isCompliant ? "\u2713 COMPLIANT: Player meets all active addon rules." : `\u26A0\uFE0F NON-COMPLIANT: ${compliance.missing.length} missing mandatory addons, ${compliance.forbidden.length} forbidden addons detected.`;
+      this.registerContainer(statusBanner);
+      const listContainer = document.createElement("div");
+      listContainer.style.cssText = `
+            position: absolute;
+            left: ${getRelativeX(120)}px;
+            top: ${getRelativeY(310)}px;
+            width: ${getRelativeWidth(1760)}px;
+            height: ${getRelativeHeight(560)}px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 5;
+        `;
+      this.registerContainer(listContainer);
+      if (mods.length === 0) {
+        const emptyMsg = document.createElement("div");
+        emptyMsg.style.cssText = "color: #90a4ae; font-size: 16px; padding: 20px;";
+        emptyMsg.textContent = "Target reported no active addons.";
+        listContainer.appendChild(emptyMsg);
+        return;
+      }
+      for (const mod of mods) {
+        const card = document.createElement("div");
+        card.style.cssText = `
+                background: rgba(30, 36, 48, 0.85);
+                border: 1px solid rgba(80, 100, 140, 0.4);
+                border-radius: 6px;
+                padding: 12px 18px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                color: #e0e6ed;
+            `;
+        const left = document.createElement("div");
+        left.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
+        const title = document.createElement("div");
+        title.style.cssText = "font-size: 16px; font-weight: bold; color: #64b5f6;";
+        title.textContent = mod.name;
+        const sub = document.createElement("div");
+        sub.style.cssText = "font-size: 12px; color: #8fa0b5;";
+        sub.textContent = `ID: ${mod.id}${mod.repository ? ` \u2022 Repo: ${mod.repository}` : ""}`;
+        left.appendChild(title);
+        left.appendChild(sub);
+        const badge = document.createElement("span");
+        badge.style.cssText = `
+                background: rgba(41, 121, 255, 0.2);
+                border: 1px solid #2979ff;
+                color: #82b1ff;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: 500;
+            `;
+        badge.textContent = `v${mod.version || "Active"}`;
+        card.appendChild(left);
+        card.appendChild(badge);
+        listContainer.appendChild(card);
+      }
+    }
+    renderTargetRulesTab() {
+      const canEnforce = this.target && hasRuleAuthorityOver(this.target);
+      if (!canEnforce) {
+        this.createText({
+          x: 120,
+          y: 240,
+          fontSize: 4,
+          text: "Permission Restricted"
+        });
+        const notice = this.createText({
+          x: 120,
+          y: 300,
+          fontSize: 3.5,
+          text: "Only an Owner (or Lover/Whitelisted partner if permitted by target) can set locked addon rules."
+        });
+        notice.style.color = "#aaa";
+        return;
+      }
+      this.createText({
+        x: 120,
+        y: 200,
+        fontSize: 4,
+        text: `Manage Locked Addons on ${this.target?.Name || "Target"}`
+      });
+      const presetsContainer = document.createElement("div");
+      presetsContainer.style.cssText = `
+            position: absolute;
+            left: ${getRelativeX(120)}px;
+            top: ${getRelativeY(240)}px;
+            width: ${getRelativeWidth(1760)}px;
+            height: ${getRelativeHeight(480)}px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 5;
+        `;
+      this.registerContainer(presetsContainer);
+      const curatedList = Object.values(CURATED_MOD_CATALOG);
+      for (const item of curatedList) {
+        const row = document.createElement("div");
+        row.style.cssText = `
+                background: rgba(30, 36, 48, 0.85);
+                border: 1px solid rgba(80, 100, 140, 0.4);
+                border-radius: 6px;
+                padding: 12px 18px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                color: #e0e6ed;
+            `;
+        const left = document.createElement("div");
+        left.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
+        const name = document.createElement("div");
+        name.style.cssText = "font-size: 16px; font-weight: bold; color: #64b5f6;";
+        name.textContent = item.name;
+        const desc = document.createElement("div");
+        desc.style.cssText = "font-size: 12px; color: #8fa0b5;";
+        desc.textContent = item.description;
+        left.appendChild(name);
+        left.appendChild(desc);
+        const existingRule = this.targetRulesCopy.find((r) => r.modId === item.id);
+        const currentState = existingRule ? existingRule.type : "none";
+        const btnGroup = document.createElement("div");
+        btnGroup.style.cssText = "display: flex; gap: 8px;";
+        const createChoiceBtn = (state, label, color) => {
+          const b = document.createElement("button");
+          b.textContent = label;
+          const isSelected = currentState === state;
+          b.style.cssText = `
+                    padding: 6px 14px;
+                    border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: ${isSelected ? "bold" : "normal"};
+                    cursor: pointer;
+                    background: ${isSelected ? color : "rgba(60, 70, 90, 0.4)"};
+                    border: 1px solid ${isSelected ? color : "rgba(100, 120, 150, 0.4)"};
+                    color: ${isSelected ? "white" : "#b0bec5"};
+                `;
+          b.addEventListener("click", () => {
+            this.targetRulesCopy = this.targetRulesCopy.filter((r) => r.modId !== item.id);
+            if (state !== "none") {
+              this.targetRulesCopy.push({
+                modId: item.id,
+                modName: item.name,
+                type: state,
+                enforcedBy: Player.MemberNumber,
+                enforcedByName: Player.Name,
+                enforcedAt: Date.now()
+              });
+            }
+            this.cleanupContainers();
+            this.renderTargetRulesTab();
+          });
+          return b;
+        };
+        btnGroup.appendChild(createChoiceBtn("none", "Neutral", "#78909c"));
+        btnGroup.appendChild(createChoiceBtn("required", "Mandatory", "#2e7d32"));
+        btnGroup.appendChild(createChoiceBtn("forbidden", "Forbidden", "#c62828"));
+        row.appendChild(left);
+        row.appendChild(btnGroup);
+        presetsContainer.appendChild(row);
+      }
+      const saveBtn = this.createButton({
+        x: 120,
+        y: 750,
+        width: 380,
+        height: 60,
+        text: "\u{1F4BE} Save & Sync Rules to Target",
+        onClick: async () => {
+          if (!this.target || typeof this.target.MemberNumber !== "number") return;
+          toastsManager.info({
+            title: `${MOD_NAME} Syncing`,
+            message: "Transmitting addon rules to target player...",
+            duration: 3e3
+          });
+          const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
+          if (res.success) {
+            modStorage.managedRules[this.target.MemberNumber] = structuredClone(this.targetRulesCopy);
+            saveStorage();
+            syncStorage();
+            toastsManager.success({
+              title: `${MOD_NAME} Rules Synced`,
+              message: "Addon rules successfully locked on target!",
+              duration: 5e3
+            });
+          } else {
+            toastsManager.error({
+              title: `${MOD_NAME} Sync Failed`,
+              message: res.error || "Target rejected rule sync.",
+              duration: 6e3
+            });
+          }
+        }
+      });
+      saveBtn.style.fontWeight = "bold";
+    }
+  };
+
+  // src/subscreens/addonPolicySubscreen.ts
+  var AddonPolicySubscreen = class extends BaseSubscreen {
+    domElements = [];
+    get name() {
+      return "Addon Policy & Sharing";
+    }
+    onRun() {
+      DrawRect(0, 0, 2e3, 1e3, "#191f2b");
+    }
+    onLoad() {
+      this.createText({
+        x: 120,
+        y: 180,
+        fontSize: 4,
+        text: "Addon Inspection & Sharing Settings"
+      });
+      this.createCheckbox({
+        x: 120,
+        y: 230,
+        width: 800,
+        height: 44,
+        text: "Enable Addon Inspector & Sharing System",
+        isChecked: modStorage.inspector.enabled,
+        onChange: () => {
+          modStorage.inspector.enabled = !modStorage.inspector.enabled;
+          saveStorage();
+          syncStorage();
+        }
+      });
+      this.createCheckbox({
+        x: 120,
+        y: 285,
+        width: 800,
+        height: 44,
+        text: "Allow Owner to lock mandatory / forbidden addon rules on me",
+        isChecked: modStorage.inspector.allowOwnerRules,
+        onChange: () => {
+          modStorage.inspector.allowOwnerRules = !modStorage.inspector.allowOwnerRules;
+          saveStorage();
+          syncStorage();
+        }
+      });
+      this.createCheckbox({
+        x: 120,
+        y: 340,
+        width: 800,
+        height: 44,
+        text: "Allow Lovers / Whitelisted partners to lock addon rules",
+        isChecked: modStorage.inspector.allowLoversRules,
+        onChange: () => {
+          modStorage.inspector.allowLoversRules = !modStorage.inspector.allowLoversRules;
+          saveStorage();
+          syncStorage();
+        }
+      });
+      this.createText({
+        x: 120,
+        y: 410,
+        fontSize: 3.5,
+        text: "Missing Mandatory Addon Behavior:"
+      });
+      const autoLoadModes = [
+        { mode: "Prompt", label: "Prompt First (Recommended)" },
+        { mode: "Silent", label: "Silent Auto-Load" }
+      ];
+      autoLoadModes.forEach((item, idx) => {
+        const isSelected = modStorage.inspector.autoLoadMode === item.mode;
+        const btn = this.createButton({
+          x: 120 + idx * 360,
+          y: 445,
+          width: 340,
+          height: 48,
+          text: `${isSelected ? "\u25CF " : "\u25CB "}${item.label}`,
+          onClick: () => {
+            modStorage.inspector.autoLoadMode = item.mode;
+            saveStorage();
+            syncStorage();
+            this.cleanup();
+            this.onLoad();
+          }
+        });
+        btn.style.fontWeight = isSelected ? "bold" : "normal";
+      });
+      this.createText({
+        x: 120,
+        y: 520,
+        fontSize: 3.5,
+        text: "Who May Inspect Your Loaded Addons:"
+      });
+      const permissions = [
+        { perm: "Prompt", label: "Prompt Me (Recommended)" },
+        { perm: "Owner", label: "Owner Only" },
+        { perm: "Lovers", label: "Owner & Lovers" },
+        { perm: "Whitelist", label: "Whitelist / Friends" },
+        { perm: "Anyone", label: "Anyone in Room" },
+        { perm: "Disabled", label: "Disabled (Nobody)" }
+      ];
+      permissions.forEach((item, idx) => {
+        const isSelected = modStorage.inspector.viewPermission === item.perm;
+        const col = idx % 3;
+        const row = Math.floor(idx / 3);
+        const btn = this.createButton({
+          x: 120 + col * 320,
+          y: 555 + row * 55,
+          width: 300,
+          height: 46,
+          text: `${isSelected ? "\u25CF " : "\u25CB "}${item.label}`,
+          onClick: () => {
+            modStorage.inspector.viewPermission = item.perm;
+            saveStorage();
+            syncStorage();
+            this.cleanup();
+            this.onLoad();
+          }
+        });
+        btn.style.fontWeight = isSelected ? "bold" : "normal";
+      });
+      const loadedMods = getLoadedMods();
+      const rules = modStorage.inspector.rules;
+      const compliance = checkComplianceAgainstRules(loadedMods, rules);
+      const summaryCard = document.createElement("div");
+      summaryCard.style.cssText = `
+            position: absolute;
+            left: ${getRelativeX(120)}px;
+            top: ${getRelativeY(690)}px;
+            width: ${getRelativeWidth(920)}px;
+            padding: 12px 18px;
+            background: rgba(30, 36, 48, 0.85);
+            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #e0e6ed;
+            font-size: 14px;
+            z-index: 10;
+        `;
+      const statusText = document.createElement("div");
+      statusText.innerHTML = `
+            <div><b>Active Addons:</b> ${loadedMods.length} detected \u2022 <b>Rules on You:</b> ${rules.length}</div>
+            <div style="font-size: 12px; color: ${compliance.isCompliant ? "#81c784" : "#e57373"}; margin-top: 3px;">
+                ${compliance.isCompliant ? "\u2713 Compliant with all addon rules" : `\u26A0\uFE0F Non-compliant (${compliance.missing.length} missing, ${compliance.forbidden.length} forbidden)`}
+            </div>
+        `;
+      summaryCard.appendChild(statusText);
+      this.domElements.push(summaryCard);
+      document.body.appendChild(summaryCard);
+      const openManagerBtn = this.createButton({
+        x: 1070,
+        y: 690,
+        width: 450,
+        height: 52,
+        text: "\u{1F50D} Open Full Addon & Policy Manager",
+        onClick: () => {
+          this.cleanup();
+          setSubscreen(new InspectorSubscreen(typeof Player !== "undefined" ? Player : null));
+        }
+      });
+      openManagerBtn.style.fontWeight = "bold";
+      const hint = this.createText({
+        x: 120,
+        y: 775,
+        fontSize: 2.8,
+        text: "Tip: You can also inspect other players in your room by opening their profile and clicking the Shield icon under the LSCG button!"
+      });
+      hint.style.color = "#8fa0b5";
+    }
+    onExit() {
+      this.cleanup();
+    }
+    cleanup() {
+      for (const el of this.domElements) {
+        try {
+          el.remove();
+        } catch {
+        }
+      }
+      this.domElements = [];
+    }
+  };
+
+  // src/subscreens/mainSubscreen.ts
+  var MainSubscreen2 = class extends BaseSubscreen {
+    get name() {
+      return "";
+    }
+    onRun() {
+      DrawRect(0, 0, 2e3, 1e3, "#191f2b");
+    }
+    onLoad() {
+      this.createCard({
+        anchor: "bottom-right",
+        x: 90,
+        y: 65,
+        width: 220,
+        name: "Version",
+        value: `v${version2}`,
+        icon: createElement(GitPullRequest)
+      });
+      const title = this.createText({
+        text: "QUALITY OF CLUB",
+        fontSize: 10,
+        x: 165,
+        y: 75,
+        width: 1600
+      });
+      title.style.fontWeight = "bold";
+      title.style.color = "#64b5f6";
+      title.style.letterSpacing = "2px";
+      const subtitle = this.createText({
+        text: "Quality-of-Life & Addon Compliance Suite for Bondage Club",
+        fontSize: 3.2,
+        x: 165,
+        y: 195,
+        width: 1200
+      });
+      subtitle.style.color = "#90a4ae";
+      const menuItems = [
+        {
+          name: "Chat Window Resizer",
+          icon: createElement(SlidersVertical),
+          subscreen: () => new ChatResizerSubscreen()
+        },
+        {
+          name: "Addon Policy & Sharing",
+          icon: createElement(ShieldCheck),
+          subscreen: () => new AddonPolicySubscreen()
+        },
+        {
+          name: "My Addons & Compliance",
+          icon: createElement(Search),
+          subscreen: () => new InspectorSubscreen(typeof Player !== "undefined" ? Player : null)
+        }
+      ];
+      menuItems.forEach((item, i) => {
+        const btn = this.createButton({
+          text: item.name,
+          icon: item.icon,
+          x: 165,
+          y: 280 + 125 * i,
+          width: 620,
+          height: 85,
+          padding: 2,
+          onClick: () => this.setSubscreen(item.subscreen())
+        });
+        btn.style.fontWeight = "bold";
+        btn.style.fontSize = "calc(3.5px * var(--size-unit, 4px))";
+      });
+      const loadedMods = getLoadedMods();
+      const rules = modStorage.inspector.rules;
+      const compliance = checkComplianceAgainstRules(loadedMods, rules);
+      const card = document.createElement("div");
+      card.style.cssText = `
+            position: absolute;
+            left: calc(1050px * (var(--canvas-width, 2000px) / 2000));
+            top: calc(280px * (var(--canvas-height, 1000px) / 1000));
+            width: calc(650px * (var(--canvas-width, 2000px) / 2000));
+            background: rgba(30, 36, 48, 0.9);
+            border: 1px solid rgba(80, 100, 140, 0.4);
+            border-radius: 8px;
+            padding: 20px 24px;
+            color: #e0e6ed;
+            box-sizing: border-box;
+            z-index: 5;
+        `;
+      card.innerHTML = `
+            <div style="font-size: 18px; font-weight: bold; color: #64b5f6; margin-bottom: 12px; border-bottom: 1px solid rgba(80,100,140,0.3); padding-bottom: 8px;">
+                Current System Overview
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #90a4ae;">Chat Resizer:</span>
+                <b style="color: ${modStorage.chatResizer.enabled ? "#81c784" : "#ef5350"};">${modStorage.chatResizer.enabled ? "Enabled (" + modStorage.chatResizer.splitPercent + "%)" : "Disabled (Off)"}</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #90a4ae;">Addon Sharing:</span>
+                <b style="color: ${modStorage.inspector.enabled ? "#81c784" : "#ef5350"};">${modStorage.inspector.enabled ? "Enabled (" + modStorage.inspector.viewPermission + ")" : "Disabled"}</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #90a4ae;">Detected Addons:</span>
+                <b>${loadedMods.length} loaded</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(80,100,140,0.3);">
+                <span style="color: #90a4ae;">Rule Compliance:</span>
+                <b style="color: ${compliance.isCompliant ? "#81c784" : "#ef5350"};">${compliance.isCompliant ? "\u2713 COMPLIANT" : "\u26A0\uFE0F " + compliance.missing.length + " MISSING / " + compliance.forbidden.length + " FORBIDDEN"}</b>
+            </div>
+        `;
+      document.body.appendChild(card);
+      this.domElements.push(card);
+      this.createButton({
+        text: "Source Code (GitHub)",
+        icon: createElement(CodeXml),
+        href: MOD_REPOSITORY,
+        x: 1050,
+        y: 535,
+        width: 480,
+        height: 60,
+        padding: 2
+      });
+      this.createButton({
+        text: "Report Issues / Feedback",
+        icon: createElement(Bug),
+        href: MOD_REPOSITORY ? `${MOD_REPOSITORY}/issues` : void 0,
+        x: 1050,
+        y: 615,
+        width: 480,
+        height: 60,
+        padding: 2
+      });
+    }
+    domElements = [];
+    onExit() {
+      this.cleanup();
+    }
+    cleanup() {
+      for (const el of this.domElements) {
+        try {
+          el.remove();
+        } catch {
+        }
+      }
+      this.domElements = [];
+    }
+    exit() {
+      super.exit();
+      this.setSubscreen(null);
+      syncStorage();
+      if (typeof PreferenceSubscreenExtensionsClear === "function") {
+        PreferenceSubscreenExtensionsClear();
+      }
+    }
+  };
+
   // src/modules/settingsMenu.ts
   function loadSettingsMenu() {
     PreferenceRegisterExtensionSetting({
@@ -4730,13 +8152,77 @@ One of mods you are using is using an old version of SDK. It will work for now b
       resize: () => {
         getCurrentSubscreen()?.resize();
       },
-      exit: () => {
-        setSubscreen(null);
-        return true;
-      },
+      exit: () => false,
       load: () => {
         setSubscreen(new MainSubscreen2());
       }
+    });
+  }
+
+  // src/modules/profileButton.ts
+  var shieldIconDataUrl = null;
+  function getIconDataUrl() {
+    if (!shieldIconDataUrl) {
+      const svg = createElement(ShieldCheck);
+      svg.setAttribute("stroke", "#1976d2");
+      svg.setAttribute("fill", "#e3f2fd");
+      svg.setAttribute("width", "64");
+      svg.setAttribute("height", "64");
+      const serializer = new XMLSerializer();
+      shieldIconDataUrl = "data:image/svg+xml," + encodeURIComponent(serializer.serializeToString(svg));
+    }
+    return shieldIconDataUrl;
+  }
+  function canDrawProfileButton() {
+    if (typeof InformationSheetSelection === "undefined" || !InformationSheetSelection) {
+      return false;
+    }
+    const win = window;
+    if (win.bcx?.inBcxSubscreen && win.bcx.inBcxSubscreen()) return false;
+    if (win.LSCG_REMOTE_WINDOW_OPEN) return false;
+    if (win.LITTLISH_CLUB?.inModSubscreen && win.LITTLISH_CLUB.inModSubscreen()) return false;
+    if (win.MPA?.menuLoaded) return false;
+    if (getCurrentSubscreen() !== null) return false;
+    return true;
+  }
+  function initProfileButton() {
+    hookFunction("InformationSheetRun", HookPriority.TOP, (args, next) => {
+      if (canDrawProfileButton()) {
+        DrawButton(
+          ...PROFILE_BUTTON_POSITION,
+          "",
+          "White",
+          getIconDataUrl(),
+          `${MOD_NAME} - Addon Inspector`
+        );
+      }
+      const subscreen = getCurrentSubscreen();
+      if (subscreen instanceof InspectorSubscreen) {
+        return subscreen.run();
+      }
+      return next(args);
+    });
+    hookFunction("InformationSheetClick", HookPriority.OBSERVE, (args, next) => {
+      if (canDrawProfileButton() && MouseIn(...PROFILE_BUTTON_POSITION)) {
+        const target = InformationSheetSelection;
+        if (typeof InformationSheetUnload === "function") {
+          InformationSheetUnload();
+        }
+        setSubscreen(new InspectorSubscreen(target));
+        return;
+      }
+      const subscreen = getCurrentSubscreen();
+      if (subscreen instanceof InspectorSubscreen) {
+        return subscreen.click();
+      }
+      return next(args);
+    });
+    hookFunction("InformationSheetExit", HookPriority.OBSERVE, (args, next) => {
+      const subscreen = getCurrentSubscreen();
+      if (subscreen instanceof InspectorSubscreen) {
+        return subscreen.exit();
+      }
+      return next(args);
     });
   }
 
@@ -4749,6 +8235,9 @@ One of mods you are using is using an old version of SDK. It will work for now b
       loadStorage();
       loadSettingsMenu();
       initChatResizer();
+      initNetworkSync();
+      initProfileButton();
+      evaluateCompliance();
       console.log(`%c[${MOD_NAME}] v${version2} loaded successfully!`, "color: #3a7bd5; font-weight: bold; font-size: 13px;");
       try {
         toastsManager.success({
@@ -4772,7 +8261,10 @@ One of mods you are using is using an old version of SDK. It will work for now b
     version: version2,
     repository: MOD_REPOSITORY,
     subscreens: {
-      MainSubscreen: MainSubscreen2
+      MainSubscreen: MainSubscreen2,
+      ChatResizerSubscreen,
+      AddonPolicySubscreen,
+      InspectorSubscreen
     },
     onReady: initializeQoC
   });
@@ -4801,14 +8293,19 @@ reflect-metadata/Reflect.js:
 lucide/dist/esm/defaultAttributes.mjs:
 lucide/dist/esm/createElement.mjs:
 lucide/dist/esm/icons/book-text.mjs:
+lucide/dist/esm/icons/bug.mjs:
 lucide/dist/esm/icons/check.mjs:
 lucide/dist/esm/icons/chevron-down.mjs:
 lucide/dist/esm/icons/circle-alert.mjs:
 lucide/dist/esm/icons/circle-check.mjs:
 lucide/dist/esm/icons/circle-x.mjs:
+lucide/dist/esm/icons/code-xml.mjs:
 lucide/dist/esm/icons/external-link.mjs:
+lucide/dist/esm/icons/git-pull-request.mjs:
 lucide/dist/esm/icons/info.mjs:
 lucide/dist/esm/icons/rotate-ccw.mjs:
+lucide/dist/esm/icons/search.mjs:
+lucide/dist/esm/icons/shield-check.mjs:
 lucide/dist/esm/icons/sliders-vertical.mjs:
 lucide/dist/esm/icons/terminal.mjs:
 lucide/dist/esm/icons/trash.mjs:

@@ -1,208 +1,179 @@
-import { BaseSubscreen, getRelativeX, getRelativeY, getRelativeWidth, setSubscreen } from "zois-core/ui";
-import { modStorage, saveStorage } from "modules/storage";
-import { applyChatDimensions, setSplitPercent } from "modules/chatResizer";
-import { MOD_NAME, MOD_VERSION, DEFAULT_SPLIT_PERCENT, MIN_SPLIT_PERCENT, MAX_SPLIT_PERCENT } from "src/constants";
+import { BaseSubscreen, setSubscreen } from "zois-core/ui";
+import { Bug, CodeXml, createElement, GitPullRequest, Search, ShieldCheck, Sliders } from "lucide";
+import { version } from "../../package.json";
+import { MOD_NAME, MOD_REPOSITORY } from "src/constants";
+import { syncStorage, modStorage } from "modules/storage";
+import { ChatResizerSubscreen } from "./chatResizerSubscreen";
+import { AddonPolicySubscreen } from "./addonPolicySubscreen";
+import { InspectorSubscreen } from "./inspectorSubscreen";
+import { getLoadedMods } from "modules/modDetection";
+import { checkComplianceAgainstRules } from "modules/compliance";
 
 export class MainSubscreen extends BaseSubscreen {
-    private sliderContainer: HTMLDivElement | null = null;
-    private sliderInput: HTMLInputElement | null = null;
-    private sliderValueLabel: HTMLSpanElement | null = null;
-
-    public get name(): string {
-        return `${MOD_NAME} (v${MOD_VERSION})`;
+    public override get name(): string {
+        return "";
     }
 
-    public onLoad(): void {
-        this.createTabs({
-            x: 100,
-            y: 130,
-            width: 1800,
-            currentTabName: "Interface",
-            tabs: [
-                {
-                    name: "Interface",
-                    load: () => this.loadInterfaceTab(),
-                    unload: () => this.unloadInterfaceTab()
-                }
-            ]
+    protected override onRun(): void {
+        DrawRect(0, 0, 2000, 1000, "#191f2b");
+    }
+
+    public override onLoad(): void {
+        // Version card (bottom-right, BCC style)
+        this.createCard({
+            anchor: "bottom-right",
+            x: 90,
+            y: 65,
+            width: 220,
+            name: "Version",
+            value: `v${version}`,
+            icon: createElement(GitPullRequest)
         });
-    }
 
-    protected onExit(): void {
-        this.unloadInterfaceTab();
-        setSubscreen(null);
-        if (typeof PreferenceSubscreenExtensionsClear === "function") {
-            try {
-                PreferenceSubscreenExtensionsClear();
-            } catch (e) {
-                console.warn("[QoC] Error clearing extension screen", e);
-            }
-        } else if (typeof PreferenceOpenSubscreen === "function") {
-            PreferenceOpenSubscreen("Extensions");
-        }
-    }
+        // Main Title
+        const title = this.createText({
+            text: "QUALITY OF CLUB",
+            fontSize: 10,
+            x: 165,
+            y: 75,
+            width: 1600
+        });
+        title.style.fontWeight = "bold";
+        title.style.color = "#64b5f6";
+        title.style.letterSpacing = "2px";
 
-    private loadInterfaceTab(): void {
-        // 1. Enable Chat Resizer Checkbox
-        this.createCheckbox({
-            x: 120,
-            y: 220,
-            width: 800,
-            height: 45,
-            text: "Enable Chat Window Resizer",
-            isChecked: modStorage.chatResizer.enabled,
-            tooltip: {
-                position: "right",
-                text: "Shrinks chat width to give more room for avatars and room graphics."
+        // Subtitle
+        const subtitle = this.createText({
+            text: "Quality-of-Life & Addon Compliance Suite for Bondage Club",
+            fontSize: 3.2,
+            x: 165,
+            y: 195,
+            width: 1200
+        });
+        subtitle.style.color = "#90a4ae";
+
+        // Navigation Menu Buttons (Left Column, exactly like BCC)
+        const menuItems = [
+            {
+                name: "Chat Window Resizer",
+                icon: createElement(Sliders),
+                subscreen: () => new ChatResizerSubscreen()
             },
-            onChange: () => {
-                modStorage.chatResizer.enabled = !modStorage.chatResizer.enabled;
-                saveStorage();
-                applyChatDimensions();
-            }
-        });
-
-        // 2. Show In-Game Draggable Divider Checkbox
-        this.createCheckbox({
-            x: 120,
-            y: 280,
-            width: 800,
-            height: 45,
-            text: "Show Draggable Divider in Chatrooms",
-            isChecked: modStorage.chatResizer.showDivider,
-            tooltip: {
-                position: "right",
-                text: "Shows an interactive vertical line between the canvas and chat to drag-resize directly."
+            {
+                name: "Addon Policy & Sharing",
+                icon: createElement(ShieldCheck),
+                subscreen: () => new AddonPolicySubscreen()
             },
-            onChange: () => {
-                modStorage.chatResizer.showDivider = !modStorage.chatResizer.showDivider;
-                saveStorage();
-                applyChatDimensions();
+            {
+                name: "My Addons & Compliance",
+                icon: createElement(Search),
+                subscreen: () => new InspectorSubscreen(typeof Player !== "undefined" ? Player : null)
             }
-        });
-
-        // 3. Proportions Section Header
-        this.createText({
-            x: 120,
-            y: 355,
-            fontSize: 4,
-            text: "Graphic View Size Proportions"
-        });
-
-        // 4. Custom Slider Container
-        this.createSliderControl(120, 400);
-
-        // 5. Presets Label
-        this.createText({
-            x: 120,
-            y: 500,
-            fontSize: 3.5,
-            text: "Quick Presets:"
-        });
-
-        // 6. Preset Buttons
-        const presets = [
-            { label: "50% (Default)", val: 50 },
-            { label: "60% Graphic", val: 60 },
-            { label: "65% Graphic", val: 65 },
-            { label: "70% Graphic", val: 70 },
-            { label: "75% Graphic", val: 75 },
-            { label: "80% Graphic", val: 80 }
         ];
 
-        presets.forEach((preset, idx) => {
+        menuItems.forEach((item, i) => {
             const btn = this.createButton({
-                x: 120 + (idx % 3) * 280,
-                y: 545 + Math.floor(idx / 3) * 65,
-                width: 260,
-                height: 52,
-                text: preset.label,
-                onClick: () => {
-                    this.updateSliderValue(preset.val);
-                }
+                text: item.name,
+                icon: item.icon,
+                x: 165,
+                y: 280 + (125 * i),
+                width: 620,
+                height: 85,
+                padding: 2,
+                onClick: () => this.setSubscreen(item.subscreen())
             });
             btn.style.fontWeight = "bold";
+            btn.style.fontSize = "calc(3.5px * var(--size-unit, 4px))";
         });
 
-        // 7. Informational Hint
-        const hint = this.createText({
-            x: 120,
-            y: 720,
-            fontSize: 3,
-            text: "Tip: In any chatroom, drag the vertical line between the canvas and chat to resize live! Double-click the line to reset to 50/50."
+        // Quick Overview Card (Right Column)
+        const loadedMods = getLoadedMods();
+        const rules = modStorage.inspector.rules;
+        const compliance = checkComplianceAgainstRules(loadedMods, rules);
+
+        const card = document.createElement("div");
+        card.style.cssText = `
+            position: absolute;
+            left: calc(1050px * (var(--canvas-width, 2000px) / 2000));
+            top: calc(280px * (var(--canvas-height, 1000px) / 1000));
+            width: calc(650px * (var(--canvas-width, 2000px) / 2000));
+            background: rgba(30, 36, 48, 0.9);
+            border: 1px solid rgba(80, 100, 140, 0.4);
+            border-radius: 8px;
+            padding: 20px 24px;
+            color: #e0e6ed;
+            box-sizing: border-box;
+            z-index: 5;
+        `;
+        card.innerHTML = `
+            <div style="font-size: 18px; font-weight: bold; color: #64b5f6; margin-bottom: 12px; border-bottom: 1px solid rgba(80,100,140,0.3); padding-bottom: 8px;">
+                Current System Overview
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #90a4ae;">Chat Resizer:</span>
+                <b style="color: ${modStorage.chatResizer.enabled ? '#81c784' : '#ef5350'};">${modStorage.chatResizer.enabled ? 'Enabled (' + modStorage.chatResizer.splitPercent + '%)' : 'Disabled (Off)'}</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #90a4ae;">Addon Sharing:</span>
+                <b style="color: ${modStorage.inspector.enabled ? '#81c784' : '#ef5350'};">${modStorage.inspector.enabled ? 'Enabled (' + modStorage.inspector.viewPermission + ')' : 'Disabled'}</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #90a4ae;">Detected Addons:</span>
+                <b>${loadedMods.length} loaded</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(80,100,140,0.3);">
+                <span style="color: #90a4ae;">Rule Compliance:</span>
+                <b style="color: ${compliance.isCompliant ? '#81c784' : '#ef5350'};">${compliance.isCompliant ? '✓ COMPLIANT' : '⚠️ ' + compliance.missing.length + ' MISSING / ' + compliance.forbidden.length + ' FORBIDDEN'}</b>
+            </div>
+        `;
+        document.body.appendChild(card);
+        this.domElements.push(card);
+
+        // Source Code & Issues Link Buttons (BCC style)
+        this.createButton({
+            text: "Source Code (GitHub)",
+            icon: createElement(CodeXml),
+            href: MOD_REPOSITORY,
+            x: 1050,
+            y: 535,
+            width: 480,
+            height: 60,
+            padding: 2
         });
-        hint.style.color = "#777";
+
+        this.createButton({
+            text: "Report Issues / Feedback",
+            icon: createElement(Bug),
+            href: MOD_REPOSITORY ? `${MOD_REPOSITORY}/issues` : undefined,
+            x: 1050,
+            y: 615,
+            width: 480,
+            height: 60,
+            padding: 2
+        });
     }
 
-    private unloadInterfaceTab(): void {
-        if (this.sliderContainer) {
-            this.sliderContainer.remove();
-            this.sliderContainer = null;
-        }
-        this.sliderInput = null;
-        this.sliderValueLabel = null;
+    private domElements: HTMLElement[] = [];
+
+    protected override onExit(): void {
+        this.cleanup();
     }
 
-    private createSliderControl(x: number, y: number): void {
-        if (this.sliderContainer) {
-            this.sliderContainer.remove();
+    private cleanup(): void {
+        for (const el of this.domElements) {
+            try {
+                el.remove();
+            } catch {}
         }
-
-        const container = document.createElement("div");
-        Object.assign(container.style, {
-            position: "fixed",
-            left: `${getRelativeX(x)}px`,
-            top: `${getRelativeY(y)}px`,
-            width: `${getRelativeWidth(800)}px`,
-            display: "flex",
-            alignItems: "center",
-            gap: "16px",
-            zIndex: "10"
-        });
-
-        const slider = document.createElement("input");
-        slider.type = "range";
-        slider.min = `${MIN_SPLIT_PERCENT}`;
-        slider.max = `${MAX_SPLIT_PERCENT}`;
-        slider.value = `${modStorage.chatResizer.splitPercent}`;
-        Object.assign(slider.style, {
-            flex: "1",
-            cursor: "pointer",
-            height: "8px",
-            accentColor: "#3a7bd5"
-        });
-
-        const label = document.createElement("span");
-        label.textContent = `${slider.value}% Graphic / ${100 - Number(slider.value)}% Chat`;
-        Object.assign(label.style, {
-            minWidth: "220px",
-            fontWeight: "bold",
-            fontSize: "calc(2.5px * var(--size-unit, 4px))",
-            color: "var(--tmd-text, black)"
-        });
-
-        slider.addEventListener("input", () => {
-            const val = Number(slider.value);
-            label.textContent = `${val}% Graphic / ${100 - val}% Chat`;
-            setSplitPercent(val);
-        });
-
-        container.appendChild(slider);
-        container.appendChild(label);
-        document.body.appendChild(container);
-
-        this.sliderContainer = container;
-        this.sliderInput = slider;
-        this.sliderValueLabel = label;
+        this.domElements = [];
     }
 
-    private updateSliderValue(val: number): void {
-        setSplitPercent(val);
-        if (this.sliderInput) {
-            this.sliderInput.value = `${val}`;
-        }
-        if (this.sliderValueLabel) {
-            this.sliderValueLabel.textContent = `${val}% Graphic / ${100 - val}% Chat`;
+    public override exit(): void {
+        super.exit();
+        this.setSubscreen(null);
+        syncStorage();
+        if (typeof PreferenceSubscreenExtensionsClear === "function") {
+            PreferenceSubscreenExtensionsClear();
         }
     }
 }

@@ -41,7 +41,7 @@ await build({
 const userScript = `// ==UserScript==
 // @name Quality of Club
 // @namespace https://www.bondageprojects.com/
-// @version 1.0.1
+// @version 1.0.2
 // @description Quality of life improvements for Bondage Club
 // @author Matti
 // @match *://*.bondageeurope.com/*
@@ -57,13 +57,15 @@ const userScript = `// ==UserScript==
 // @include *://*bondage*/*
 // @run-at document-end
 // @grant none
+// @updateURL https://raw.githubusercontent.com/GeneralKakyoin/QualityOfClub/main/qoc.user.js
+// @downloadURL https://raw.githubusercontent.com/GeneralKakyoin/QualityOfClub/main/qoc.user.js
 // ==/UserScript==
 
 setTimeout(function () {
     let n = document.createElement("script");
     n.setAttribute("language", "JavaScript");
     n.setAttribute("crossorigin", "anonymous");
-    n.setAttribute("src", "https://generalkakyoin.github.io/QualityOfClub/bundle.js");
+    n.setAttribute("src", "https://generalkakyoin.github.io/QualityOfClub/bundle.js?v=" + Date.now());
     n.onload = () => n.remove();
     document.head.appendChild(n);
 }, 1000);
@@ -71,9 +73,10 @@ setTimeout(function () {
 
 fs.writeFileSync("./dist/QualityOfClub.user.js", userScript, "utf-8");
 
-// Generate bookmarklet
-const bookmarklet = `javascript:(function(){let n=document.createElement("script");n.setAttribute("language","JavaScript");n.setAttribute("crossorigin","anonymous");n.setAttribute("src","https://generalkakyoin.github.io/QualityOfClub/bundle.js");n.onload=()=>n.remove();document.head.appendChild(n);})();`;
+// Generate bookmarklet with dynamic reload cache-busting
+const bookmarklet = `javascript:(function(){let n=document.createElement("script");n.setAttribute("language","JavaScript");n.setAttribute("crossorigin","anonymous");n.setAttribute("src","https://generalkakyoin.github.io/QualityOfClub/bundle.js?v="+Date.now());n.onload=()=>n.remove();document.head.appendChild(n);})();`;
 fs.writeFileSync("./dist/QualityOfClub.bookmark.txt", bookmarklet, "utf-8");
+
 
 console.log(chalk.green("Build completed successfully:\n"));
 const files = fs.readdirSync("dist", { recursive: true, withFileTypes: true });

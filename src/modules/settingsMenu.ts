@@ -21,10 +21,7 @@ export function loadSettingsMenu(): void {
         resize: () => {
             getCurrentSubscreen()?.resize();
         },
-        exit: () => {
-            setSubscreen(null);
-            return true;
-        },
+        exit: () => false,
         load: () => {
             setSubscreen(new MainSubscreen());
         }

@@ -332,7 +332,7 @@ export function initChatResizer(): void {
             blur: typeof Player.GetBlurLevel === "function" ? Player.GetBlurLevel() : 0,
             darken: typeof DrawGetDarkFactor === "function" ? DrawGetDarkFactor() : 0,
             tints: typeof Player.GetTints === "function" ? Player.GetTints() : [],
-            sizeMode: ChatRoomData?.Custom?.SizeMode,
+            sizeMode: ChatRoomData?.Custom?.SizeMode as any,
         };
 
         // Draw the background once across the whole graphic area

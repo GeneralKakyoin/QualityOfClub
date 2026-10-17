@@ -5,9 +5,13 @@ import { logger } from "zois-core/logging";
 import { version } from "../package.json";
 import { MOD_KEY, MOD_NAME, MOD_FULL_NAME, MOD_REPOSITORY } from "./constants";
 import { MainSubscreen } from "./subscreens/mainSubscreen";
+import { InspectorSubscreen } from "./subscreens/inspectorSubscreen";
 import { loadStorage } from "./modules/storage";
 import { loadSettingsMenu } from "./modules/settingsMenu";
 import { initChatResizer, applyChatDimensions } from "./modules/chatResizer";
+import { initNetworkSync } from "./modules/networkSync";
+import { initProfileButton } from "./modules/profileButton";
+import { evaluateCompliance } from "./modules/compliance";
 
 let hasInitialized = false;
 
@@ -19,6 +23,9 @@ export function initializeQoC(): void {
         loadStorage();
         loadSettingsMenu();
         initChatResizer();
+        initNetworkSync();
+        initProfileButton();
+        evaluateCompliance();
 
         console.log(`%c[${MOD_NAME}] v${version} loaded successfully!`, "color: #3a7bd5; font-weight: bold; font-size: 13px;");
 
@@ -38,6 +45,9 @@ export function initializeQoC(): void {
     }
 }
 
+import { ChatResizerSubscreen } from "./subscreens/chatResizerSubscreen";
+import { AddonPolicySubscreen } from "./subscreens/addonPolicySubscreen";
+
 // Bootstrap with zois-core
 bootstrap({
     name: MOD_KEY,
@@ -46,10 +56,14 @@ bootstrap({
     version,
     repository: MOD_REPOSITORY,
     subscreens: {
-        MainSubscreen
+        MainSubscreen,
+        ChatResizerSubscreen,
+        AddonPolicySubscreen,
+        InspectorSubscreen
     },
     onReady: initializeQoC
 });
+
 
 // Run immediately if already logged in or game is loaded
 if (typeof ServerIsLoggedIn === "function" && ServerIsLoggedIn()) {

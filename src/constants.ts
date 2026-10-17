@@ -12,3 +12,7 @@ export const CANVAS_HEIGHT = 1000;
 export const DEFAULT_SPLIT_PERCENT = 50;
 export const MIN_SPLIT_PERCENT = 50;
 export const MAX_SPLIT_PERCENT = 80;
+
+export const PROFILE_BUTTON_POSITION: [number, number, number, number] = [1700, 790, 90, 90];
+export const EXTENSION_SETTINGS_KEY = "QOC";
+
