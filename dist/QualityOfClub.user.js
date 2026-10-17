@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Quality of Club
 // @namespace https://www.bondageprojects.com/
-// @version 1.0.8
+// @version 1.0.9
 // @description Quality of life improvements for Bondage Club
 // @author Matti
 // @match *://*.bondageeurope.com/*

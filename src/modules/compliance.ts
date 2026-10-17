@@ -32,16 +32,21 @@ export function getCuratedMod(idOrName: string) {
     return null;
 }
 
-/**
- * Checks compliance for a given list of mods against a set of rules.
- */
-export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[]): {
+export interface ComplianceCheckResult {
+    hasRules: boolean;
     isCompliant: boolean;
     missing: ModRule[];
     forbidden: ModRule[];
-} {
+    details: { rule: ModRule; status: "met" | "violated" }[];
+}
+
+/**
+ * Checks compliance for a given list of mods against a set of rules.
+ */
+export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[]): ComplianceCheckResult {
     const missing: ModRule[] = [];
     const forbidden: ModRule[] = [];
+    const details: { rule: ModRule; status: "met" | "violated" }[] = [];
 
     const isLoadedInList = (idOrName: string) => {
         const target = idOrName.toLowerCase().trim();
@@ -58,19 +63,38 @@ export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[
         });
     };
 
-    for (const rule of rules) {
-        const loaded = isLoadedInList(rule.modId) || isLoadedInList(rule.modName);
-        if (rule.type === "required" && !loaded) {
-            missing.push(rule);
-        } else if (rule.type === "forbidden" && loaded) {
-            forbidden.push(rule);
+    const hasRules = Array.isArray(rules) && rules.length > 0;
+
+    if (hasRules) {
+        for (const rule of rules) {
+            const isMandatory = rule.type === "required" || (rule.type as string) === "mandatory";
+            const isForbidden = rule.type === "forbidden";
+            const loaded = isLoadedInList(rule.modId) || isLoadedInList(rule.modName);
+
+            if (isMandatory) {
+                if (!loaded) {
+                    missing.push(rule);
+                    details.push({ rule, status: "violated" });
+                } else {
+                    details.push({ rule, status: "met" });
+                }
+            } else if (isForbidden) {
+                if (loaded) {
+                    forbidden.push(rule);
+                    details.push({ rule, status: "violated" });
+                } else {
+                    details.push({ rule, status: "met" });
+                }
+            }
         }
     }
 
     return {
-        isCompliant: missing.length === 0 && forbidden.length === 0,
+        hasRules,
+        isCompliant: hasRules ? (missing.length === 0 && forbidden.length === 0) : true,
         missing,
-        forbidden
+        forbidden,
+        details
     };
 }
 

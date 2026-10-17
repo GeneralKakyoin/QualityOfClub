@@ -96,8 +96,13 @@ export function getCharacterAccessLevel(character: Character | number | null | u
 
     if (memberNumber !== null && typeof memberNumber === "number") {
         // 1. Clubowner (Native BC collar owner)
-        if (typeof Player !== "undefined" && typeof Player.IsOwnedByMemberNumber === "function" && Player.IsOwnedByMemberNumber(memberNumber)) {
-            return AccessLevel.clubowner;
+        if (typeof Player !== "undefined") {
+            if (Player.Ownership && typeof Player.Ownership.MemberNumber === "number" && Player.Ownership.MemberNumber === memberNumber && Player.Ownership.Stage === 1) {
+                return AccessLevel.clubowner;
+            }
+            if (typeof Player.IsOwnedByMemberNumber === "function" && Player.IsOwnedByMemberNumber(memberNumber)) {
+                return AccessLevel.clubowner;
+            }
         }
 
         // 2. Custom QoC Owners list
@@ -106,8 +111,19 @@ export function getCharacterAccessLevel(character: Character | number | null | u
         }
 
         // 3. Lover (Native BC Lover)
-        if (typeof Player !== "undefined" && typeof Player.IsLoverOfMemberNumber === "function" && Player.IsLoverOfMemberNumber(memberNumber)) {
-            return AccessLevel.lover;
+        if (typeof Player !== "undefined") {
+            if (Array.isArray(Player.Lovership) && Player.Lovership.some(l => l && l.MemberNumber === memberNumber && l.Stage === 1)) {
+                return AccessLevel.lover;
+            }
+            if (typeof Player.GetLoversNumbers === "function") {
+                const lovers = Player.GetLoversNumbers(true);
+                if (Array.isArray(lovers) && lovers.includes(memberNumber)) {
+                    return AccessLevel.lover;
+                }
+            }
+            if (typeof Player.IsLoverOfMemberNumber === "function" && Player.IsLoverOfMemberNumber(memberNumber)) {
+                return AccessLevel.lover;
+            }
         }
 
         // 4. Custom QoC Mistresses list

@@ -327,30 +327,114 @@ export class InspectorSubscreen extends BaseSubscreen {
         if (!this.contentArea) return;
         this.contentArea.innerHTML = "";
 
+        const subjectName = this.getSubjectName();
         const mods: DetectedMod[] = this.isSelf ? getLoadedMods() : (this.targetData?.mods || []);
-        const rules: ModRule[] = this.isSelf ? modStorage.inspector.rules : (this.targetData?.rules || []);
+        // Check against active working copy if present, otherwise saved target rules
+        const rules: ModRule[] = this.isSelf
+            ? modStorage.inspector.rules
+            : (this.targetRulesCopy.length > 0 ? this.targetRulesCopy : (this.targetData?.rules || []));
         const compliance = checkComplianceAgainstRules(mods, rules);
 
-        // Compliance Banner
+        // 1. Status Banner
         const banner = document.createElement("div");
-        banner.style.cssText = `
-            padding: 14px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: bold;
-            background: ${compliance.isCompliant ? "rgba(46, 125, 50, 0.25)" : "rgba(198, 40, 40, 0.3)"};
-            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
-            color: ${compliance.isCompliant ? "#a5d6a7" : "#ffcdd2"};
-            margin-bottom: 8px;
-        `;
-        banner.textContent = compliance.isCompliant
-            ? "✓ COMPLIANT: Player meets all active addon rules."
-            : `⚠️ NON-COMPLIANT: ${compliance.missing.length} missing mandatory addon(s), ${compliance.forbidden.length} forbidden addon(s) detected.`;
+        if (!compliance.hasRules) {
+            banner.style.cssText = `
+                padding: 14px 20px;
+                border-radius: 6px;
+                background: rgba(41, 121, 255, 0.15);
+                border: 1px solid #2979ff;
+                color: #90caf9;
+                margin-bottom: 12px;
+            `;
+            banner.innerHTML = `
+                <div style="font-size: 15px; font-weight: bold;">ℹ️ NO ACTIVE RULES CONFIGURED</div>
+                <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
+                    No mandatory or forbidden addon rules are currently locked on ${subjectName}.
+                    ${!this.isSelf ? 'Switch to the <b>🔒 Enforce Rules</b> tab to set mandatory or forbidden requirements.' : ''}
+                </div>
+            `;
+        } else if (compliance.isCompliant) {
+            banner.style.cssText = `
+                padding: 14px 20px;
+                border-radius: 6px;
+                background: rgba(46, 125, 50, 0.25);
+                border: 1px solid #4caf50;
+                color: #a5d6a7;
+                margin-bottom: 12px;
+            `;
+            banner.innerHTML = `
+                <div style="font-size: 15px; font-weight: bold;">✓ FULLY COMPLIANT: All ${rules.length} active addon rule(s) met.</div>
+                <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
+                    ${subjectName} satisfies all mandatory and forbidden addon requirements.
+                </div>
+            `;
+        } else {
+            banner.style.cssText = `
+                padding: 14px 20px;
+                border-radius: 6px;
+                background: rgba(198, 40, 40, 0.3);
+                border: 1px solid #ef5350;
+                color: #ffcdd2;
+                margin-bottom: 12px;
+            `;
+            banner.innerHTML = `
+                <div style="font-size: 15px; font-weight: bold;">⚠️ POLICY VIOLATION: ${subjectName} is NON-COMPLIANT!</div>
+                <div style="font-size: 13px; font-weight: normal; margin-top: 4px; color: #cfd8dc;">
+                    ${compliance.missing.length > 0 ? `Missing Mandatory: <b>${compliance.missing.map(m => m.modName).join(", ")}</b>. ` : ''}
+                    ${compliance.forbidden.length > 0 ? `Running Forbidden: <b>${compliance.forbidden.map(m => m.modName).join(", ")}</b>.` : ''}
+                </div>
+            `;
+        }
         this.contentArea.appendChild(banner);
+
+        // 2. Active Rule Breakdown (Shows status of every rule)
+        if (compliance.hasRules) {
+            const rulesSection = document.createElement("div");
+            rulesSection.style.cssText = "display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;";
+            rulesSection.innerHTML = `<div style="font-size: 15px; font-weight: bold; color: #64b5f6;">Rule Requirements & Live Status (${rules.length}):</div>`;
+
+            compliance.details.forEach(detail => {
+                const isMandatory = detail.rule.type === "required" || (detail.rule.type as string) === "mandatory";
+                const isMet = detail.status === "met";
+                const card = document.createElement("div");
+                card.style.cssText = `
+                    background: rgba(35, 43, 60, 0.85);
+                    border-left: 5px solid ${isMet ? "#4caf50" : "#ef5350"};
+                    border: 1px solid rgba(80, 100, 140, 0.4);
+                    border-radius: 6px;
+                    padding: 10px 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                `;
+                card.innerHTML = `
+                    <div>
+                        <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">${detail.rule.modName}</div>
+                        <div style="font-size: 12px; color: ${isMet ? "#81c784" : "#e57373"}; margin-top: 2px;">
+                            ${isMandatory
+                                ? (isMet ? "✓ Mandatory requirement satisfied (Mod is active in session)" : "❌ MANDATORY REQUIREMENT VIOLATED: Mod is NOT loaded in session!")
+                                : (isMet ? "✓ Forbidden rule satisfied (Mod is not running)" : "🚫 FORBIDDEN RULE VIOLATED: Mod is actively running in session!")
+                            }
+                        </div>
+                    </div>
+                    <span style="background: ${isMet ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMet ? "#81c784" : "#e57373"}; border: 1px solid ${isMet ? "#4caf50" : "#f44336"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;">
+                        ${isMet ? "MET" : "VIOLATION"}
+                    </span>
+                `;
+                rulesSection.appendChild(card);
+            });
+            this.contentArea.appendChild(rulesSection);
+        }
+
+        // 3. Loaded Addons Manifest
+        const modsHeader = document.createElement("div");
+        modsHeader.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 8px;";
+        modsHeader.textContent = `Loaded Addons in Session (${mods.length}):`;
+        this.contentArea.appendChild(modsHeader);
 
         if (mods.length === 0) {
             const empty = document.createElement("div");
-            empty.style.cssText = "color: #90a4ae; padding: 24px; text-align: center;";
+            empty.style.cssText = "color: #90a4ae; padding: 20px; text-align: center; background: rgba(30, 36, 48, 0.6); border-radius: 6px;";
             empty.textContent = "No external addons detected in session.";
             this.contentArea.appendChild(empty);
             return;
@@ -380,6 +464,8 @@ export class InspectorSubscreen extends BaseSubscreen {
         if (!this.contentArea) return;
         this.contentArea.innerHTML = "";
 
+        const subjectName = this.getSubjectName();
+
         if (this.isSelf) {
             // Self view: list locked rules enforced on self
             const rules = modStorage.inspector.rules;
@@ -393,7 +479,7 @@ export class InspectorSubscreen extends BaseSubscreen {
             }
 
             for (const rule of rules) {
-                const isMandatory = rule.type === "required";
+                const isMandatory = rule.type === "required" || (rule.type as string) === "mandatory";
                 const card = document.createElement("div");
                 card.style.cssText = `
                     background: rgba(35, 43, 60, 0.85);
@@ -423,6 +509,13 @@ export class InspectorSubscreen extends BaseSubscreen {
         const canMandatory = this.targetData?.callerPermissions?.rules_lock_mandatory ?? false;
         const canForbidden = this.targetData?.callerPermissions?.rules_lock_forbidden ?? false;
         const canRemove = this.targetData?.callerPermissions?.rules_remove_rules ?? false;
+
+        if (!canMandatory && !canForbidden && !canRemove) {
+            const lockNotice = document.createElement("div");
+            lockNotice.style.cssText = "color: #ef5350; font-size: 13px; font-weight: bold; padding: 12px; background: rgba(239, 83, 80, 0.1); border: 1px solid #ef5350; border-radius: 6px; margin-bottom: 12px;";
+            lockNotice.textContent = "🔒 Rule enforcement is restricted: You do not meet the minimum role required to lock addon rules on this player.";
+            this.contentArea.appendChild(lockNotice);
+        }
 
         const curatedList = Object.values(CURATED_MOD_CATALOG);
         for (const item of curatedList) {
@@ -458,7 +551,7 @@ export class InspectorSubscreen extends BaseSubscreen {
                     opacity: ${enabled ? "1" : "0.5"};
                     transition: all 0.15s ease;
                 `;
-                b.addEventListener("click", () => {
+                b.addEventListener("click", async () => {
                     if (!enabled) return;
                     this.targetRulesCopy = this.targetRulesCopy.filter(r => r.modId !== item.id);
                     if (state !== "none") {
@@ -471,7 +564,30 @@ export class InspectorSubscreen extends BaseSubscreen {
                             enforcedAt: Date.now()
                         });
                     }
+
+                    if (this.targetData) {
+                        this.targetData.rules = structuredClone(this.targetRulesCopy);
+                    }
+
                     this.renderRulesTab();
+
+                    // Real-time auto sync to target
+                    if (this.target && typeof this.target.MemberNumber === "number") {
+                        const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
+                        if (res.success) {
+                            toastsManager.info({
+                                title: `${MOD_NAME} Rules`,
+                                message: `Rule for ${item.name} synced to ${subjectName}.`,
+                                duration: 2500
+                            });
+                        } else {
+                            toastsManager.error({
+                                title: `${MOD_NAME} Sync Failed`,
+                                message: res.error || "Failed to sync rule to target.",
+                                duration: 4000
+                            });
+                        }
+                    }
                 });
                 return b;
             };
@@ -485,9 +601,9 @@ export class InspectorSubscreen extends BaseSubscreen {
             this.contentArea.appendChild(row);
         }
 
-        // Save & Sync button
+        // Re-sync All button
         const saveBtn = document.createElement("button");
-        saveBtn.textContent = "💾 Save & Sync Rules to Target";
+        saveBtn.textContent = "💾 Re-sync All Rules to Target";
         saveBtn.style.cssText = "padding: 12px 28px; border-radius: 6px; background: #2e7d32; border: 1px solid #4caf50; color: white; font-weight: bold; font-size: 15px; cursor: pointer; width: fit-content; margin-top: 10px;";
         saveBtn.addEventListener("click", async () => {
             if (!this.target || typeof this.target.MemberNumber !== "number") return;
