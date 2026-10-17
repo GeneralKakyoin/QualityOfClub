@@ -229,6 +229,7 @@ export class InspectorSubscreen extends BaseSubscreen {
 
     private renderSelfAddons(): void {
         if (!this.contentArea) return;
+        this.contentArea.innerHTML = "";
         const loadedMods = getLoadedMods();
 
         const countHeader = document.createElement("div");
@@ -277,6 +278,7 @@ export class InspectorSubscreen extends BaseSubscreen {
 
     private renderSelfRules(): void {
         if (!this.contentArea) return;
+        this.contentArea.innerHTML = "";
         const loadedMods = getLoadedMods();
         const rules = modStorage.inspector.rules;
         const compliance = checkComplianceAgainstRules(loadedMods, rules);
@@ -350,6 +352,7 @@ export class InspectorSubscreen extends BaseSubscreen {
 
     private renderSelfSettings(): void {
         if (!this.contentArea) return;
+        this.contentArea.innerHTML = "";
 
         const container = document.createElement("div");
         container.style.cssText = "display: flex; flex-direction: column; gap: 18px;";
@@ -480,6 +483,7 @@ export class InspectorSubscreen extends BaseSubscreen {
 
     private renderTargetAddons(): void {
         if (!this.contentArea) return;
+        this.contentArea.innerHTML = "";
 
         if (this.isLoading) {
             this.contentArea.innerHTML = "<div style='font-size: 16px; color: #64b5f6; padding: 20px;'>Querying target player's Quality of Club manifest...</div>";
@@ -532,6 +536,7 @@ export class InspectorSubscreen extends BaseSubscreen {
 
     private renderTargetRules(): void {
         if (!this.contentArea) return;
+        this.contentArea.innerHTML = "";
         const canEnforce = this.target && hasRuleAuthorityOver(this.target);
 
         if (!canEnforce) {

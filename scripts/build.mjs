@@ -41,7 +41,7 @@ await build({
 const userScript = `// ==UserScript==
 // @name Quality of Club
 // @namespace https://www.bondageprojects.com/
-// @version 1.0.5
+// @version 1.0.6
 // @description Quality of life improvements for Bondage Club
 // @author Matti
 // @match *://*.bondageeurope.com/*
