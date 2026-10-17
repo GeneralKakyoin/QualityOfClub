@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.0";
+  var version2 = "1.0.3";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4720,6 +4720,13 @@ One of mods you are using is using an old version of SDK. It will work for now b
         text: "Tip: When enabled, drag the vertical divider line in chatrooms to resize live! Double-click to reset to 50/50."
       });
       hint.style.color = "#8fa0b5";
+    }
+    exit() {
+      this.cleanup();
+      setSubscreen(new MainSubscreen2());
+    }
+    onUnload() {
+      this.cleanup();
     }
     onExit() {
       this.cleanup();
@@ -7170,21 +7177,20 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
     exit() {
       this.cleanup();
-      if (this.target && !this.isSelf && typeof CurrentScreen !== "undefined" && CurrentScreen === "InformationSheet") {
+      if (typeof CurrentScreen !== "undefined" && CurrentScreen === "InformationSheet") {
         setSubscreen(null);
-        if (typeof InformationSheetLoadCharacter === "function") {
+        if (typeof InformationSheetLoadCharacter === "function" && this.target) {
           try {
             InformationSheetLoadCharacter(this.target);
           } catch {
           }
         }
       } else {
-        if (this.previousSubscreen) {
-          setPreviousSubscreen();
-        } else {
-          setSubscreen(new MainSubscreen2());
-        }
+        setSubscreen(new MainSubscreen2());
       }
+    }
+    onUnload() {
+      this.cleanup();
     }
     onExit() {
       this.cleanup();
@@ -7198,21 +7204,31 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
     createRootUI() {
       this.cleanup();
-      const root = document.createElement("div");
-      root.style.cssText = `
+      const backdrop = document.createElement("div");
+      backdrop.style.cssText = `
             position: fixed;
-            left: ${getRelativeX(100)}px;
-            top: ${getRelativeY(70)}px;
-            width: ${getRelativeWidth(1800)}px;
-            height: ${getRelativeHeight(870)}px;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #191f2b;
             display: flex;
-            flex-direction: column;
-            gap: 16px;
-            z-index: 10;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
             color: #e0e6ed;
             font-family: inherit;
             box-sizing: border-box;
             user-select: none;
+        `;
+      const container = document.createElement("div");
+      container.style.cssText = `
+            width: ${getRelativeWidth(1800)}px;
+            height: ${getRelativeHeight(880)}px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-sizing: border-box;
         `;
       const header = document.createElement("div");
       header.style.cssText = `
@@ -7229,19 +7245,20 @@ One of mods you are using is using an old version of SDK. It will work for now b
       const backBtn = document.createElement("button");
       backBtn.textContent = "\u2715 Close";
       backBtn.style.cssText = `
-            padding: 8px 20px;
-            background: rgba(180, 40, 40, 0.6);
+            padding: 10px 24px;
+            background: rgba(220, 50, 50, 0.85);
             border: 1px solid #ef5350;
             color: white;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
+            transition: background 0.15s ease;
         `;
       backBtn.addEventListener("click", () => this.exit());
       header.appendChild(titleText);
       header.appendChild(backBtn);
-      root.appendChild(header);
+      container.appendChild(header);
       const tabBar = document.createElement("div");
       tabBar.style.cssText = `
             display: flex;
@@ -7277,12 +7294,12 @@ One of mods you are using is using an old version of SDK. It will work for now b
         });
         tabBar.appendChild(tabBtn);
       });
-      root.appendChild(tabBar);
+      container.appendChild(tabBar);
       const contentArea = document.createElement("div");
       contentArea.style.cssText = `
             flex: 1;
             overflow-y: auto;
-            background: rgba(25, 31, 43, 0.75);
+            background: rgba(25, 31, 43, 0.95);
             border: 1px solid rgba(80, 100, 140, 0.35);
             border-radius: 8px;
             padding: 20px;
@@ -7291,9 +7308,10 @@ One of mods you are using is using an old version of SDK. It will work for now b
             gap: 14px;
             box-sizing: border-box;
         `;
-      root.appendChild(contentArea);
-      document.body.appendChild(root);
-      this.rootElement = root;
+      container.appendChild(contentArea);
+      backdrop.appendChild(container);
+      document.body.appendChild(backdrop);
+      this.rootElement = backdrop;
       this.contentArea = contentArea;
     }
     renderTabContent() {
@@ -7661,7 +7679,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   };
 
   // src/subscreens/addonPolicySubscreen.ts
-  var AddonPolicySubscreen = class extends BaseSubscreen {
+  var AddonPolicySubscreen = class _AddonPolicySubscreen extends BaseSubscreen {
     domElements = [];
     get name() {
       return "Addon Policy & Sharing";
@@ -7737,8 +7755,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
             modStorage.inspector.autoLoadMode = item.mode;
             saveStorage();
             syncStorage();
-            this.cleanup();
-            this.onLoad();
+            setSubscreen(new _AddonPolicySubscreen());
           }
         });
         btn.style.fontWeight = isSelected ? "bold" : "normal";
@@ -7771,8 +7788,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
             modStorage.inspector.viewPermission = item.perm;
             saveStorage();
             syncStorage();
-            this.cleanup();
-            this.onLoad();
+            setSubscreen(new _AddonPolicySubscreen());
           }
         });
         btn.style.fontWeight = isSelected ? "bold" : "normal";
@@ -7826,6 +7842,13 @@ One of mods you are using is using an old version of SDK. It will work for now b
         text: "Tip: You can also inspect other players in your room by opening their profile and clicking the Shield icon under the LSCG button!"
       });
       hint.style.color = "#8fa0b5";
+    }
+    exit() {
+      this.cleanup();
+      setSubscreen(new MainSubscreen2());
+    }
+    onUnload() {
+      this.cleanup();
     }
     onExit() {
       this.cleanup();
@@ -7970,6 +7993,9 @@ One of mods you are using is using an old version of SDK. It will work for now b
       });
     }
     domElements = [];
+    onUnload() {
+      this.cleanup();
+    }
     onExit() {
       this.cleanup();
     }
@@ -7983,10 +8009,10 @@ One of mods you are using is using an old version of SDK. It will work for now b
       this.domElements = [];
     }
     exit() {
-      super.exit();
-      this.setSubscreen(null);
+      this.cleanup();
+      setSubscreen(null);
       syncStorage();
-      if (typeof PreferenceSubscreenExtensionsClear === "function") {
+      if (typeof CurrentScreen !== "undefined" && CurrentScreen === "Preference" && typeof PreferenceSubscreenExtensionsClear === "function") {
         PreferenceSubscreenExtensionsClear();
       }
     }
@@ -8011,9 +8037,21 @@ One of mods you are using is using an old version of SDK. It will work for now b
       resize: () => {
         getCurrentSubscreen()?.resize();
       },
-      exit: () => false,
+      exit: () => {
+        const current = getCurrentSubscreen();
+        if (current) {
+          current.exit();
+        }
+        return true;
+      },
       load: () => {
         setSubscreen(new MainSubscreen2());
+      },
+      unload: () => {
+        const current = getCurrentSubscreen();
+        if (current) {
+          setSubscreen(null);
+        }
       }
     });
   }
