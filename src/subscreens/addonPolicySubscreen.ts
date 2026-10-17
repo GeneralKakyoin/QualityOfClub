@@ -3,6 +3,7 @@ import { modStorage, saveStorage, syncStorage, InspectViewPermission, AutoLoadMo
 import { getLoadedMods } from "modules/modDetection";
 import { checkComplianceAgainstRules } from "modules/compliance";
 import { InspectorSubscreen } from "./inspectorSubscreen";
+import { MainSubscreen } from "./mainSubscreen";
 
 export class AddonPolicySubscreen extends BaseSubscreen {
     private domElements: HTMLElement[] = [];
@@ -93,8 +94,7 @@ export class AddonPolicySubscreen extends BaseSubscreen {
                     modStorage.inspector.autoLoadMode = item.mode;
                     saveStorage();
                     syncStorage();
-                    this.cleanup();
-                    this.onLoad();
+                    setSubscreen(new AddonPolicySubscreen());
                 }
             });
             btn.style.fontWeight = isSelected ? "bold" : "normal";
@@ -131,8 +131,7 @@ export class AddonPolicySubscreen extends BaseSubscreen {
                     modStorage.inspector.viewPermission = item.perm;
                     saveStorage();
                     syncStorage();
-                    this.cleanup();
-                    this.onLoad();
+                    setSubscreen(new AddonPolicySubscreen());
                 }
             });
             btn.style.fontWeight = isSelected ? "bold" : "normal";
@@ -193,6 +192,15 @@ export class AddonPolicySubscreen extends BaseSubscreen {
             text: "Tip: You can also inspect other players in your room by opening their profile and clicking the Shield icon under the LSCG button!"
         });
         hint.style.color = "#8fa0b5";
+    }
+
+    public override exit(): void {
+        this.cleanup();
+        setSubscreen(new MainSubscreen());
+    }
+
+    protected override onUnload(): void {
+        this.cleanup();
     }
 
     protected override onExit(): void {

@@ -49,20 +49,20 @@ export class InspectorSubscreen extends BaseSubscreen {
 
     public override exit(): void {
         this.cleanup();
-        if (this.target && !this.isSelf && typeof CurrentScreen !== "undefined" && CurrentScreen === "InformationSheet") {
+        if (typeof CurrentScreen !== "undefined" && CurrentScreen === "InformationSheet") {
             setSubscreen(null);
-            if (typeof InformationSheetLoadCharacter === "function") {
+            if (typeof InformationSheetLoadCharacter === "function" && this.target) {
                 try {
                     InformationSheetLoadCharacter(this.target);
                 } catch {}
             }
         } else {
-            if (this.previousSubscreen) {
-                setPreviousSubscreen();
-            } else {
-                setSubscreen(new MainSubscreen());
-            }
+            setSubscreen(new MainSubscreen());
         }
+    }
+
+    protected override onUnload(): void {
+        this.cleanup();
     }
 
     protected override onExit(): void {
@@ -80,21 +80,33 @@ export class InspectorSubscreen extends BaseSubscreen {
     private createRootUI(): void {
         this.cleanup();
 
-        const root = document.createElement("div");
-        root.style.cssText = `
+        // Full-screen solid backdrop that completely covers any underlying game elements
+        const backdrop = document.createElement("div");
+        backdrop.style.cssText = `
             position: fixed;
-            left: ${getRelativeX(100)}px;
-            top: ${getRelativeY(70)}px;
-            width: ${getRelativeWidth(1800)}px;
-            height: ${getRelativeHeight(870)}px;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #191f2b;
             display: flex;
-            flex-direction: column;
-            gap: 16px;
-            z-index: 10;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
             color: #e0e6ed;
             font-family: inherit;
             box-sizing: border-box;
             user-select: none;
+        `;
+
+        const container = document.createElement("div");
+        container.style.cssText = `
+            width: ${getRelativeWidth(1800)}px;
+            height: ${getRelativeHeight(880)}px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-sizing: border-box;
         `;
 
         // 1. Header (Title + Back Button)
@@ -117,20 +129,21 @@ export class InspectorSubscreen extends BaseSubscreen {
         const backBtn = document.createElement("button");
         backBtn.textContent = "✕ Close";
         backBtn.style.cssText = `
-            padding: 8px 20px;
-            background: rgba(180, 40, 40, 0.6);
+            padding: 10px 24px;
+            background: rgba(220, 50, 50, 0.85);
             border: 1px solid #ef5350;
             color: white;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
+            transition: background 0.15s ease;
         `;
         backBtn.addEventListener("click", () => this.exit());
 
         header.appendChild(titleText);
         header.appendChild(backBtn);
-        root.appendChild(header);
+        container.appendChild(header);
 
         // 2. Navigation Tab Bar
         const tabBar = document.createElement("div");
@@ -171,14 +184,14 @@ export class InspectorSubscreen extends BaseSubscreen {
             tabBar.appendChild(tabBtn);
         });
 
-        root.appendChild(tabBar);
+        container.appendChild(tabBar);
 
         // 3. Dynamic Content Area
         const contentArea = document.createElement("div");
         contentArea.style.cssText = `
             flex: 1;
             overflow-y: auto;
-            background: rgba(25, 31, 43, 0.75);
+            background: rgba(25, 31, 43, 0.95);
             border: 1px solid rgba(80, 100, 140, 0.35);
             border-radius: 8px;
             padding: 20px;
@@ -188,10 +201,11 @@ export class InspectorSubscreen extends BaseSubscreen {
             box-sizing: border-box;
         `;
 
-        root.appendChild(contentArea);
-        document.body.appendChild(root);
+        container.appendChild(contentArea);
+        backdrop.appendChild(container);
+        document.body.appendChild(backdrop);
 
-        this.rootElement = root;
+        this.rootElement = backdrop;
         this.contentArea = contentArea;
     }
 

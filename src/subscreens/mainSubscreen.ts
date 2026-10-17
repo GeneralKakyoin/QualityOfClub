@@ -155,6 +155,10 @@ export class MainSubscreen extends BaseSubscreen {
 
     private domElements: HTMLElement[] = [];
 
+    protected override onUnload(): void {
+        this.cleanup();
+    }
+
     protected override onExit(): void {
         this.cleanup();
     }
@@ -169,10 +173,10 @@ export class MainSubscreen extends BaseSubscreen {
     }
 
     public override exit(): void {
-        super.exit();
-        this.setSubscreen(null);
+        this.cleanup();
+        setSubscreen(null);
         syncStorage();
-        if (typeof PreferenceSubscreenExtensionsClear === "function") {
+        if (typeof CurrentScreen !== "undefined" && CurrentScreen === "Preference" && typeof PreferenceSubscreenExtensionsClear === "function") {
             PreferenceSubscreenExtensionsClear();
         }
     }

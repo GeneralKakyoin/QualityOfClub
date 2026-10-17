@@ -21,9 +21,21 @@ export function loadSettingsMenu(): void {
         resize: () => {
             getCurrentSubscreen()?.resize();
         },
-        exit: () => false,
+        exit: () => {
+            const current = getCurrentSubscreen();
+            if (current) {
+                current.exit();
+            }
+            return true;
+        },
         load: () => {
             setSubscreen(new MainSubscreen());
+        },
+        unload: () => {
+            const current = getCurrentSubscreen();
+            if (current) {
+                setSubscreen(null);
+            }
         }
     });
 }

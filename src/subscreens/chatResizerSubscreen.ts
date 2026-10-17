@@ -2,6 +2,7 @@ import { BaseSubscreen, getRelativeX, getRelativeY, getRelativeWidth, setSubscre
 import { modStorage, saveStorage } from "modules/storage";
 import { applyChatDimensions, setSplitPercent } from "modules/chatResizer";
 import { DEFAULT_SPLIT_PERCENT, MIN_SPLIT_PERCENT, MAX_SPLIT_PERCENT } from "src/constants";
+import { MainSubscreen } from "./mainSubscreen";
 
 export class ChatResizerSubscreen extends BaseSubscreen {
     private sliderContainer: HTMLDivElement | null = null;
@@ -106,6 +107,15 @@ export class ChatResizerSubscreen extends BaseSubscreen {
             text: "Tip: When enabled, drag the vertical divider line in chatrooms to resize live! Double-click to reset to 50/50."
         });
         hint.style.color = "#8fa0b5";
+    }
+
+    public override exit(): void {
+        this.cleanup();
+        setSubscreen(new MainSubscreen());
+    }
+
+    protected override onUnload(): void {
+        this.cleanup();
     }
 
     protected override onExit(): void {
