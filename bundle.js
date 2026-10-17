@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.11";
+  var version2 = "1.0.12";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4322,6 +4322,11 @@ One of mods you are using is using an old version of SDK. It will work for now b
     inspector: {
       enabled: true,
       autoLoadMode: "Prompt",
+      violationAction: "toast",
+      evaluationInterval: 30,
+      silentTelemetry: true,
+      showProfileButton: true,
+      customCatalog: [],
       rules: []
     },
     managedRules: {}
@@ -4371,7 +4376,13 @@ One of mods you are using is using an old version of SDK. It will work for now b
         inspector: {
           ...DEFAULT_SETTINGS.inspector,
           ...loadedData.inspector || {},
-          rules: Array.isArray(loadedData.inspector?.rules) ? loadedData.inspector.rules : []
+          rules: Array.isArray(loadedData.inspector?.rules) ? loadedData.inspector.rules : [],
+          customCatalog: Array.isArray(loadedData.inspector?.customCatalog) ? loadedData.inspector.customCatalog : [],
+          violationAction: loadedData.inspector?.violationAction || "toast",
+          autoLoadMode: loadedData.inspector?.autoLoadMode || "Prompt",
+          evaluationInterval: typeof loadedData.inspector?.evaluationInterval === "number" ? loadedData.inspector.evaluationInterval : 30,
+          silentTelemetry: typeof loadedData.inspector?.silentTelemetry === "boolean" ? loadedData.inspector.silentTelemetry : true,
+          showProfileButton: typeof loadedData.inspector?.showProfileButton === "boolean" ? loadedData.inspector.showProfileButton : true
         },
         managedRules: loadedData.managedRules || {}
       };
@@ -5031,16 +5042,30 @@ One of mods you are using is using an old version of SDK. It will work for now b
       repositoryMatch: "bc-chaos"
     }
   };
+  function getAllCatalogMods() {
+    const combined = { ...CURATED_MOD_CATALOG };
+    if (modStorage?.inspector?.customCatalog && Array.isArray(modStorage.inspector.customCatalog)) {
+      for (const item of modStorage.inspector.customCatalog) {
+        if (item && item.id) {
+          combined[item.id] = { ...item, isCustom: true };
+        }
+      }
+    }
+    return combined;
+  }
   function getCuratedMod(idOrName) {
     if (!idOrName) return null;
     const target = idOrName.toLowerCase().trim();
-    if (CURATED_MOD_CATALOG[idOrName]) return CURATED_MOD_CATALOG[idOrName];
-    for (const item of Object.values(CURATED_MOD_CATALOG)) {
+    const all = getAllCatalogMods();
+    if (all[idOrName]) return all[idOrName];
+    for (const item of Object.values(all)) {
       if (item.id.toLowerCase() === target || item.name.toLowerCase() === target) {
         return item;
       }
-      for (const k of item.detectKeys) {
-        if (k.toLowerCase() === target) return item;
+      if (Array.isArray(item.detectKeys)) {
+        for (const k of item.detectKeys) {
+          if (k.toLowerCase() === target) return item;
+        }
       }
     }
     return null;
@@ -5173,11 +5198,12 @@ One of mods you are using is using an old version of SDK. It will work for now b
   function loadCuratedMod(catalogId) {
     if (!catalogId) return Promise.resolve(false);
     const target = catalogId.toLowerCase().trim();
-    const mod = CURATED_MOD_CATALOG[catalogId] || Object.values(CURATED_MOD_CATALOG).find(
-      (c) => c.id.toLowerCase() === target || c.name.toLowerCase() === target || c.detectKeys.some((k) => k.toLowerCase() === target)
+    const all = getAllCatalogMods();
+    const mod = all[catalogId] || Object.values(all).find(
+      (c) => c.id.toLowerCase() === target || c.name.toLowerCase() === target || Array.isArray(c.detectKeys) && c.detectKeys.some((k) => k.toLowerCase() === target)
     );
-    if (!mod) {
-      console.warn(`[QoC] Cannot auto-load unverified mod '${catalogId}'. Only curated catalog mods can be auto-loaded.`);
+    if (!mod || !mod.scriptUrl) {
+      console.warn(`[QoC] Cannot auto-load mod '${catalogId}'. No valid script URL found.`);
       return Promise.resolve(false);
     }
     if (isModLoaded(catalogId)) {
@@ -5246,6 +5272,83 @@ One of mods you are using is using an old version of SDK. It will work for now b
       details
     };
   }
+  var lockoutElement = null;
+  function triggerLockoutOverlay(rule) {
+    if (lockoutElement && document.body.contains(lockoutElement)) {
+      return;
+    }
+    const overlay = document.createElement("div");
+    overlay.id = "qoc-lockout-overlay";
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(18, 5, 8, 0.96);
+        z-index: 100000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: #ff5252;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 40px;
+        box-sizing: border-box;
+        user-select: none;
+    `;
+    const enforcer = rule.enforcedByName || `Member #${rule.enforcedBy}`;
+    overlay.innerHTML = `
+        <div style="font-size: 72px; margin-bottom: 16px; filter: drop-shadow(0 0 20px rgba(255, 82, 82, 0.6));">\u{1F6AB}</div>
+        <div style="font-size: 28px; font-weight: bold; color: #ff5252; margin-bottom: 12px; letter-spacing: 1.5px;">
+            QUALITY OF CLUB POLICY VIOLATION: INTERFACE LOCKED
+        </div>
+        <div style="font-size: 17px; color: #ffcdd2; max-width: 650px; line-height: 1.6; margin-bottom: 20px;">
+            You are actively running the forbidden addon: <b style="color: #ff8a80;">${rule.modName}</b>.<br>
+            Access to Bondage Club has been locked until this forbidden addon is disabled or uninstalled.
+        </div>
+        <div style="font-size: 14px; color: #ef9a9a; margin-bottom: 30px;">
+            Policy enforced by: <b>${enforcer}</b>
+        </div>
+        <div style="display: flex; gap: 16px;">
+            <button id="qoc-lockout-reload" style="padding: 12px 30px; background: #c62828; border: 1px solid #ff5252; color: white; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                \u{1F504} Reload Game Page
+            </button>
+            <button id="qoc-lockout-recheck" style="padding: 12px 30px; background: rgba(55, 71, 79, 0.9); border: 1px solid #78909c; color: white; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                \u26A1 Re-check Compliance
+            </button>
+        </div>
+    `;
+    overlay.querySelector("#qoc-lockout-reload")?.addEventListener("click", () => {
+      window.location.reload();
+    });
+    overlay.querySelector("#qoc-lockout-recheck")?.addEventListener("click", async () => {
+      const report = await evaluateCompliance();
+      if (report.detectedForbidden.length === 0) {
+        clearLockoutOverlay();
+        toastsManager.success({
+          title: `${MOD_NAME} Unlocked`,
+          message: "Forbidden addon no longer detected. Access restored!",
+          duration: 4e3
+        });
+      } else {
+        toastsManager.error({
+          title: `${MOD_NAME} Still Non-Compliant`,
+          message: "Forbidden addon is still running in this session.",
+          duration: 4e3
+        });
+      }
+    });
+    document.body.appendChild(overlay);
+    lockoutElement = overlay;
+  }
+  function clearLockoutOverlay() {
+    if (lockoutElement) {
+      lockoutElement.remove();
+      lockoutElement = null;
+    }
+  }
   async function evaluateCompliance() {
     if (isEvaluating || !modStorage.inspector.enabled) {
       return { isCompliant: true, missingRequired: [], detectedForbidden: [] };
@@ -5256,12 +5359,14 @@ One of mods you are using is using an old version of SDK. It will work for now b
     try {
       const rules = modStorage.inspector.rules;
       if (!rules || rules.length === 0) {
+        clearLockoutOverlay();
         return { isCompliant: true, missingRequired: [], detectedForbidden: [] };
       }
       for (const rule of rules) {
         const loaded = isModLoaded(rule.modId) || isModLoaded(rule.modName);
         if (rule.type === "required" && !loaded) {
           missingRequired.push(rule);
+          const enforcer = rule.enforcedByName || `Member #${rule.enforcedBy}`;
           const curated = getCuratedMod(rule.modId) || getCuratedMod(rule.modName);
           if (curated) {
             if (modStorage.inspector.autoLoadMode === "Silent") {
@@ -5281,8 +5386,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
             } else if (modStorage.inspector.autoLoadMode === "Prompt") {
               if (!promptedMods.has(curated.id)) {
                 promptedMods.add(curated.id);
-                const name = rule.enforcedByName || `Member #${rule.enforcedBy}`;
-                const promptMsg = `[${MOD_NAME}] Mandatory Addon: ${curated.name} is required by ${name}. Load it now?`;
+                const promptMsg = `[${MOD_NAME}] Mandatory Addon: ${curated.name} is required by ${enforcer}. Load it now?`;
                 try {
                   dialogsManager.confirm({
                     message: promptMsg
@@ -5301,6 +5405,12 @@ One of mods you are using is using an old version of SDK. It will work for now b
                   }
                 }
               }
+            } else if (modStorage.inspector.autoLoadMode === "Alert") {
+              toastsManager.warn({
+                title: `${MOD_NAME} Mandatory Notice`,
+                message: `Mandatory addon '${curated.name}' required by ${enforcer} is missing.`,
+                duration: 6e3
+              });
             }
           } else {
             toastsManager.warn({
@@ -5312,12 +5422,42 @@ One of mods you are using is using an old version of SDK. It will work for now b
         } else if (rule.type === "forbidden" && loaded) {
           detectedForbidden.push(rule);
           const enforcer = rule.enforcedByName || `Member #${rule.enforcedBy}`;
-          toastsManager.error({
-            title: `${MOD_NAME} Policy Violation`,
-            message: `Addon '${rule.modName}' is FORBIDDEN by ${enforcer}. Please disable it immediately!`,
-            duration: 9e3
-          });
+          const violationAction = modStorage.inspector.violationAction || "toast";
+          if (violationAction === "toast") {
+            toastsManager.error({
+              title: `${MOD_NAME} Policy Violation`,
+              message: `Addon '${rule.modName}' is FORBIDDEN by ${enforcer}. Please disable it immediately!`,
+              duration: 9e3
+            });
+          } else if (violationAction === "room_alert") {
+            toastsManager.error({
+              title: `${MOD_NAME} Policy Violation`,
+              message: `Addon '${rule.modName}' is FORBIDDEN! Public room alert announced.`,
+              duration: 9e3
+            });
+            if (typeof ServerSend === "function" && typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
+              const pName = typeof Player !== "undefined" ? Player.Name : "Player";
+              ServerSend("ChatRoomChat", {
+                Content: `* [${MOD_NAME} Violation] ${pName} is actively running forbidden addon '${rule.modName}'! *`,
+                Type: "Emote"
+              });
+            }
+          } else if (violationAction === "lockout") {
+            triggerLockoutOverlay(rule);
+          } else if (violationAction === "leave_room") {
+            toastsManager.error({
+              title: `${MOD_NAME} Room Ejection`,
+              message: `Ejected from room: Addon '${rule.modName}' is FORBIDDEN by ${enforcer}!`,
+              duration: 9e3
+            });
+            if (typeof ChatRoomLeave === "function" && typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
+              ChatRoomLeave();
+            }
+          }
         }
+      }
+      if (detectedForbidden.length === 0) {
+        clearLockoutOverlay();
       }
     } catch (e) {
       console.error("[QoC] Error evaluating compliance:", e);
@@ -7484,6 +7624,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     return { allowed: true };
   }
   function sendSilentRoomTelemetry() {
+    if (!modStorage.inspector.silentTelemetry) return;
     if (typeof ChatRoomCharacter === "undefined" || !Array.isArray(ChatRoomCharacter)) return;
     if (typeof Player === "undefined") return;
     const loadedMods = getLoadedMods();
@@ -7503,7 +7644,26 @@ One of mods you are using is using an old version of SDK. It will work for now b
       }
     }
   }
+  var periodicComplianceTimer = null;
+  function restartPeriodicComplianceTimer() {
+    if (periodicComplianceTimer) {
+      clearInterval(periodicComplianceTimer);
+      periodicComplianceTimer = null;
+    }
+    const intervalSec = modStorage.inspector.evaluationInterval;
+    if (intervalSec && intervalSec > 0) {
+      periodicComplianceTimer = setInterval(() => {
+        if (typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
+          evaluateCompliance();
+          if (modStorage.inspector.silentTelemetry) {
+            sendSilentRoomTelemetry();
+          }
+        }
+      }, intervalSec * 1e3);
+    }
+  }
   function initNetworkSync() {
+    restartPeriodicComplianceTimer();
     hookFunction("ChatRoomMessage", HookPriority.ADD_BEHAVIOR, async (args, next) => {
       const msg = args[0];
       if (!msg || msg.Content !== MOD_KEY || !msg.Dictionary) {
@@ -7527,6 +7687,14 @@ One of mods you are using is using an old version of SDK. It will work for now b
             mods: permCheck.canViewAddons ? getLoadedMods() : [],
             rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
             autoLoadMode: modStorage.inspector.autoLoadMode,
+            preferences: {
+              violationAction: modStorage.inspector.violationAction || "toast",
+              autoLoadMode: modStorage.inspector.autoLoadMode || "Prompt",
+              evaluationInterval: typeof modStorage.inspector.evaluationInterval === "number" ? modStorage.inspector.evaluationInterval : 30,
+              silentTelemetry: typeof modStorage.inspector.silentTelemetry === "boolean" ? modStorage.inspector.silentTelemetry : true,
+              showProfileButton: typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true
+            },
+            customCatalog: modStorage.inspector.customCatalog || [],
             authority: modStorage.authority,
             callerAccessLevel: getCharacterAccessLevel(senderId),
             callerPermissions: getCallerPermissions(senderId),
@@ -7624,6 +7792,55 @@ One of mods you are using is using an old version of SDK. It will work for now b
               saveStorage();
               syncStorage();
               resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
+            }
+          } else if (req.action === "update_preferences") {
+            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+              resData = { success: false, reason: "Permission Denied: You do not have authority to edit preferences." };
+            } else if (req.preferences) {
+              if (req.preferences.violationAction) modStorage.inspector.violationAction = req.preferences.violationAction;
+              if (req.preferences.autoLoadMode) modStorage.inspector.autoLoadMode = req.preferences.autoLoadMode;
+              if (typeof req.preferences.evaluationInterval === "number") modStorage.inspector.evaluationInterval = req.preferences.evaluationInterval;
+              if (typeof req.preferences.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = req.preferences.silentTelemetry;
+              if (typeof req.preferences.showProfileButton === "boolean") modStorage.inspector.showProfileButton = req.preferences.showProfileButton;
+              saveStorage();
+              syncStorage();
+              restartPeriodicComplianceTimer();
+              resData = {
+                success: true,
+                preferences: {
+                  violationAction: modStorage.inspector.violationAction,
+                  autoLoadMode: modStorage.inspector.autoLoadMode,
+                  evaluationInterval: modStorage.inspector.evaluationInterval,
+                  silentTelemetry: modStorage.inspector.silentTelemetry,
+                  showProfileButton: modStorage.inspector.showProfileButton
+                }
+              };
+            } else {
+              resData = { success: false, reason: "No preferences provided." };
+            }
+          } else if (req.action === "add_custom_mod") {
+            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+              resData = { success: false, reason: "Permission Denied: You do not have authority to add custom addons." };
+            } else if (req.customMod && req.customMod.id) {
+              modStorage.inspector.customCatalog = modStorage.inspector.customCatalog || [];
+              modStorage.inspector.customCatalog = modStorage.inspector.customCatalog.filter((c) => c.id.toLowerCase() !== req.customMod.id.toLowerCase());
+              modStorage.inspector.customCatalog.push(req.customMod);
+              saveStorage();
+              syncStorage();
+              resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
+            } else {
+              resData = { success: false, reason: "Invalid custom addon data." };
+            }
+          } else if (req.action === "remove_custom_mod") {
+            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+              resData = { success: false, reason: "Permission Denied: You do not have authority to remove custom addons." };
+            } else if (req.customModId) {
+              modStorage.inspector.customCatalog = (modStorage.inspector.customCatalog || []).filter((c) => c.id.toLowerCase() !== req.customModId.toLowerCase());
+              saveStorage();
+              syncStorage();
+              resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
+            } else {
+              resData = { success: false, reason: "Invalid custom addon ID." };
             }
           } else {
             resData = { success: false, reason: "Unknown action." };
@@ -8536,15 +8753,18 @@ One of mods you are using is using an old version of SDK. It will work for now b
       }
       const catalogHeader = document.createElement("div");
       catalogHeader.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 8px;";
-      catalogHeader.textContent = "Curated Addon Catalog:";
+      catalogHeader.textContent = "Curated & Custom Addon Catalog:";
       this.contentArea.appendChild(catalogHeader);
-      const curatedList = Object.values(CURATED_MOD_CATALOG);
+      const curatedList = Object.values(getAllCatalogMods());
       for (const item of curatedList) {
         const row = document.createElement("div");
         row.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;";
         const left = document.createElement("div");
         left.innerHTML = `
-                <div style="font-size: 15px; font-weight: bold; color: #64b5f6;">${item.name}</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 15px; font-weight: bold; color: #64b5f6;">${item.name}</span>
+                    ${item.isCustom ? '<span style="background: rgba(255, 152, 0, 0.2); border: 1px solid #ff9800; color: #ffb74d; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 3px;">CUSTOM</span>' : ""}
+                </div>
                 <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">${item.description}</div>
             `;
         const existingRule = this.targetRulesCopy.find((r) => r.modId.toLowerCase() === item.id.toLowerCase());
@@ -9234,21 +9454,154 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       this.modalElement = modalBackdrop;
     }
     // ==========================================
-    // TAB 5: PREFERENCES (Auto-Load Behavior)
+    // TAB 5: PREFERENCES & ENGINE CONFIGURATION
     // ==========================================
     renderSettingsTab() {
       if (!this.contentArea) return;
       this.contentArea.innerHTML = "";
       const subjectName = this.getSubjectName();
-      const canEditAutoLoad = this.isSelf ? checkPermissionAccess("rules_edit_autoload_mode") : this.targetData?.callerPermissions?.rules_edit_autoload_mode ?? false;
-      const currentMode = this.isSelf ? modStorage.inspector.autoLoadMode : this.targetData?.autoLoadMode || "Prompt";
+      const canEditPreferences = this.isSelf ? checkPermissionAccess("rules_edit_autoload_mode") : this.targetData?.callerPermissions?.rules_edit_autoload_mode ?? false;
+      const currentViolationAction = this.isSelf ? modStorage.inspector.violationAction || "toast" : this.targetData?.preferences?.violationAction || "toast";
+      const currentAutoLoadMode = this.isSelf ? modStorage.inspector.autoLoadMode || "Prompt" : this.targetData?.preferences?.autoLoadMode || this.targetData?.autoLoadMode || "Prompt";
+      const currentInterval = this.isSelf ? typeof modStorage.inspector.evaluationInterval === "number" ? modStorage.inspector.evaluationInterval : 30 : this.targetData?.preferences?.evaluationInterval ?? 30;
+      const currentTelemetry = this.isSelf ? typeof modStorage.inspector.silentTelemetry === "boolean" ? modStorage.inspector.silentTelemetry : true : this.targetData?.preferences?.silentTelemetry ?? true;
+      const currentProfileBtn = this.isSelf ? typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true : this.targetData?.preferences?.showProfileButton ?? true;
+      const customCatalog = this.isSelf ? modStorage.inspector.customCatalog || [] : this.targetData?.customCatalog || [];
+      const updatePref = async (newPref) => {
+        if (!canEditPreferences) return;
+        if (this.isSelf) {
+          if (newPref.violationAction) modStorage.inspector.violationAction = newPref.violationAction;
+          if (newPref.autoLoadMode) modStorage.inspector.autoLoadMode = newPref.autoLoadMode;
+          if (typeof newPref.evaluationInterval === "number") modStorage.inspector.evaluationInterval = newPref.evaluationInterval;
+          if (typeof newPref.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = newPref.silentTelemetry;
+          if (typeof newPref.showProfileButton === "boolean") modStorage.inspector.showProfileButton = newPref.showProfileButton;
+          saveStorage();
+          syncStorage();
+          restartPeriodicComplianceTimer();
+          toastsManager.info({ title: `${MOD_NAME} Preferences`, message: "Preferences updated.", duration: 2500 });
+          this.renderSettingsTab();
+        } else if (this.target && typeof this.target.MemberNumber === "number") {
+          const res = await requestUpdateAuthority(this.target.MemberNumber, {
+            action: "update_preferences",
+            preferences: newPref
+          });
+          if (res.success && res.data?.preferences) {
+            this.targetData.preferences = res.data.preferences;
+            toastsManager.info({ title: `${MOD_NAME} Preferences`, message: `Preferences updated for ${subjectName}.`, duration: 2500 });
+            this.renderSettingsTab();
+          } else {
+            toastsManager.error({ title: `${MOD_NAME} Error`, message: res.error || "Failed to update preferences.", duration: 4e3 });
+          }
+        }
+      };
+      const addCustomMod = async (mod) => {
+        if (!canEditPreferences) return;
+        if (this.isSelf) {
+          modStorage.inspector.customCatalog = modStorage.inspector.customCatalog || [];
+          modStorage.inspector.customCatalog = modStorage.inspector.customCatalog.filter((c) => c.id.toLowerCase() !== mod.id.toLowerCase());
+          modStorage.inspector.customCatalog.push(mod);
+          saveStorage();
+          syncStorage();
+          toastsManager.success({ title: `${MOD_NAME} Catalog`, message: `Added '${mod.name}' to custom catalog.`, duration: 3e3 });
+          this.renderSettingsTab();
+        } else if (this.target && typeof this.target.MemberNumber === "number") {
+          const res = await requestUpdateAuthority(this.target.MemberNumber, {
+            action: "add_custom_mod",
+            customMod: mod
+          });
+          if (res.success && res.data?.customCatalog) {
+            this.targetData.customCatalog = res.data.customCatalog;
+            toastsManager.success({ title: `${MOD_NAME} Catalog`, message: `Added '${mod.name}' to ${subjectName}'s catalog.`, duration: 3e3 });
+            this.renderSettingsTab();
+          } else {
+            toastsManager.error({ title: `${MOD_NAME} Error`, message: res.error || "Failed to add custom addon.", duration: 4e3 });
+          }
+        }
+      };
+      const removeCustomMod = async (modId) => {
+        if (!canEditPreferences) return;
+        if (this.isSelf) {
+          modStorage.inspector.customCatalog = (modStorage.inspector.customCatalog || []).filter((c) => c.id.toLowerCase() !== modId.toLowerCase());
+          saveStorage();
+          syncStorage();
+          toastsManager.info({ title: `${MOD_NAME} Catalog`, message: "Custom addon removed from catalog.", duration: 2500 });
+          this.renderSettingsTab();
+        } else if (this.target && typeof this.target.MemberNumber === "number") {
+          const res = await requestUpdateAuthority(this.target.MemberNumber, {
+            action: "remove_custom_mod",
+            customModId: modId
+          });
+          if (res.success && res.data?.customCatalog) {
+            this.targetData.customCatalog = res.data.customCatalog;
+            toastsManager.info({ title: `${MOD_NAME} Catalog`, message: `Custom addon removed from ${subjectName}'s catalog.`, duration: 2500 });
+            this.renderSettingsTab();
+          } else {
+            toastsManager.error({ title: `${MOD_NAME} Error`, message: res.error || "Failed to remove custom addon.", duration: 4e3 });
+          }
+        }
+      };
       const container = document.createElement("div");
       container.style.cssText = "display: flex; flex-direction: column; gap: 20px;";
+      if (!canEditPreferences) {
+        const lockMsg = document.createElement("div");
+        lockMsg.style.cssText = "color: #ef5350; font-size: 13px; font-weight: bold; padding: 14px; background: rgba(239, 83, 80, 0.12); border: 1px solid #ef5350; border-radius: 6px;";
+        lockMsg.textContent = this.isSelf ? "\u{1F512} Preferences are locked: You do not have self-access to modify engine preferences (controlled by your dominant)." : `\u{1F512} Preferences are restricted: You do not meet the minimum role required to modify engine preferences on ${subjectName}.`;
+        container.appendChild(lockMsg);
+      }
+      const violationSection = document.createElement("div");
+      violationSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
+      violationSection.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: #ef5350; margin-bottom: 6px;">
+                \u{1F6D1} Forbidden Addon Violation Response for ${subjectName}
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 16px;">
+                Configure the enforcement action triggered when a forbidden addon is detected actively running in the player's session.
+            </div>
+        `;
+      const violationModes = [
+        { action: "toast", label: "Local Warning Toast", desc: "Discretely displays high-visibility warning notifications to the player advising them to disable the forbidden addon.", badge: "DISCREET", color: "#64b5f6" },
+        { action: "room_alert", label: "Room Chat Public Warning", desc: "Broadcasts a public emote announcement in the room chat alerting room members that the player is violating policy.", badge: "PUBLIC", color: "#ffb74d" },
+        { action: "lockout", label: "Screen Lockout Overlay", desc: "Displays a full-screen red lockout barrier blocking game interaction until the page is reloaded without the forbidden mod.", badge: "STRICT ENFORCEMENT", color: "#e57373" },
+        { action: "leave_room", label: "Auto-Leave Room", desc: "Immediately ejects the player from the chat room upon detecting a forbidden addon.", badge: "IMMEDIATE EJECTION", color: "#f06292" }
+      ];
+      const violList = document.createElement("div");
+      violList.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
+      violationModes.forEach((vm) => {
+        const isSel = currentViolationAction === vm.action;
+        const btn = document.createElement("button");
+        btn.disabled = !canEditPreferences;
+        btn.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 18px;
+                border-radius: 6px;
+                background: ${isSel ? "rgba(239, 83, 80, 0.15)" : "rgba(45, 55, 75, 0.7)"};
+                border: 1px solid ${isSel ? "#ef5350" : "rgba(80, 100, 140, 0.4)"};
+                color: ${isSel ? "#ffcdd2" : "#cfd8dc"};
+                cursor: ${canEditPreferences ? "pointer" : "not-allowed"};
+                text-align: left;
+                transition: all 0.15s ease;
+            `;
+        btn.innerHTML = `
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 14px; font-weight: bold; color: ${isSel ? "#ff8a80" : "#e0e6ed"};">${isSel ? "\u25CF " : "\u25CB "}${vm.label}</span>
+                        <span style="background: rgba(255, 255, 255, 0.08); border: 1px solid ${vm.color}; color: ${vm.color}; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 3px;">${vm.badge}</span>
+                    </div>
+                    <div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${vm.desc}</div>
+                </div>
+            `;
+        btn.addEventListener("click", () => updatePref({ violationAction: vm.action }));
+        violList.appendChild(btn);
+      });
+      violationSection.appendChild(violList);
+      container.appendChild(violationSection);
       const autoLoadSection = document.createElement("div");
       autoLoadSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
       autoLoadSection.innerHTML = `
             <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
-                Mandatory Addon Auto-Injection Behavior for ${subjectName}
+                \u26A1 Mandatory Addon Auto-Injection Behavior for ${subjectName}
             </div>
             <div style="font-size: 13px; color: #90a4ae; margin-bottom: 16px;">
                 Configure how Quality of Club acts when entering a room or checking compliance if a mandatory addon is missing.
@@ -9256,60 +9609,264 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
         `;
       const autoModes = [
         { mode: "Prompt", label: "Prompt First (Recommended)", desc: "Prompts with a confirmation dialog before injecting missing addons." },
-        { mode: "Silent", label: "Silent Auto-Injection", desc: "Silently auto-injects missing mandatory scripts automatically in the background." }
+        { mode: "Silent", label: "Silent Auto-Injection", desc: "Silently auto-injects missing mandatory scripts automatically in the background." },
+        { mode: "Alert", label: "Alert Notice Only", desc: "Displays a warning notice that a required addon is missing, but does not attempt script injection." }
       ];
       const autoRow = document.createElement("div");
-      autoRow.style.cssText = "display: flex; flex-direction: column; gap: 10px;";
+      autoRow.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
       autoModes.forEach((m) => {
-        const isSel = currentMode === m.mode;
+        const isSel = currentAutoLoadMode === m.mode;
         const btn = document.createElement("button");
-        btn.disabled = !canEditAutoLoad;
+        btn.disabled = !canEditPreferences;
         btn.style.cssText = `
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                padding: 14px 20px;
+                padding: 12px 18px;
                 border-radius: 6px;
                 background: ${isSel ? "rgba(25, 118, 210, 0.3)" : "rgba(45, 55, 75, 0.7)"};
                 border: 1px solid ${isSel ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
                 color: ${isSel ? "#90caf9" : "#cfd8dc"};
-                cursor: ${canEditAutoLoad ? "pointer" : "not-allowed"};
+                cursor: ${canEditPreferences ? "pointer" : "not-allowed"};
                 text-align: left;
                 transition: all 0.15s ease;
             `;
         btn.innerHTML = `
                 <div>
-                    <div style="font-size: 15px; font-weight: bold;">${isSel ? "\u25CF " : "\u25CB "}${m.label}</div>
+                    <div style="font-size: 14px; font-weight: bold;">${isSel ? "\u25CF " : "\u25CB "}${m.label}</div>
                     <div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${m.desc}</div>
                 </div>
             `;
-        btn.addEventListener("click", async () => {
-          if (!canEditAutoLoad) return;
-          if (this.isSelf) {
-            modStorage.inspector.autoLoadMode = m.mode;
-            saveStorage();
-            syncStorage();
-            this.renderSettingsTab();
-          } else if (this.target && typeof this.target.MemberNumber === "number") {
-            const res = await requestUpdateAuthority(this.target.MemberNumber, { action: "set_autoload_mode", autoLoadMode: m.mode });
-            if (res.success) {
-              this.targetData.autoLoadMode = m.mode;
-              this.renderSettingsTab();
-            } else {
-              alert(res.error || "Failed to update auto-load mode on target.");
-            }
-          }
-        });
+        btn.addEventListener("click", () => updatePref({ autoLoadMode: m.mode }));
         autoRow.appendChild(btn);
       });
       autoLoadSection.appendChild(autoRow);
-      if (!canEditAutoLoad) {
-        const lockMsg = document.createElement("div");
-        lockMsg.style.cssText = "color: #ef5350; font-size: 12px; margin-top: 12px; font-weight: bold;";
-        lockMsg.textContent = "\u{1F512} Auto-Load modification is restricted by authority settings.";
-        autoLoadSection.appendChild(lockMsg);
-      }
       container.appendChild(autoLoadSection);
+      const periodicSection = document.createElement("div");
+      periodicSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
+      periodicSection.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
+                \u23F1\uFE0F Compliance Evaluation Interval & Dominant Telemetry
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 16px;">
+                Controls automated background evaluation frequency to catch mid-session addon tampering, and telemetry reporting to room dominants.
+            </div>
+        `;
+      const intervalRow = document.createElement("div");
+      intervalRow.style.cssText = "display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;";
+      const intervalHeader = document.createElement("div");
+      intervalHeader.style.cssText = "font-size: 13px; font-weight: bold; color: #cfd8dc; margin-bottom: 4px;";
+      intervalHeader.textContent = "Evaluation Polling Frequency:";
+      intervalRow.appendChild(intervalHeader);
+      const intervalBtns = document.createElement("div");
+      intervalBtns.style.cssText = "display: flex; gap: 8px; flex-wrap: wrap;";
+      const intervals = [
+        { sec: 0, label: "Off (Room Sync Only)" },
+        { sec: 15, label: "Every 15s (Aggressive)" },
+        { sec: 30, label: "Every 30s (Default)" },
+        { sec: 60, label: "Every 60s (Relaxed)" }
+      ];
+      intervals.forEach((iv) => {
+        const isSel = currentInterval === iv.sec;
+        const b = document.createElement("button");
+        b.disabled = !canEditPreferences;
+        b.textContent = iv.label;
+        b.style.cssText = `
+                padding: 8px 14px;
+                border-radius: 4px;
+                font-size: 12.5px;
+                font-weight: ${isSel ? "bold" : "normal"};
+                cursor: ${canEditPreferences ? "pointer" : "not-allowed"};
+                background: ${isSel ? "#1976d2" : "rgba(45, 55, 75, 0.8)"};
+                border: 1px solid ${isSel ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
+                color: ${isSel ? "white" : "#b0bec5"};
+                transition: all 0.15s ease;
+            `;
+        b.addEventListener("click", () => updatePref({ evaluationInterval: iv.sec }));
+        intervalBtns.appendChild(b);
+      });
+      intervalRow.appendChild(intervalBtns);
+      periodicSection.appendChild(intervalRow);
+      const telemRow = document.createElement("div");
+      telemRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding-top: 14px; border-top: 1px solid rgba(80, 100, 140, 0.3);";
+      telemRow.innerHTML = `
+            <div>
+                <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">\u{1F4E1} Silent Room Telemetry to Dominants</div>
+                <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">Silently broadcasts addon compliance manifests to in-room Owners, Mistresses, and Clubowners.</div>
+            </div>
+        `;
+      const telemBtn = document.createElement("button");
+      telemBtn.disabled = !canEditPreferences;
+      telemBtn.textContent = currentTelemetry ? "\u2713 Enabled" : "\u2715 Disabled";
+      telemBtn.style.cssText = `
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: ${canEditPreferences ? "pointer" : "not-allowed"};
+            background: ${currentTelemetry ? "rgba(76, 175, 80, 0.25)" : "rgba(100, 116, 139, 0.2)"};
+            border: 1px solid ${currentTelemetry ? "#4caf50" : "#78909c"};
+            color: ${currentTelemetry ? "#81c784" : "#90a4ae"};
+            transition: all 0.15s ease;
+        `;
+      telemBtn.addEventListener("click", () => updatePref({ silentTelemetry: !currentTelemetry }));
+      telemRow.appendChild(telemBtn);
+      periodicSection.appendChild(telemRow);
+      container.appendChild(periodicSection);
+      const uiSection = document.createElement("div");
+      uiSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
+      uiSection.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
+                \u{1F6E1}\uFE0F Interface & Client Preferences
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 16px;">
+                Visual display toggles and client Quality of Life settings.
+            </div>
+        `;
+      const profileBtnRow = document.createElement("div");
+      profileBtnRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;";
+      profileBtnRow.innerHTML = `
+            <div>
+                <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">Show Inspector Shield on Character Profiles</div>
+                <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">Renders the blue shield icon on InformationSheet under other mod buttons for 1-click inspection.</div>
+            </div>
+        `;
+      const profileBtnToggle = document.createElement("button");
+      profileBtnToggle.disabled = !canEditPreferences;
+      profileBtnToggle.textContent = currentProfileBtn ? "\u2713 Shown" : "\u2715 Hidden";
+      profileBtnToggle.style.cssText = `
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: ${canEditPreferences ? "pointer" : "not-allowed"};
+            background: ${currentProfileBtn ? "rgba(41, 121, 255, 0.25)" : "rgba(100, 116, 139, 0.2)"};
+            border: 1px solid ${currentProfileBtn ? "#2979ff" : "#78909c"};
+            color: ${currentProfileBtn ? "#82b1ff" : "#90a4ae"};
+            transition: all 0.15s ease;
+        `;
+      profileBtnToggle.addEventListener("click", () => updatePref({ showProfileButton: !currentProfileBtn }));
+      profileBtnRow.appendChild(profileBtnToggle);
+      uiSection.appendChild(profileBtnRow);
+      const chatResizerNote = document.createElement("div");
+      chatResizerNote.style.cssText = "padding: 12px 16px; border-radius: 6px; background: rgba(30, 45, 65, 0.5); border: 1px dashed rgba(80, 100, 140, 0.5); display: flex; align-items: center; justify-content: space-between;";
+      chatResizerNote.innerHTML = `
+            <div>
+                <div style="font-size: 13px; font-weight: bold; color: #90caf9;">\u{1F4AC} Chat Resizer & Draggable Handle</div>
+                <div style="font-size: 12px; color: #78909c; margin-top: 2px;">Local client QoL only (split ratio & divider). Maintained locally and strictly exempt from remote dominant rules.</div>
+            </div>
+            <span style="font-size: 11px; color: #81c784; background: rgba(76, 175, 80, 0.15); border: 1px solid #4caf50; padding: 3px 8px; border-radius: 4px; font-weight: bold;">LOCAL ONLY</span>
+        `;
+      uiSection.appendChild(chatResizerNote);
+      container.appendChild(uiSection);
+      const catalogSection = document.createElement("div");
+      catalogSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
+      catalogSection.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <div style="font-size: 16px; font-weight: bold; color: #64b5f6;">
+                    \u{1F4DA} Custom Addon Catalog (${customCatalog.length})
+                </div>
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 16px;">
+                Register custom external scripts, mods, or userscripts into the catalog so dominants can mandate or forbid them in the Enforce Rules tab.
+            </div>
+        `;
+      if (customCatalog.length === 0) {
+        const noCustom = document.createElement("div");
+        noCustom.style.cssText = "color: #78909c; font-size: 13px; padding: 14px; text-align: center; background: rgba(30, 36, 48, 0.5); border-radius: 6px; margin-bottom: 16px;";
+        noCustom.textContent = "No custom addons currently registered. Use the form below to add one.";
+        catalogSection.appendChild(noCustom);
+      } else {
+        const list = document.createElement("div");
+        list.style.cssText = "display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;";
+        customCatalog.forEach((c) => {
+          const itemCard = document.createElement("div");
+          itemCard.style.cssText = "background: rgba(45, 55, 75, 0.6); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;";
+          itemCard.innerHTML = `
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 14px; font-weight: bold; color: #e0e6ed;">${c.name}</span>
+                            <span style="font-size: 11px; color: #ffb74d; background: rgba(255, 152, 0, 0.15); border: 1px solid #ff9800; padding: 1px 6px; border-radius: 3px;">ID: ${c.id}</span>
+                        </div>
+                        <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">
+                            ${c.description || "Custom mod"} ${c.detectKeys?.length ? `\u2022 Keys: [${c.detectKeys.join(", ")}]` : ""}
+                        </div>
+                        ${c.scriptUrl ? `<div style="font-size: 11px; color: #81c784; margin-top: 2px; word-break: break-all;">URL: ${c.scriptUrl}</div>` : ""}
+                    </div>
+                `;
+          if (canEditPreferences) {
+            const delBtn = document.createElement("button");
+            delBtn.textContent = "\u{1F5D1}\uFE0F Remove";
+            delBtn.title = "Delete custom addon from catalog";
+            delBtn.style.cssText = "padding: 4px 10px; border-radius: 4px; background: rgba(198, 40, 40, 0.2); border: 1px solid #ef5350; color: #ef9a9a; font-size: 11px; font-weight: bold; cursor: pointer;";
+            delBtn.addEventListener("click", () => removeCustomMod(c.id));
+            itemCard.appendChild(delBtn);
+          }
+          list.appendChild(itemCard);
+        });
+        catalogSection.appendChild(list);
+      }
+      if (canEditPreferences) {
+        const formBox = document.createElement("div");
+        formBox.style.cssText = "background: rgba(30, 36, 48, 0.7); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 16px;";
+        formBox.innerHTML = `
+                <div style="font-size: 14px; font-weight: bold; color: #64b5f6; margin-bottom: 12px;">\u2795 Register New Custom Addon</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #b0bec5; display: block; margin-bottom: 4px;">Mod Display Name *</label>
+                        <input id="qoc-add-name" type="text" placeholder="e.g. Banned Cheats Script" style="width: 100%; box-sizing: border-box; padding: 7px 10px; background: #191f2b; border: 1px solid #546e7a; color: white; border-radius: 4px; font-size: 13px;" />
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #b0bec5; display: block; margin-bottom: 4px;">Unique ID / Keyword *</label>
+                        <input id="qoc-add-id" type="text" placeholder="e.g. BannedCheats" style="width: 100%; box-sizing: border-box; padding: 7px 10px; background: #191f2b; border: 1px solid #546e7a; color: white; border-radius: 4px; font-size: 13px;" />
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <label style="font-size: 12px; color: #b0bec5; display: block; margin-bottom: 4px;">Description / Purpose</label>
+                    <input id="qoc-add-desc" type="text" placeholder="e.g. Third-party automation or tampermonkey script" style="width: 100%; box-sizing: border-box; padding: 7px 10px; background: #191f2b; border: 1px solid #546e7a; color: white; border-radius: 4px; font-size: 13px;" />
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <label style="font-size: 12px; color: #b0bec5; display: block; margin-bottom: 4px;">Detection Keywords (comma-separated)</label>
+                        <input id="qoc-add-keys" type="text" placeholder="e.g. cheat, tampermonkey, hack" style="width: 100%; box-sizing: border-box; padding: 7px 10px; background: #191f2b; border: 1px solid #546e7a; color: white; border-radius: 4px; font-size: 13px;" />
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #b0bec5; display: block; margin-bottom: 4px;">Script Injection URL (optional)</label>
+                        <input id="qoc-add-url" type="text" placeholder="https://example.com/mod.js" style="width: 100%; box-sizing: border-box; padding: 7px 10px; background: #191f2b; border: 1px solid #546e7a; color: white; border-radius: 4px; font-size: 13px;" />
+                    </div>
+                </div>
+                <button id="qoc-btn-add-mod" style="padding: 8px 20px; background: #1976d2; border: 1px solid #42a5f5; color: white; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                    \u2795 Add Custom Addon to Catalog
+                </button>
+            `;
+        formBox.querySelector("#qoc-btn-add-mod")?.addEventListener("click", () => {
+          const nameInp = formBox.querySelector("#qoc-add-name");
+          const idInp = formBox.querySelector("#qoc-add-id");
+          const descInp = formBox.querySelector("#qoc-add-desc");
+          const keysInp = formBox.querySelector("#qoc-add-keys");
+          const urlInp = formBox.querySelector("#qoc-add-url");
+          const name = nameInp?.value.trim();
+          const id = idInp?.value.trim();
+          if (!name || !id) {
+            toastsManager.error({ title: "Incomplete Addon", message: "Please provide both Mod Name and Unique ID.", duration: 3e3 });
+            return;
+          }
+          const desc = descInp?.value.trim() || "Custom Addon";
+          const rawKeys = keysInp?.value.trim();
+          const detectKeys = rawKeys ? rawKeys.split(",").map((k) => k.trim()).filter(Boolean) : [id.toLowerCase(), name.toLowerCase()];
+          const scriptUrl = urlInp?.value.trim() || "";
+          addCustomMod({
+            id,
+            name,
+            description: desc,
+            detectKeys,
+            scriptUrl,
+            isCustom: true
+          });
+        });
+        catalogSection.appendChild(formBox);
+      }
+      container.appendChild(catalogSection);
       this.contentArea.appendChild(container);
     }
   };
@@ -9595,6 +10152,9 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
     return shieldIconDataUrl;
   }
   function canDrawProfileButton() {
+    if (!modStorage.inspector.showProfileButton) {
+      return false;
+    }
     if (typeof InformationSheetSelection === "undefined" || !InformationSheetSelection) {
       return false;
     }
