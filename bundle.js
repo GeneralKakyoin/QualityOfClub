@@ -8718,7 +8718,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
           right.style.cssText = "display: flex; align-items: center; gap: 8px;";
           const badge = document.createElement("span");
           badge.style.cssText = `background: ${isMandatory ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMandatory ? "#81c784" : "#e57373"}; border: 1px solid ${isMandatory ? "#4caf50" : "#f44336"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;`;
-          badge.textContent = isMandatory ? "MANDATORY" : "FORBIDDEN";
+          badge.textContent = isMandatory ? "\u{1F512} MANDATORY" : "\u{1F6AB} FORBIDDEN";
           right.appendChild(badge);
           if (canRemove) {
             const removeBtn = document.createElement("button");
@@ -8837,9 +8837,9 @@ One of mods you are using is using an old version of SDK. It will work for now b
           });
           return b;
         };
-        btnGroup.appendChild(createChoiceBtn("none", "Neutral", "#78909c", canRemove));
-        btnGroup.appendChild(createChoiceBtn("required", "Mandatory", "#2e7d32", canMandatory));
-        btnGroup.appendChild(createChoiceBtn("forbidden", "Forbidden", "#c62828", canForbidden));
+        btnGroup.appendChild(createChoiceBtn("none", "\u{1F513} Neutral", "#78909c", canRemove));
+        btnGroup.appendChild(createChoiceBtn("required", "\u{1F512} Mandatory", "#2e7d32", canMandatory));
+        btnGroup.appendChild(createChoiceBtn("forbidden", "\u{1F6AB} Forbidden", "#c62828", canForbidden));
         row.appendChild(left);
         row.appendChild(btnGroup);
         this.contentArea.appendChild(row);
