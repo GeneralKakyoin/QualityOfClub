@@ -1,7 +1,7 @@
 import { messagesManager } from "zois-core/messaging";
 import { toastsManager } from "zois-core/toasts";
 import { hookFunction, HookPriority } from "zois-core/mod-sdk";
-import { modStorage, syncStorage, saveStorage, ModRule, QoCPermission, AuthorityData, AccessLevel, AutoLoadMode } from "./storage";
+import { modStorage, syncStorage, saveStorage, ModRule, QoCPermission, AuthorityData, AccessLevel, AutoLoadMode, ViolationAction, CuratedModInfo } from "./storage";
 import { DetectedMod, getLoadedMods } from "./modDetection";
 import { evaluateCompliance, checkComplianceAgainstRules } from "./compliance";
 import { checkPermissionAccess, getCharacterAccessLevel, addRoleMember, removeRoleMember, setPermissionMinRole, setPermissionSelfAccess } from "./authority";
@@ -16,6 +16,14 @@ export interface InspectResponseData {
     mods?: DetectedMod[];
     rules?: ModRule[];
     autoLoadMode?: AutoLoadMode;
+    preferences?: {
+        violationAction: ViolationAction;
+        autoLoadMode: AutoLoadMode;
+        evaluationInterval: number;
+        silentTelemetry: boolean;
+        showProfileButton: boolean;
+    };
+    customCatalog?: CuratedModInfo[];
     authority?: AuthorityData;
     callerAccessLevel?: AccessLevel;
     callerPermissions?: Record<QoCPermission, boolean>;
@@ -38,13 +46,22 @@ export interface TriggerComplianceResponseData {
 }
 
 export interface AuthorityUpdateRequest {
-    action: "add_role" | "remove_role" | "set_min_role" | "set_self_access" | "set_autoload_mode";
+    action: "add_role" | "remove_role" | "set_min_role" | "set_self_access" | "set_autoload_mode" | "update_preferences" | "add_custom_mod" | "remove_custom_mod";
     role?: "owner" | "mistress";
     memberNumber?: number;
     perm?: QoCPermission;
     minRole?: AccessLevel;
     selfAllowed?: boolean;
     autoLoadMode?: AutoLoadMode;
+    preferences?: {
+        violationAction?: ViolationAction;
+        autoLoadMode?: AutoLoadMode;
+        evaluationInterval?: number;
+        silentTelemetry?: boolean;
+        showProfileButton?: boolean;
+    };
+    customMod?: CuratedModInfo;
+    customModId?: string;
 }
 
 export interface AuthorityUpdateResponseData {
@@ -52,6 +69,14 @@ export interface AuthorityUpdateResponseData {
     reason?: string;
     authority?: AuthorityData;
     autoLoadMode?: AutoLoadMode;
+    preferences?: {
+        violationAction: ViolationAction;
+        autoLoadMode: AutoLoadMode;
+        evaluationInterval: number;
+        silentTelemetry: boolean;
+        showProfileButton: boolean;
+    };
+    customCatalog?: CuratedModInfo[];
 }
 
 function getCallerPermissions(senderId: number): Record<QoCPermission, boolean> {
@@ -150,6 +175,7 @@ export function hasRuleAuthorityOver(target: Character | number): boolean {
  * Sends a silent telemetry report to any dominant in the room.
  */
 function sendSilentRoomTelemetry(): void {
+    if (!modStorage.inspector.silentTelemetry) return;
     if (typeof ChatRoomCharacter === "undefined" || !Array.isArray(ChatRoomCharacter)) return;
     if (typeof Player === "undefined") return;
 
@@ -173,10 +199,32 @@ function sendSilentRoomTelemetry(): void {
     }
 }
 
+let periodicComplianceTimer: any = null;
+
+export function restartPeriodicComplianceTimer(): void {
+    if (periodicComplianceTimer) {
+        clearInterval(periodicComplianceTimer);
+        periodicComplianceTimer = null;
+    }
+    const intervalSec = modStorage.inspector.evaluationInterval;
+    if (intervalSec && intervalSec > 0) {
+        periodicComplianceTimer = setInterval(() => {
+            if (typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
+                evaluateCompliance();
+                if (modStorage.inspector.silentTelemetry) {
+                    sendSilentRoomTelemetry();
+                }
+            }
+        }, intervalSec * 1000);
+    }
+}
+
 /**
  * Initializes network message handlers and room sync listeners.
  */
 export function initNetworkSync(): void {
+    restartPeriodicComplianceTimer();
+
     // 1. Direct packet request listener for ChatRoomMessage
     hookFunction("ChatRoomMessage", HookPriority.ADD_BEHAVIOR, async (args, next) => {
         const msg = args[0];
@@ -208,6 +256,14 @@ export function initNetworkSync(): void {
                     mods: permCheck.canViewAddons ? getLoadedMods() : [],
                     rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
                     autoLoadMode: modStorage.inspector.autoLoadMode,
+                    preferences: {
+                        violationAction: modStorage.inspector.violationAction || "toast",
+                        autoLoadMode: modStorage.inspector.autoLoadMode || "Prompt",
+                        evaluationInterval: typeof modStorage.inspector.evaluationInterval === "number" ? modStorage.inspector.evaluationInterval : 30,
+                        silentTelemetry: typeof modStorage.inspector.silentTelemetry === "boolean" ? modStorage.inspector.silentTelemetry : true,
+                        showProfileButton: typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true
+                    },
+                    customCatalog: modStorage.inspector.customCatalog || [],
                     authority: modStorage.authority,
                     callerAccessLevel: getCharacterAccessLevel(senderId),
                     callerPermissions: getCallerPermissions(senderId),
@@ -319,6 +375,55 @@ export function initNetworkSync(): void {
                         saveStorage();
                         syncStorage();
                         resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
+                    }
+                } else if (req.action === "update_preferences") {
+                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+                        resData = { success: false, reason: "Permission Denied: You do not have authority to edit preferences." };
+                    } else if (req.preferences) {
+                        if (req.preferences.violationAction) modStorage.inspector.violationAction = req.preferences.violationAction;
+                        if (req.preferences.autoLoadMode) modStorage.inspector.autoLoadMode = req.preferences.autoLoadMode;
+                        if (typeof req.preferences.evaluationInterval === "number") modStorage.inspector.evaluationInterval = req.preferences.evaluationInterval;
+                        if (typeof req.preferences.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = req.preferences.silentTelemetry;
+                        if (typeof req.preferences.showProfileButton === "boolean") modStorage.inspector.showProfileButton = req.preferences.showProfileButton;
+                        saveStorage();
+                        syncStorage();
+                        restartPeriodicComplianceTimer();
+                        resData = {
+                            success: true,
+                            preferences: {
+                                violationAction: modStorage.inspector.violationAction,
+                                autoLoadMode: modStorage.inspector.autoLoadMode,
+                                evaluationInterval: modStorage.inspector.evaluationInterval,
+                                silentTelemetry: modStorage.inspector.silentTelemetry,
+                                showProfileButton: modStorage.inspector.showProfileButton
+                            }
+                        };
+                    } else {
+                        resData = { success: false, reason: "No preferences provided." };
+                    }
+                } else if (req.action === "add_custom_mod") {
+                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+                        resData = { success: false, reason: "Permission Denied: You do not have authority to add custom addons." };
+                    } else if (req.customMod && req.customMod.id) {
+                        modStorage.inspector.customCatalog = modStorage.inspector.customCatalog || [];
+                        modStorage.inspector.customCatalog = modStorage.inspector.customCatalog.filter(c => c.id.toLowerCase() !== req.customMod!.id.toLowerCase());
+                        modStorage.inspector.customCatalog.push(req.customMod);
+                        saveStorage();
+                        syncStorage();
+                        resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
+                    } else {
+                        resData = { success: false, reason: "Invalid custom addon data." };
+                    }
+                } else if (req.action === "remove_custom_mod") {
+                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+                        resData = { success: false, reason: "Permission Denied: You do not have authority to remove custom addons." };
+                    } else if (req.customModId) {
+                        modStorage.inspector.customCatalog = (modStorage.inspector.customCatalog || []).filter(c => c.id.toLowerCase() !== req.customModId!.toLowerCase());
+                        saveStorage();
+                        syncStorage();
+                        resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
+                    } else {
+                        resData = { success: false, reason: "Invalid custom addon ID." };
                     }
                 } else {
                     resData = { success: false, reason: "Unknown action." };

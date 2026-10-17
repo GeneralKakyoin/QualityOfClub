@@ -74,6 +74,92 @@ export function checkComplianceAgainstRules(mods: DetectedMod[], rules: ModRule[
     };
 }
 
+let lockoutElement: HTMLElement | null = null;
+
+export function triggerLockoutOverlay(rule: ModRule): void {
+    if (lockoutElement && document.body.contains(lockoutElement)) {
+        return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.id = "qoc-lockout-overlay";
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(18, 5, 8, 0.96);
+        z-index: 100000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: #ff5252;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 40px;
+        box-sizing: border-box;
+        user-select: none;
+    `;
+
+    const enforcer = rule.enforcedByName || `Member #${rule.enforcedBy}`;
+
+    overlay.innerHTML = `
+        <div style="font-size: 72px; margin-bottom: 16px; filter: drop-shadow(0 0 20px rgba(255, 82, 82, 0.6));">🚫</div>
+        <div style="font-size: 28px; font-weight: bold; color: #ff5252; margin-bottom: 12px; letter-spacing: 1.5px;">
+            QUALITY OF CLUB POLICY VIOLATION: INTERFACE LOCKED
+        </div>
+        <div style="font-size: 17px; color: #ffcdd2; max-width: 650px; line-height: 1.6; margin-bottom: 20px;">
+            You are actively running the forbidden addon: <b style="color: #ff8a80;">${rule.modName}</b>.<br>
+            Access to Bondage Club has been locked until this forbidden addon is disabled or uninstalled.
+        </div>
+        <div style="font-size: 14px; color: #ef9a9a; margin-bottom: 30px;">
+            Policy enforced by: <b>${enforcer}</b>
+        </div>
+        <div style="display: flex; gap: 16px;">
+            <button id="qoc-lockout-reload" style="padding: 12px 30px; background: #c62828; border: 1px solid #ff5252; color: white; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                🔄 Reload Game Page
+            </button>
+            <button id="qoc-lockout-recheck" style="padding: 12px 30px; background: rgba(55, 71, 79, 0.9); border: 1px solid #78909c; color: white; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                ⚡ Re-check Compliance
+            </button>
+        </div>
+    `;
+
+    overlay.querySelector("#qoc-lockout-reload")?.addEventListener("click", () => {
+        window.location.reload();
+    });
+
+    overlay.querySelector("#qoc-lockout-recheck")?.addEventListener("click", async () => {
+        const report = await evaluateCompliance();
+        if (report.detectedForbidden.length === 0) {
+            clearLockoutOverlay();
+            toastsManager.success({
+                title: `${MOD_NAME} Unlocked`,
+                message: "Forbidden addon no longer detected. Access restored!",
+                duration: 4000
+            });
+        } else {
+            toastsManager.error({
+                title: `${MOD_NAME} Still Non-Compliant`,
+                message: "Forbidden addon is still running in this session.",
+                duration: 4000
+            });
+        }
+    });
+
+    document.body.appendChild(overlay);
+    lockoutElement = overlay;
+}
+
+export function clearLockoutOverlay(): void {
+    if (lockoutElement) {
+        lockoutElement.remove();
+        lockoutElement = null;
+    }
+}
+
 /**
  * Evaluates active rules on the local player and initiates auto-loading or prompts.
  */
@@ -89,6 +175,7 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
     try {
         const rules = modStorage.inspector.rules;
         if (!rules || rules.length === 0) {
+            clearLockoutOverlay();
             return { isCompliant: true, missingRequired: [], detectedForbidden: [] };
         }
 
@@ -97,6 +184,7 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
 
             if (rule.type === "required" && !loaded) {
                 missingRequired.push(rule);
+                const enforcer = rule.enforcedByName || `Member #${rule.enforcedBy}`;
 
                 const curated = getCuratedMod(rule.modId) || getCuratedMod(rule.modName);
                 if (curated) {
@@ -117,8 +205,7 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
                     } else if (modStorage.inspector.autoLoadMode === "Prompt") {
                         if (!promptedMods.has(curated.id)) {
                             promptedMods.add(curated.id);
-                            const name = rule.enforcedByName || `Member #${rule.enforcedBy}`;
-                            const promptMsg = `[${MOD_NAME}] Mandatory Addon: ${curated.name} is required by ${name}. Load it now?`;
+                            const promptMsg = `[${MOD_NAME}] Mandatory Addon: ${curated.name} is required by ${enforcer}. Load it now?`;
                             try {
                                 dialogsManager.confirm({
                                     message: promptMsg
@@ -137,6 +224,12 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
                                 }
                             }
                         }
+                    } else if (modStorage.inspector.autoLoadMode === "Alert") {
+                        toastsManager.warn({
+                            title: `${MOD_NAME} Mandatory Notice`,
+                            message: `Mandatory addon '${curated.name}' required by ${enforcer} is missing.`,
+                            duration: 6000
+                        });
                     }
                 } else {
                     toastsManager.warn({
@@ -148,12 +241,45 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
             } else if (rule.type === "forbidden" && loaded) {
                 detectedForbidden.push(rule);
                 const enforcer = rule.enforcedByName || `Member #${rule.enforcedBy}`;
-                toastsManager.error({
-                    title: `${MOD_NAME} Policy Violation`,
-                    message: `Addon '${rule.modName}' is FORBIDDEN by ${enforcer}. Please disable it immediately!`,
-                    duration: 9000
-                });
+                const violationAction = modStorage.inspector.violationAction || "toast";
+
+                if (violationAction === "toast") {
+                    toastsManager.error({
+                        title: `${MOD_NAME} Policy Violation`,
+                        message: `Addon '${rule.modName}' is FORBIDDEN by ${enforcer}. Please disable it immediately!`,
+                        duration: 9000
+                    });
+                } else if (violationAction === "room_alert") {
+                    toastsManager.error({
+                        title: `${MOD_NAME} Policy Violation`,
+                        message: `Addon '${rule.modName}' is FORBIDDEN! Public room alert announced.`,
+                        duration: 9000
+                    });
+                    if (typeof ServerSend === "function" && typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
+                        const pName = typeof Player !== "undefined" ? Player.Name : "Player";
+                        ServerSend("ChatRoomChat", {
+                            Content: `* [${MOD_NAME} Violation] ${pName} is actively running forbidden addon '${rule.modName}'! *`,
+                            Type: "Emote"
+                        });
+                    }
+                } else if (violationAction === "lockout") {
+                    triggerLockoutOverlay(rule);
+                } else if (violationAction === "leave_room") {
+                    toastsManager.error({
+                        title: `${MOD_NAME} Room Ejection`,
+                        message: `Ejected from room: Addon '${rule.modName}' is FORBIDDEN by ${enforcer}!`,
+                        duration: 9000
+                    });
+                    if (typeof ChatRoomLeave === "function" && typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
+                        ChatRoomLeave();
+                    }
+                }
             }
+        }
+
+        // If no forbidden addons detected, dismiss any existing lockout overlay
+        if (detectedForbidden.length === 0) {
+            clearLockoutOverlay();
         }
     } catch (e) {
         console.error("[QoC] Error evaluating compliance:", e);

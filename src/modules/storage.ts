@@ -63,7 +63,19 @@ export const DEFAULT_PERMISSIONS: Record<QoCPermission, PermissionSetting> = {
     menu_open_settings: { self: true, min: AccessLevel.owner }
 };
 
-export type AutoLoadMode = "Silent" | "Prompt";
+export type AutoLoadMode = "Silent" | "Prompt" | "Alert";
+
+export type ViolationAction = "toast" | "room_alert" | "lockout" | "leave_room";
+
+export interface CuratedModInfo {
+    id: string;
+    name: string;
+    description: string;
+    scriptUrl: string;
+    detectKeys: string[];
+    repositoryMatch?: string;
+    isCustom?: boolean;
+}
 
 export interface ModRule {
     modId: string;
@@ -85,6 +97,11 @@ export interface QoCSettings {
     inspector: {
         enabled: boolean;
         autoLoadMode: AutoLoadMode;
+        violationAction: ViolationAction;
+        evaluationInterval: number; // seconds: 0 = manual/room sync only, 15, 30, 60
+        silentTelemetry: boolean; // broadcast manifest to dominants in room
+        showProfileButton: boolean; // show shield button on info sheet
+        customCatalog: CuratedModInfo[];
         rules: ModRule[];
     };
     managedRules: Record<number, ModRule[]>;
@@ -105,6 +122,11 @@ const DEFAULT_SETTINGS: QoCSettings = {
     inspector: {
         enabled: true,
         autoLoadMode: "Prompt",
+        violationAction: "toast",
+        evaluationInterval: 30,
+        silentTelemetry: true,
+        showProfileButton: true,
+        customCatalog: [],
         rules: []
     },
     managedRules: {}
@@ -162,7 +184,13 @@ export function loadStorage(): void {
             inspector: {
                 ...DEFAULT_SETTINGS.inspector,
                 ...(loadedData.inspector || {}),
-                rules: Array.isArray(loadedData.inspector?.rules) ? loadedData.inspector.rules : []
+                rules: Array.isArray(loadedData.inspector?.rules) ? loadedData.inspector.rules : [],
+                customCatalog: Array.isArray(loadedData.inspector?.customCatalog) ? loadedData.inspector.customCatalog : [],
+                violationAction: loadedData.inspector?.violationAction || "toast",
+                autoLoadMode: loadedData.inspector?.autoLoadMode || "Prompt",
+                evaluationInterval: typeof loadedData.inspector?.evaluationInterval === "number" ? loadedData.inspector.evaluationInterval : 30,
+                silentTelemetry: typeof loadedData.inspector?.silentTelemetry === "boolean" ? loadedData.inspector.silentTelemetry : true,
+                showProfileButton: typeof loadedData.inspector?.showProfileButton === "boolean" ? loadedData.inspector.showProfileButton : true
             },
             managedRules: loadedData.managedRules || {}
         };

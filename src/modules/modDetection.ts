@@ -1,18 +1,12 @@
+import { modStorage, CuratedModInfo } from "./storage";
+export { CuratedModInfo };
+
 export interface DetectedMod {
     id: string;
     name: string;
     fullName?: string;
     version?: string;
     repository?: string;
-}
-
-export interface CuratedModInfo {
-    id: string;
-    name: string;
-    description: string;
-    scriptUrl: string;
-    detectKeys: string[];
-    repositoryMatch?: string;
 }
 
 export const CURATED_MOD_CATALOG: Record<string, CuratedModInfo> = {
@@ -59,19 +53,37 @@ export const CURATED_MOD_CATALOG: Record<string, CuratedModInfo> = {
 };
 
 /**
- * Resolves a curated mod entry case-insensitively by ID, name, or detect keys.
+ * Returns all catalog mods including default curated mods and user-defined custom mods.
+ */
+export function getAllCatalogMods(): Record<string, CuratedModInfo> {
+    const combined: Record<string, CuratedModInfo> = { ...CURATED_MOD_CATALOG };
+    if (modStorage?.inspector?.customCatalog && Array.isArray(modStorage.inspector.customCatalog)) {
+        for (const item of modStorage.inspector.customCatalog) {
+            if (item && item.id) {
+                combined[item.id] = { ...item, isCustom: true };
+            }
+        }
+    }
+    return combined;
+}
+
+/**
+ * Resolves a curated or custom catalog mod entry case-insensitively by ID, name, or detect keys.
  */
 export function getCuratedMod(idOrName: string): CuratedModInfo | null {
     if (!idOrName) return null;
     const target = idOrName.toLowerCase().trim();
-    if (CURATED_MOD_CATALOG[idOrName]) return CURATED_MOD_CATALOG[idOrName];
+    const all = getAllCatalogMods();
+    if (all[idOrName]) return all[idOrName];
 
-    for (const item of Object.values(CURATED_MOD_CATALOG)) {
+    for (const item of Object.values(all)) {
         if (item.id.toLowerCase() === target || item.name.toLowerCase() === target) {
             return item;
         }
-        for (const k of item.detectKeys) {
-            if (k.toLowerCase() === target) return item;
+        if (Array.isArray(item.detectKeys)) {
+            for (const k of item.detectKeys) {
+                if (k.toLowerCase() === target) return item;
+            }
         }
     }
     return null;
@@ -259,13 +271,14 @@ export function isModLoaded(identifier: string): boolean {
 export function loadCuratedMod(catalogId: string): Promise<boolean> {
     if (!catalogId) return Promise.resolve(false);
     const target = catalogId.toLowerCase().trim();
-    const mod = CURATED_MOD_CATALOG[catalogId] || Object.values(CURATED_MOD_CATALOG).find(c =>
+    const all = getAllCatalogMods();
+    const mod = all[catalogId] || Object.values(all).find(c =>
         c.id.toLowerCase() === target ||
         c.name.toLowerCase() === target ||
-        c.detectKeys.some(k => k.toLowerCase() === target)
+        (Array.isArray(c.detectKeys) && c.detectKeys.some(k => k.toLowerCase() === target))
     );
-    if (!mod) {
-        console.warn(`[QoC] Cannot auto-load unverified mod '${catalogId}'. Only curated catalog mods can be auto-loaded.`);
+    if (!mod || !mod.scriptUrl) {
+        console.warn(`[QoC] Cannot auto-load mod '${catalogId}'. No valid script URL found.`);
         return Promise.resolve(false);
     }
 

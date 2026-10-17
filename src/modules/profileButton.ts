@@ -3,6 +3,7 @@ import { getCurrentSubscreen, setSubscreen } from "zois-core/ui";
 import { createElement, ShieldCheck } from "lucide";
 import { PROFILE_BUTTON_POSITION, MOD_NAME } from "src/constants";
 import { InspectorSubscreen } from "subscreens/inspectorSubscreen";
+import { modStorage } from "./storage";
 
 let shieldIconDataUrl: string | null = null;
 
@@ -23,6 +24,9 @@ function getIconDataUrl(): string {
  * Checks whether the profile button can be drawn on InformationSheet.
  */
 function canDrawProfileButton(): boolean {
+    if (!modStorage.inspector.showProfileButton) {
+        return false;
+    }
     if (typeof InformationSheetSelection === "undefined" || !InformationSheetSelection) {
         return false;
     }
