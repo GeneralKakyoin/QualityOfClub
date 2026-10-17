@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.3";
+  var version2 = "1.0.4";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4635,91 +4635,17 @@ One of mods you are using is using an old version of SDK. It will work for now b
 
   // src/subscreens/chatResizerSubscreen.ts
   var ChatResizerSubscreen = class extends BaseSubscreen {
-    sliderContainer = null;
+    rootElement = null;
     sliderInput = null;
     sliderValueLabel = null;
     get name() {
-      return "Chat Window Resizer";
+      return "";
     }
     onRun() {
       DrawRect(0, 0, 2e3, 1e3, "#191f2b");
     }
     onLoad() {
-      this.createCheckbox({
-        x: 120,
-        y: 200,
-        width: 800,
-        height: 48,
-        text: "Enable Chat Window Resizer",
-        isChecked: modStorage.chatResizer.enabled,
-        tooltip: {
-          position: "right",
-          text: "Shrinks chat width to give more room for avatars and room graphics."
-        },
-        onChange: () => {
-          modStorage.chatResizer.enabled = !modStorage.chatResizer.enabled;
-          saveStorage();
-          applyChatDimensions();
-        }
-      });
-      this.createCheckbox({
-        x: 120,
-        y: 265,
-        width: 800,
-        height: 48,
-        text: "Show Draggable Divider in Chatrooms",
-        isChecked: modStorage.chatResizer.showDivider,
-        tooltip: {
-          position: "right",
-          text: "Shows an interactive vertical line between canvas and chat to drag-resize directly."
-        },
-        onChange: () => {
-          modStorage.chatResizer.showDivider = !modStorage.chatResizer.showDivider;
-          saveStorage();
-          applyChatDimensions();
-        }
-      });
-      this.createText({
-        x: 120,
-        y: 350,
-        fontSize: 4,
-        text: "Graphic View Size Proportions"
-      });
-      this.createSliderControl(120, 400);
-      this.createText({
-        x: 120,
-        y: 500,
-        fontSize: 3.5,
-        text: "Quick Presets:"
-      });
-      const presets = [
-        { label: "50% (Default)", val: 50 },
-        { label: "60% Graphic", val: 60 },
-        { label: "65% Graphic", val: 65 },
-        { label: "70% Graphic", val: 70 },
-        { label: "75% Graphic", val: 75 },
-        { label: "80% Graphic", val: 80 }
-      ];
-      presets.forEach((preset, idx) => {
-        const btn = this.createButton({
-          x: 120 + idx % 3 * 280,
-          y: 545 + Math.floor(idx / 3) * 65,
-          width: 260,
-          height: 52,
-          text: preset.label,
-          onClick: () => {
-            this.updateSliderValue(preset.val);
-          }
-        });
-        btn.style.fontWeight = "bold";
-      });
-      const hint = this.createText({
-        x: 120,
-        y: 720,
-        fontSize: 3,
-        text: "Tip: When enabled, drag the vertical divider line in chatrooms to resize live! Double-click to reset to 50/50."
-      });
-      hint.style.color = "#8fa0b5";
+      this.createUI();
     }
     exit() {
       this.cleanup();
@@ -4732,56 +4658,217 @@ One of mods you are using is using an old version of SDK. It will work for now b
       this.cleanup();
     }
     cleanup() {
-      if (this.sliderContainer) {
-        this.sliderContainer.remove();
-        this.sliderContainer = null;
+      if (this.rootElement) {
+        this.rootElement.remove();
+        this.rootElement = null;
       }
       this.sliderInput = null;
       this.sliderValueLabel = null;
     }
-    createSliderControl(x, y) {
+    createUI() {
       this.cleanup();
+      const backdrop = document.createElement("div");
+      backdrop.style.cssText = `
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #191f2b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: #e0e6ed;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            box-sizing: border-box;
+            user-select: none;
+        `;
       const container = document.createElement("div");
-      Object.assign(container.style, {
-        position: "fixed",
-        left: `${getRelativeX(x)}px`,
-        top: `${getRelativeY(y)}px`,
-        width: `${getRelativeWidth(800)}px`,
-        display: "flex",
-        alignItems: "center",
-        gap: "16px",
-        zIndex: "10"
+      container.style.cssText = `
+            width: min(92vw, 1200px);
+            height: min(90vh, 850px);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-sizing: border-box;
+        `;
+      const header = document.createElement("div");
+      header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(80, 100, 140, 0.35);
+        `;
+      const titleBox = document.createElement("div");
+      titleBox.innerHTML = `
+            <div style="font-size: 24px; font-weight: bold; color: #64b5f6; letter-spacing: 0.5px;">
+                \u{1F4D0} Chat Window Resizer Settings
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-top: 4px;">
+                Adjust the balance between character graphics and the chatroom message log.
+            </div>
+        `;
+      const backBtn = document.createElement("button");
+      backBtn.textContent = "\u2715 Back to Menu";
+      backBtn.style.cssText = `
+            padding: 10px 24px;
+            background: rgba(220, 50, 50, 0.85);
+            border: 1px solid #ef5350;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        `;
+      backBtn.addEventListener("mouseover", () => {
+        backBtn.style.background = "#d32f2f";
       });
+      backBtn.addEventListener("mouseout", () => {
+        backBtn.style.background = "rgba(220, 50, 50, 0.85)";
+      });
+      backBtn.addEventListener("click", () => this.exit());
+      header.appendChild(titleBox);
+      header.appendChild(backBtn);
+      container.appendChild(header);
+      const body = document.createElement("div");
+      body.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding-right: 6px;
+            box-sizing: border-box;
+        `;
+      const togglesCard = this.createCardElement("\u2699\uFE0F Feature Toggles");
+      const toggles = [
+        {
+          title: "Enable Chat Window Resizer",
+          desc: "Activates custom chat dimensions. When off, Bondage Club uses default 50/50 sizing.",
+          checked: modStorage.chatResizer.enabled,
+          toggle: () => {
+            modStorage.chatResizer.enabled = !modStorage.chatResizer.enabled;
+            saveStorage();
+            applyChatDimensions();
+            this.createUI();
+          }
+        },
+        {
+          title: "Show Draggable Divider in Chatrooms",
+          desc: "Draws an interactive vertical separator bar in chatrooms allowing live drag-and-drop resizing.",
+          checked: modStorage.chatResizer.showDivider,
+          toggle: () => {
+            modStorage.chatResizer.showDivider = !modStorage.chatResizer.showDivider;
+            saveStorage();
+            applyChatDimensions();
+            this.createUI();
+          }
+        }
+      ];
+      toggles.forEach((t) => {
+        togglesCard.appendChild(this.createToggleRow(t.title, t.desc, t.checked, t.toggle));
+      });
+      body.appendChild(togglesCard);
+      const sliderCard = this.createCardElement("\u{1F4CF} Screen Size Proportion", "Drag the slider to adjust how much screen space is allocated to graphics vs chat:");
+      const currentPercent = modStorage.chatResizer.splitPercent || DEFAULT_SPLIT_PERCENT;
+      const sliderContainer = document.createElement("div");
+      sliderContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-top: 14px;
+            padding: 8px 0;
+        `;
       const slider = document.createElement("input");
       slider.type = "range";
       slider.min = `${MIN_SPLIT_PERCENT}`;
       slider.max = `${MAX_SPLIT_PERCENT}`;
-      slider.value = `${modStorage.chatResizer.splitPercent}`;
-      Object.assign(slider.style, {
-        flex: "1",
-        cursor: "pointer",
-        height: "8px",
-        accentColor: "#3a7bd5"
-      });
-      const label = document.createElement("span");
-      label.textContent = `${slider.value}% Graphic / ${100 - Number(slider.value)}% Chat`;
-      Object.assign(label.style, {
-        minWidth: "220px",
-        fontWeight: "bold",
-        fontSize: "calc(2.5px * var(--size-unit, 4px))",
-        color: "var(--tmd-text, white)"
-      });
+      slider.value = `${currentPercent}`;
+      slider.style.cssText = `
+            flex: 1;
+            height: 10px;
+            cursor: pointer;
+            accent-color: #2196f3;
+            border-radius: 5px;
+        `;
+      const label = document.createElement("div");
+      label.style.cssText = `
+            min-width: 240px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #64b5f6;
+            text-align: right;
+            padding-right: 8px;
+        `;
+      label.textContent = `${currentPercent}% Graphic / ${100 - currentPercent}% Chat`;
       slider.addEventListener("input", () => {
         const val = Number(slider.value);
         label.textContent = `${val}% Graphic / ${100 - val}% Chat`;
         setSplitPercent(val);
+        this.highlightActivePreset(val);
       });
-      container.appendChild(slider);
-      container.appendChild(label);
-      document.body.appendChild(container);
-      this.sliderContainer = container;
       this.sliderInput = slider;
       this.sliderValueLabel = label;
+      sliderContainer.appendChild(slider);
+      sliderContainer.appendChild(label);
+      sliderCard.appendChild(sliderContainer);
+      body.appendChild(sliderCard);
+      const presetsCard = this.createCardElement("\u26A1 Quick Presets", "Click a preset to instantly apply proportions:");
+      const presetsGrid = document.createElement("div");
+      presetsGrid.id = "qoc-presets-grid";
+      presetsGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 10px;
+        `;
+      const presets = [
+        { label: "50% (Default)", val: 50 },
+        { label: "60% Graphic / 40% Chat", val: 60 },
+        { label: "65% Graphic / 35% Chat", val: 65 },
+        { label: "70% Graphic / 30% Chat", val: 70 },
+        { label: "75% Graphic / 25% Chat", val: 75 },
+        { label: "80% Graphic / 20% Chat", val: 80 }
+      ];
+      presets.forEach((p) => {
+        const isMatch = currentPercent === p.val;
+        const btn = document.createElement("button");
+        btn.dataset.val = `${p.val}`;
+        btn.style.cssText = `
+                padding: 14px 18px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: bold;
+                background: ${isMatch ? "rgba(25, 118, 210, 0.4)" : "rgba(35, 45, 60, 0.6)"};
+                border: 1px solid ${isMatch ? "#42a5f5" : "rgba(80, 100, 140, 0.35)"};
+                color: ${isMatch ? "#64b5f6" : "#e0e6ed"};
+                transition: all 0.15s ease;
+            `;
+        btn.textContent = p.label;
+        btn.addEventListener("click", () => {
+          this.updateSliderValue(p.val);
+        });
+        presetsGrid.appendChild(btn);
+      });
+      presetsCard.appendChild(presetsGrid);
+      body.appendChild(presetsCard);
+      const tip = document.createElement("div");
+      tip.style.cssText = `
+            font-size: 12px;
+            color: #8fa0b5;
+            text-align: center;
+            padding: 8px 0;
+        `;
+      tip.innerHTML = `\u{1F4A1} <b>Tip:</b> When enabled, drag the vertical line between the canvas and chat to resize live! <b>Double-click</b> the line to reset to 50/50.`;
+      body.appendChild(tip);
+      container.appendChild(body);
+      backdrop.appendChild(container);
+      document.body.appendChild(backdrop);
+      this.rootElement = backdrop;
     }
     updateSliderValue(val) {
       setSplitPercent(val);
@@ -4791,6 +4878,80 @@ One of mods you are using is using an old version of SDK. It will work for now b
       if (this.sliderValueLabel) {
         this.sliderValueLabel.textContent = `${val}% Graphic / ${100 - val}% Chat`;
       }
+      this.highlightActivePreset(val);
+    }
+    highlightActivePreset(val) {
+      const grid = document.getElementById("qoc-presets-grid");
+      if (!grid) return;
+      const buttons = grid.querySelectorAll("button");
+      buttons.forEach((btn) => {
+        const btnVal = Number(btn.dataset.val);
+        const isMatch = btnVal === val;
+        btn.style.background = isMatch ? "rgba(25, 118, 210, 0.4)" : "rgba(35, 45, 60, 0.6)";
+        btn.style.borderColor = isMatch ? "#42a5f5" : "rgba(80, 100, 140, 0.35)";
+        btn.style.color = isMatch ? "#64b5f6" : "#e0e6ed";
+      });
+    }
+    createCardElement(title, subtitle) {
+      const card = document.createElement("div");
+      card.style.cssText = `
+            background: rgba(30, 36, 48, 0.85);
+            border: 1px solid rgba(80, 100, 140, 0.35);
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-sizing: border-box;
+        `;
+      let headerHtml = `<div style="font-size: 16px; font-weight: bold; color: #64b5f6;">${title}</div>`;
+      if (subtitle) {
+        headerHtml += `<div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${subtitle}</div>`;
+      }
+      card.innerHTML = headerHtml;
+      return card;
+    }
+    createToggleRow(title, desc, isChecked, onToggle) {
+      const row = document.createElement("div");
+      row.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(80, 100, 140, 0.2);
+            cursor: pointer;
+        `;
+      row.addEventListener("click", onToggle);
+      const textBox = document.createElement("div");
+      textBox.style.cssText = "padding-right: 16px;";
+      textBox.innerHTML = `
+            <div style="font-size: 15px; font-weight: 600; color: #e0e6ed;">${title}</div>
+            <div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${desc}</div>
+        `;
+      const switchEl = document.createElement("div");
+      switchEl.style.cssText = `
+            width: 48px;
+            height: 26px;
+            background: ${isChecked ? "#1976d2" : "rgba(60, 70, 90, 0.7)"};
+            border-radius: 13px;
+            position: relative;
+            flex-shrink: 0;
+            transition: background 0.2s ease;
+            border: 1px solid ${isChecked ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
+        `;
+      const knob = document.createElement("div");
+      knob.style.cssText = `
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: ${isChecked ? "24px" : "3px"};
+            transition: left 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        `;
+      switchEl.appendChild(knob);
+      row.appendChild(textBox);
+      row.appendChild(switchEl);
+      return row;
     }
   };
 
@@ -7679,169 +7840,16 @@ One of mods you are using is using an old version of SDK. It will work for now b
   };
 
   // src/subscreens/addonPolicySubscreen.ts
-  var AddonPolicySubscreen = class _AddonPolicySubscreen extends BaseSubscreen {
-    domElements = [];
+  var AddonPolicySubscreen = class extends BaseSubscreen {
+    rootElement = null;
     get name() {
-      return "Addon Policy & Sharing";
+      return "";
     }
     onRun() {
       DrawRect(0, 0, 2e3, 1e3, "#191f2b");
     }
     onLoad() {
-      this.createText({
-        x: 120,
-        y: 180,
-        fontSize: 4,
-        text: "Addon Inspection & Sharing Settings"
-      });
-      this.createCheckbox({
-        x: 120,
-        y: 230,
-        width: 800,
-        height: 44,
-        text: "Enable Addon Inspector & Sharing System",
-        isChecked: modStorage.inspector.enabled,
-        onChange: () => {
-          modStorage.inspector.enabled = !modStorage.inspector.enabled;
-          saveStorage();
-          syncStorage();
-        }
-      });
-      this.createCheckbox({
-        x: 120,
-        y: 285,
-        width: 800,
-        height: 44,
-        text: "Allow Owner to lock mandatory / forbidden addon rules on me",
-        isChecked: modStorage.inspector.allowOwnerRules,
-        onChange: () => {
-          modStorage.inspector.allowOwnerRules = !modStorage.inspector.allowOwnerRules;
-          saveStorage();
-          syncStorage();
-        }
-      });
-      this.createCheckbox({
-        x: 120,
-        y: 340,
-        width: 800,
-        height: 44,
-        text: "Allow Lovers / Whitelisted partners to lock addon rules",
-        isChecked: modStorage.inspector.allowLoversRules,
-        onChange: () => {
-          modStorage.inspector.allowLoversRules = !modStorage.inspector.allowLoversRules;
-          saveStorage();
-          syncStorage();
-        }
-      });
-      this.createText({
-        x: 120,
-        y: 410,
-        fontSize: 3.5,
-        text: "Missing Mandatory Addon Behavior:"
-      });
-      const autoLoadModes = [
-        { mode: "Prompt", label: "Prompt First (Recommended)" },
-        { mode: "Silent", label: "Silent Auto-Load" }
-      ];
-      autoLoadModes.forEach((item, idx) => {
-        const isSelected = modStorage.inspector.autoLoadMode === item.mode;
-        const btn = this.createButton({
-          x: 120 + idx * 360,
-          y: 445,
-          width: 340,
-          height: 48,
-          text: `${isSelected ? "\u25CF " : "\u25CB "}${item.label}`,
-          onClick: () => {
-            modStorage.inspector.autoLoadMode = item.mode;
-            saveStorage();
-            syncStorage();
-            setSubscreen(new _AddonPolicySubscreen());
-          }
-        });
-        btn.style.fontWeight = isSelected ? "bold" : "normal";
-      });
-      this.createText({
-        x: 120,
-        y: 520,
-        fontSize: 3.5,
-        text: "Who May Inspect Your Loaded Addons:"
-      });
-      const permissions = [
-        { perm: "Prompt", label: "Prompt Me (Recommended)" },
-        { perm: "Owner", label: "Owner Only" },
-        { perm: "Lovers", label: "Owner & Lovers" },
-        { perm: "Whitelist", label: "Whitelist / Friends" },
-        { perm: "Anyone", label: "Anyone in Room" },
-        { perm: "Disabled", label: "Disabled (Nobody)" }
-      ];
-      permissions.forEach((item, idx) => {
-        const isSelected = modStorage.inspector.viewPermission === item.perm;
-        const col = idx % 3;
-        const row = Math.floor(idx / 3);
-        const btn = this.createButton({
-          x: 120 + col * 320,
-          y: 555 + row * 55,
-          width: 300,
-          height: 46,
-          text: `${isSelected ? "\u25CF " : "\u25CB "}${item.label}`,
-          onClick: () => {
-            modStorage.inspector.viewPermission = item.perm;
-            saveStorage();
-            syncStorage();
-            setSubscreen(new _AddonPolicySubscreen());
-          }
-        });
-        btn.style.fontWeight = isSelected ? "bold" : "normal";
-      });
-      const loadedMods = getLoadedMods();
-      const rules = modStorage.inspector.rules;
-      const compliance = checkComplianceAgainstRules(loadedMods, rules);
-      const summaryCard = document.createElement("div");
-      summaryCard.style.cssText = `
-            position: absolute;
-            left: ${getRelativeX(120)}px;
-            top: ${getRelativeY(690)}px;
-            width: ${getRelativeWidth(920)}px;
-            padding: 12px 18px;
-            background: rgba(30, 36, 48, 0.85);
-            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            color: #e0e6ed;
-            font-size: 14px;
-            z-index: 10;
-        `;
-      const statusText = document.createElement("div");
-      statusText.innerHTML = `
-            <div><b>Active Addons:</b> ${loadedMods.length} detected \u2022 <b>Rules on You:</b> ${rules.length}</div>
-            <div style="font-size: 12px; color: ${compliance.isCompliant ? "#81c784" : "#e57373"}; margin-top: 3px;">
-                ${compliance.isCompliant ? "\u2713 Compliant with all addon rules" : `\u26A0\uFE0F Non-compliant (${compliance.missing.length} missing, ${compliance.forbidden.length} forbidden)`}
-            </div>
-        `;
-      summaryCard.appendChild(statusText);
-      this.domElements.push(summaryCard);
-      document.body.appendChild(summaryCard);
-      const openManagerBtn = this.createButton({
-        x: 1070,
-        y: 690,
-        width: 450,
-        height: 52,
-        text: "\u{1F50D} Open Full Addon & Policy Manager",
-        onClick: () => {
-          this.cleanup();
-          setSubscreen(new InspectorSubscreen(typeof Player !== "undefined" ? Player : null));
-        }
-      });
-      openManagerBtn.style.fontWeight = "bold";
-      const hint = this.createText({
-        x: 120,
-        y: 775,
-        fontSize: 2.8,
-        text: "Tip: You can also inspect other players in your room by opening their profile and clicking the Shield icon under the LSCG button!"
-      });
-      hint.style.color = "#8fa0b5";
+      this.createUI();
     }
     exit() {
       this.cleanup();
@@ -7854,13 +7862,349 @@ One of mods you are using is using an old version of SDK. It will work for now b
       this.cleanup();
     }
     cleanup() {
-      for (const el of this.domElements) {
-        try {
-          el.remove();
-        } catch {
-        }
+      if (this.rootElement) {
+        this.rootElement.remove();
+        this.rootElement = null;
       }
-      this.domElements = [];
+    }
+    createUI() {
+      this.cleanup();
+      const backdrop = document.createElement("div");
+      backdrop.style.cssText = `
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #191f2b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: #e0e6ed;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            box-sizing: border-box;
+            user-select: none;
+        `;
+      const container = document.createElement("div");
+      container.style.cssText = `
+            width: min(92vw, 1300px);
+            height: min(92vh, 900px);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-sizing: border-box;
+        `;
+      const header = document.createElement("div");
+      header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(80, 100, 140, 0.35);
+        `;
+      const titleBox = document.createElement("div");
+      titleBox.innerHTML = `
+            <div style="font-size: 24px; font-weight: bold; color: #64b5f6; letter-spacing: 0.5px;">
+                \u{1F6E1}\uFE0F Addon Policy & Sharing Settings
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-top: 4px;">
+                Control who can view your active addons and who is authorized to lock mandatory or forbidden addon rules.
+            </div>
+        `;
+      const backBtn = document.createElement("button");
+      backBtn.textContent = "\u2715 Back to Menu";
+      backBtn.style.cssText = `
+            padding: 10px 24px;
+            background: rgba(220, 50, 50, 0.85);
+            border: 1px solid #ef5350;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        `;
+      backBtn.addEventListener("mouseover", () => {
+        backBtn.style.background = "#d32f2f";
+      });
+      backBtn.addEventListener("mouseout", () => {
+        backBtn.style.background = "rgba(220, 50, 50, 0.85)";
+      });
+      backBtn.addEventListener("click", () => this.exit());
+      header.appendChild(titleBox);
+      header.appendChild(backBtn);
+      container.appendChild(header);
+      const body = document.createElement("div");
+      body.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding-right: 6px;
+            box-sizing: border-box;
+        `;
+      const consentCard = this.createCardElement("\u{1F512} General Permissions & Consent");
+      const toggles = [
+        {
+          title: "Enable Addon Inspector & Sharing System",
+          desc: "Master switch. Allows checking addon compliance and exchanging addon status with other players in chatrooms.",
+          checked: modStorage.inspector.enabled,
+          toggle: () => {
+            modStorage.inspector.enabled = !modStorage.inspector.enabled;
+            saveStorage();
+            syncStorage();
+            this.createUI();
+          }
+        },
+        {
+          title: "Allow Club Owner to Lock Rules",
+          desc: "Permits your Club Owner to set mandatory or forbidden addon requirements on your character.",
+          checked: modStorage.inspector.allowOwnerRules,
+          toggle: () => {
+            modStorage.inspector.allowOwnerRules = !modStorage.inspector.allowOwnerRules;
+            saveStorage();
+            syncStorage();
+            this.createUI();
+          }
+        },
+        {
+          title: "Allow Lovers & Whitelist to Lock Rules",
+          desc: "Permits your Lovers or Whitelisted partners to enforce addon rules on your character.",
+          checked: modStorage.inspector.allowLoversRules,
+          toggle: () => {
+            modStorage.inspector.allowLoversRules = !modStorage.inspector.allowLoversRules;
+            saveStorage();
+            syncStorage();
+            this.createUI();
+          }
+        }
+      ];
+      toggles.forEach((t) => {
+        consentCard.appendChild(this.createToggleRow(t.title, t.desc, t.checked, t.toggle));
+      });
+      body.appendChild(consentCard);
+      const autoLoadCard = this.createCardElement("\u2699\uFE0F Missing Mandatory Addon Behavior", "What happens when an authorized owner or room requires an addon you don't have loaded:");
+      const autoLoadGrid = document.createElement("div");
+      autoLoadGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 8px;
+        `;
+      const autoLoadOptions = [
+        {
+          mode: "Prompt",
+          label: "Prompt First (Recommended)",
+          desc: "Displays an in-game confirmation toast before loading any missing addon."
+        },
+        {
+          mode: "Silent",
+          label: "Silent Auto-Load",
+          desc: "Automatically injects verified addons (BCX, LSCG, BCT, ClubChaos) without prompting."
+        }
+      ];
+      autoLoadOptions.forEach((opt) => {
+        const isSelected = modStorage.inspector.autoLoadMode === opt.mode;
+        const btn = document.createElement("div");
+        btn.style.cssText = `
+                padding: 14px 18px;
+                border-radius: 8px;
+                cursor: pointer;
+                background: ${isSelected ? "rgba(25, 118, 210, 0.25)" : "rgba(35, 45, 60, 0.6)"};
+                border: 1px solid ${isSelected ? "#42a5f5" : "rgba(80, 100, 140, 0.35)"};
+                transition: all 0.15s ease;
+            `;
+        btn.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 15px; color: ${isSelected ? "#64b5f6" : "#e0e6ed"};">
+                    <span style="font-size: 16px;">${isSelected ? "\u25CF" : "\u25CB"}</span>
+                    <span>${opt.label}</span>
+                </div>
+                <div style="font-size: 12px; color: #90a4ae; margin-top: 5px; margin-left: 24px;">
+                    ${opt.desc}
+                </div>
+            `;
+        btn.addEventListener("click", () => {
+          modStorage.inspector.autoLoadMode = opt.mode;
+          saveStorage();
+          syncStorage();
+          this.createUI();
+        });
+        autoLoadGrid.appendChild(btn);
+      });
+      autoLoadCard.appendChild(autoLoadGrid);
+      body.appendChild(autoLoadCard);
+      const permCard = this.createCardElement("\u{1F441}\uFE0F Who May Inspect Your Loaded Addons", "Choose who in your chatroom has permission to query and view your loaded addons:");
+      const permGrid = document.createElement("div");
+      permGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+        `;
+      const permOptions = [
+        { perm: "Prompt", label: "Prompt Me (Recommended)", desc: "Asks you each time someone requests inspection" },
+        { perm: "Owner", label: "Owner Only", desc: "Only your Club Owner can inspect" },
+        { perm: "Lovers", label: "Owner & Lovers", desc: "Your Owner and Lovers can inspect" },
+        { perm: "Whitelist", label: "Whitelist / Friends", desc: "Only players on your whitelist can inspect" },
+        { perm: "Anyone", label: "Anyone in Room", desc: "Any player in the same room can inspect" },
+        { perm: "Disabled", label: "Disabled (Nobody)", desc: "Blocks all remote inspection queries" }
+      ];
+      permOptions.forEach((opt) => {
+        const isSelected = modStorage.inspector.viewPermission === opt.perm;
+        const btn = document.createElement("div");
+        btn.style.cssText = `
+                padding: 12px 14px;
+                border-radius: 6px;
+                cursor: pointer;
+                background: ${isSelected ? "rgba(25, 118, 210, 0.25)" : "rgba(35, 45, 60, 0.6)"};
+                border: 1px solid ${isSelected ? "#42a5f5" : "rgba(80, 100, 140, 0.35)"};
+                transition: all 0.15s ease;
+            `;
+        btn.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; color: ${isSelected ? "#64b5f6" : "#e0e6ed"};">
+                    <span>${isSelected ? "\u25CF" : "\u25CB"}</span>
+                    <span>${opt.label}</span>
+                </div>
+                <div style="font-size: 11px; color: #90a4ae; margin-top: 4px; margin-left: 20px;">
+                    ${opt.desc}
+                </div>
+            `;
+        btn.addEventListener("click", () => {
+          modStorage.inspector.viewPermission = opt.perm;
+          saveStorage();
+          syncStorage();
+          this.createUI();
+        });
+        permGrid.appendChild(btn);
+      });
+      permCard.appendChild(permGrid);
+      body.appendChild(permCard);
+      const loadedMods = getLoadedMods();
+      const rules = modStorage.inspector.rules;
+      const compliance = checkComplianceAgainstRules(loadedMods, rules);
+      const statusBanner = document.createElement("div");
+      statusBanner.style.cssText = `
+            background: rgba(30, 36, 48, 0.9);
+            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        `;
+      const statusInfo = document.createElement("div");
+      statusInfo.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: ${compliance.isCompliant ? "#81c784" : "#ef5350"};">
+                ${compliance.isCompliant ? "\u2713 Compliant with All Addon Rules" : `\u26A0\uFE0F Non-Compliant (${compliance.missing.length} missing, ${compliance.forbidden.length} forbidden)`}
+            </div>
+            <div style="font-size: 13px; color: #b0bec5; margin-top: 4px;">
+                <b>${loadedMods.length}</b> addons loaded &nbsp;\u2022&nbsp; <b>${rules.length}</b> rules active on your character
+            </div>
+        `;
+      const openManagerBtn = document.createElement("button");
+      openManagerBtn.textContent = "\u{1F50D} Open Full Addon & Policy Manager";
+      openManagerBtn.style.cssText = `
+            padding: 12px 24px;
+            background: #1976d2;
+            border: 1px solid #42a5f5;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            white-space: nowrap;
+        `;
+      openManagerBtn.addEventListener("mouseover", () => {
+        openManagerBtn.style.background = "#1e88e5";
+      });
+      openManagerBtn.addEventListener("mouseout", () => {
+        openManagerBtn.style.background = "#1976d2";
+      });
+      openManagerBtn.addEventListener("click", () => {
+        this.cleanup();
+        setSubscreen(new InspectorSubscreen(typeof Player !== "undefined" ? Player : null));
+      });
+      statusBanner.appendChild(statusInfo);
+      statusBanner.appendChild(openManagerBtn);
+      body.appendChild(statusBanner);
+      const tip = document.createElement("div");
+      tip.style.cssText = `
+            font-size: 12px;
+            color: #8fa0b5;
+            text-align: center;
+            padding: 4px 0;
+        `;
+      tip.innerHTML = `\u{1F4A1} <b>Tip:</b> You can also inspect other players in your room by opening their character profile and clicking the <b>Shield icon</b> under the LSCG button!`;
+      body.appendChild(tip);
+      container.appendChild(body);
+      backdrop.appendChild(container);
+      document.body.appendChild(backdrop);
+      this.rootElement = backdrop;
+    }
+    createCardElement(title, subtitle) {
+      const card = document.createElement("div");
+      card.style.cssText = `
+            background: rgba(30, 36, 48, 0.85);
+            border: 1px solid rgba(80, 100, 140, 0.35);
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-sizing: border-box;
+        `;
+      let headerHtml = `<div style="font-size: 16px; font-weight: bold; color: #64b5f6;">${title}</div>`;
+      if (subtitle) {
+        headerHtml += `<div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${subtitle}</div>`;
+      }
+      card.innerHTML = headerHtml;
+      return card;
+    }
+    createToggleRow(title, desc, isChecked, onToggle) {
+      const row = document.createElement("div");
+      row.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(80, 100, 140, 0.2);
+            cursor: pointer;
+        `;
+      row.addEventListener("click", onToggle);
+      const textBox = document.createElement("div");
+      textBox.style.cssText = "padding-right: 16px;";
+      textBox.innerHTML = `
+            <div style="font-size: 15px; font-weight: 600; color: #e0e6ed;">${title}</div>
+            <div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${desc}</div>
+        `;
+      const switchEl = document.createElement("div");
+      switchEl.style.cssText = `
+            width: 48px;
+            height: 26px;
+            background: ${isChecked ? "#1976d2" : "rgba(60, 70, 90, 0.7)"};
+            border-radius: 13px;
+            position: relative;
+            flex-shrink: 0;
+            transition: background 0.2s ease;
+            border: 1px solid ${isChecked ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
+        `;
+      const knob = document.createElement("div");
+      knob.style.cssText = `
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: ${isChecked ? "24px" : "3px"};
+            transition: left 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        `;
+      switchEl.appendChild(knob);
+      row.appendChild(textBox);
+      row.appendChild(switchEl);
+      return row;
     }
   };
 

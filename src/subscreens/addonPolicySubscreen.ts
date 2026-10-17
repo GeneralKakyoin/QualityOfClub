@@ -1,4 +1,4 @@
-import { BaseSubscreen, getRelativeX, getRelativeY, getRelativeWidth, setSubscreen } from "zois-core/ui";
+import { BaseSubscreen, setSubscreen } from "zois-core/ui";
 import { modStorage, saveStorage, syncStorage, InspectViewPermission, AutoLoadMode } from "modules/storage";
 import { getLoadedMods } from "modules/modDetection";
 import { checkComplianceAgainstRules } from "modules/compliance";
@@ -6,10 +6,10 @@ import { InspectorSubscreen } from "./inspectorSubscreen";
 import { MainSubscreen } from "./mainSubscreen";
 
 export class AddonPolicySubscreen extends BaseSubscreen {
-    private domElements: HTMLElement[] = [];
+    private rootElement: HTMLElement | null = null;
 
     public override get name(): string {
-        return "Addon Policy & Sharing";
+        return "";
     }
 
     protected override onRun(): void {
@@ -17,181 +17,7 @@ export class AddonPolicySubscreen extends BaseSubscreen {
     }
 
     public override onLoad(): void {
-        this.createText({
-            x: 120,
-            y: 180,
-            fontSize: 4,
-            text: "Addon Inspection & Sharing Settings"
-        });
-
-        // 1. Enable Addon Inspector & Sharing
-        this.createCheckbox({
-            x: 120,
-            y: 230,
-            width: 800,
-            height: 44,
-            text: "Enable Addon Inspector & Sharing System",
-            isChecked: modStorage.inspector.enabled,
-            onChange: () => {
-                modStorage.inspector.enabled = !modStorage.inspector.enabled;
-                saveStorage();
-                syncStorage();
-            }
-        });
-
-        // 2. Allow Owner to lock rules
-        this.createCheckbox({
-            x: 120,
-            y: 285,
-            width: 800,
-            height: 44,
-            text: "Allow Owner to lock mandatory / forbidden addon rules on me",
-            isChecked: modStorage.inspector.allowOwnerRules,
-            onChange: () => {
-                modStorage.inspector.allowOwnerRules = !modStorage.inspector.allowOwnerRules;
-                saveStorage();
-                syncStorage();
-            }
-        });
-
-        // 3. Allow Lovers/Whitelist to lock rules
-        this.createCheckbox({
-            x: 120,
-            y: 340,
-            width: 800,
-            height: 44,
-            text: "Allow Lovers / Whitelisted partners to lock addon rules",
-            isChecked: modStorage.inspector.allowLoversRules,
-            onChange: () => {
-                modStorage.inspector.allowLoversRules = !modStorage.inspector.allowLoversRules;
-                saveStorage();
-                syncStorage();
-            }
-        });
-
-        // 4. Auto-Load Behavior Selection
-        this.createText({
-            x: 120,
-            y: 410,
-            fontSize: 3.5,
-            text: "Missing Mandatory Addon Behavior:"
-        });
-
-        const autoLoadModes: { mode: AutoLoadMode; label: string }[] = [
-            { mode: "Prompt", label: "Prompt First (Recommended)" },
-            { mode: "Silent", label: "Silent Auto-Load" }
-        ];
-
-        autoLoadModes.forEach((item, idx) => {
-            const isSelected = modStorage.inspector.autoLoadMode === item.mode;
-            const btn = this.createButton({
-                x: 120 + idx * 360,
-                y: 445,
-                width: 340,
-                height: 48,
-                text: `${isSelected ? "● " : "○ "}${item.label}`,
-                onClick: () => {
-                    modStorage.inspector.autoLoadMode = item.mode;
-                    saveStorage();
-                    syncStorage();
-                    setSubscreen(new AddonPolicySubscreen());
-                }
-            });
-            btn.style.fontWeight = isSelected ? "bold" : "normal";
-        });
-
-        // 5. Viewing Permission Selection
-        this.createText({
-            x: 120,
-            y: 520,
-            fontSize: 3.5,
-            text: "Who May Inspect Your Loaded Addons:"
-        });
-
-        const permissions: { perm: InspectViewPermission; label: string }[] = [
-            { perm: "Prompt", label: "Prompt Me (Recommended)" },
-            { perm: "Owner", label: "Owner Only" },
-            { perm: "Lovers", label: "Owner & Lovers" },
-            { perm: "Whitelist", label: "Whitelist / Friends" },
-            { perm: "Anyone", label: "Anyone in Room" },
-            { perm: "Disabled", label: "Disabled (Nobody)" }
-        ];
-
-        permissions.forEach((item, idx) => {
-            const isSelected = modStorage.inspector.viewPermission === item.perm;
-            const col = idx % 3;
-            const row = Math.floor(idx / 3);
-            const btn = this.createButton({
-                x: 120 + col * 320,
-                y: 555 + row * 55,
-                width: 300,
-                height: 46,
-                text: `${isSelected ? "● " : "○ "}${item.label}`,
-                onClick: () => {
-                    modStorage.inspector.viewPermission = item.perm;
-                    saveStorage();
-                    syncStorage();
-                    setSubscreen(new AddonPolicySubscreen());
-                }
-            });
-            btn.style.fontWeight = isSelected ? "bold" : "normal";
-        });
-
-        // 6. Status Summary Card & Full Inspector Launcher Button
-        const loadedMods = getLoadedMods();
-        const rules = modStorage.inspector.rules;
-        const compliance = checkComplianceAgainstRules(loadedMods, rules);
-
-        const summaryCard = document.createElement("div");
-        summaryCard.style.cssText = `
-            position: absolute;
-            left: ${getRelativeX(120)}px;
-            top: ${getRelativeY(690)}px;
-            width: ${getRelativeWidth(920)}px;
-            padding: 12px 18px;
-            background: rgba(30, 36, 48, 0.85);
-            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            color: #e0e6ed;
-            font-size: 14px;
-            z-index: 10;
-        `;
-
-        const statusText = document.createElement("div");
-        statusText.innerHTML = `
-            <div><b>Active Addons:</b> ${loadedMods.length} detected • <b>Rules on You:</b> ${rules.length}</div>
-            <div style="font-size: 12px; color: ${compliance.isCompliant ? "#81c784" : "#e57373"}; margin-top: 3px;">
-                ${compliance.isCompliant ? "✓ Compliant with all addon rules" : `⚠️ Non-compliant (${compliance.missing.length} missing, ${compliance.forbidden.length} forbidden)`}
-            </div>
-        `;
-        summaryCard.appendChild(statusText);
-        this.domElements.push(summaryCard);
-        document.body.appendChild(summaryCard);
-
-        const openManagerBtn = this.createButton({
-            x: 1070,
-            y: 690,
-            width: 450,
-            height: 52,
-            text: "🔍 Open Full Addon & Policy Manager",
-            onClick: () => {
-                this.cleanup();
-                setSubscreen(new InspectorSubscreen(typeof Player !== "undefined" ? Player : null));
-            }
-        });
-        openManagerBtn.style.fontWeight = "bold";
-
-        // Hint
-        const hint = this.createText({
-            x: 120,
-            y: 775,
-            fontSize: 2.8,
-            text: "Tip: You can also inspect other players in your room by opening their profile and clicking the Shield icon under the LSCG button!"
-        });
-        hint.style.color = "#8fa0b5";
+        this.createUI();
     }
 
     public override exit(): void {
@@ -208,11 +34,379 @@ export class AddonPolicySubscreen extends BaseSubscreen {
     }
 
     private cleanup(): void {
-        for (const el of this.domElements) {
-            try {
-                el.remove();
-            } catch {}
+        if (this.rootElement) {
+            this.rootElement.remove();
+            this.rootElement = null;
         }
-        this.domElements = [];
+    }
+
+    private createUI(): void {
+        this.cleanup();
+
+        // 1. Full-screen solid backdrop
+        const backdrop = document.createElement("div");
+        backdrop.style.cssText = `
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #191f2b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: #e0e6ed;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            box-sizing: border-box;
+            user-select: none;
+        `;
+
+        // 2. Container
+        const container = document.createElement("div");
+        container.style.cssText = `
+            width: min(92vw, 1300px);
+            height: min(92vh, 900px);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-sizing: border-box;
+        `;
+
+        // 3. Header
+        const header = document.createElement("div");
+        header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(80, 100, 140, 0.35);
+        `;
+
+        const titleBox = document.createElement("div");
+        titleBox.innerHTML = `
+            <div style="font-size: 24px; font-weight: bold; color: #64b5f6; letter-spacing: 0.5px;">
+                🛡️ Addon Policy & Sharing Settings
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-top: 4px;">
+                Control who can view your active addons and who is authorized to lock mandatory or forbidden addon rules.
+            </div>
+        `;
+
+        const backBtn = document.createElement("button");
+        backBtn.textContent = "✕ Back to Menu";
+        backBtn.style.cssText = `
+            padding: 10px 24px;
+            background: rgba(220, 50, 50, 0.85);
+            border: 1px solid #ef5350;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        `;
+        backBtn.addEventListener("mouseover", () => { backBtn.style.background = "#d32f2f"; });
+        backBtn.addEventListener("mouseout", () => { backBtn.style.background = "rgba(220, 50, 50, 0.85)"; });
+        backBtn.addEventListener("click", () => this.exit());
+
+        header.appendChild(titleBox);
+        header.appendChild(backBtn);
+        container.appendChild(header);
+
+        // 4. Scrollable Body
+        const body = document.createElement("div");
+        body.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding-right: 6px;
+            box-sizing: border-box;
+        `;
+
+        // Section A: General Consent & Permissions
+        const consentCard = this.createCardElement("🔒 General Permissions & Consent");
+        const toggles = [
+            {
+                title: "Enable Addon Inspector & Sharing System",
+                desc: "Master switch. Allows checking addon compliance and exchanging addon status with other players in chatrooms.",
+                checked: modStorage.inspector.enabled,
+                toggle: () => {
+                    modStorage.inspector.enabled = !modStorage.inspector.enabled;
+                    saveStorage();
+                    syncStorage();
+                    this.createUI();
+                }
+            },
+            {
+                title: "Allow Club Owner to Lock Rules",
+                desc: "Permits your Club Owner to set mandatory or forbidden addon requirements on your character.",
+                checked: modStorage.inspector.allowOwnerRules,
+                toggle: () => {
+                    modStorage.inspector.allowOwnerRules = !modStorage.inspector.allowOwnerRules;
+                    saveStorage();
+                    syncStorage();
+                    this.createUI();
+                }
+            },
+            {
+                title: "Allow Lovers & Whitelist to Lock Rules",
+                desc: "Permits your Lovers or Whitelisted partners to enforce addon rules on your character.",
+                checked: modStorage.inspector.allowLoversRules,
+                toggle: () => {
+                    modStorage.inspector.allowLoversRules = !modStorage.inspector.allowLoversRules;
+                    saveStorage();
+                    syncStorage();
+                    this.createUI();
+                }
+            }
+        ];
+
+        toggles.forEach(t => {
+            consentCard.appendChild(this.createToggleRow(t.title, t.desc, t.checked, t.toggle));
+        });
+        body.appendChild(consentCard);
+
+        // Section B: Missing Mandatory Addon Auto-Load Behavior
+        const autoLoadCard = this.createCardElement("⚙️ Missing Mandatory Addon Behavior", "What happens when an authorized owner or room requires an addon you don't have loaded:");
+        const autoLoadGrid = document.createElement("div");
+        autoLoadGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 8px;
+        `;
+
+        const autoLoadOptions: { mode: AutoLoadMode; label: string; desc: string }[] = [
+            {
+                mode: "Prompt",
+                label: "Prompt First (Recommended)",
+                desc: "Displays an in-game confirmation toast before loading any missing addon."
+            },
+            {
+                mode: "Silent",
+                label: "Silent Auto-Load",
+                desc: "Automatically injects verified addons (BCX, LSCG, BCT, ClubChaos) without prompting."
+            }
+        ];
+
+        autoLoadOptions.forEach(opt => {
+            const isSelected = modStorage.inspector.autoLoadMode === opt.mode;
+            const btn = document.createElement("div");
+            btn.style.cssText = `
+                padding: 14px 18px;
+                border-radius: 8px;
+                cursor: pointer;
+                background: ${isSelected ? "rgba(25, 118, 210, 0.25)" : "rgba(35, 45, 60, 0.6)"};
+                border: 1px solid ${isSelected ? "#42a5f5" : "rgba(80, 100, 140, 0.35)"};
+                transition: all 0.15s ease;
+            `;
+            btn.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 15px; color: ${isSelected ? "#64b5f6" : "#e0e6ed"};">
+                    <span style="font-size: 16px;">${isSelected ? "●" : "○"}</span>
+                    <span>${opt.label}</span>
+                </div>
+                <div style="font-size: 12px; color: #90a4ae; margin-top: 5px; margin-left: 24px;">
+                    ${opt.desc}
+                </div>
+            `;
+            btn.addEventListener("click", () => {
+                modStorage.inspector.autoLoadMode = opt.mode;
+                saveStorage();
+                syncStorage();
+                this.createUI();
+            });
+            autoLoadGrid.appendChild(btn);
+        });
+        autoLoadCard.appendChild(autoLoadGrid);
+        body.appendChild(autoLoadCard);
+
+        // Section C: Who May Inspect Your Loaded Addons
+        const permCard = this.createCardElement("👁️ Who May Inspect Your Loaded Addons", "Choose who in your chatroom has permission to query and view your loaded addons:");
+        const permGrid = document.createElement("div");
+        permGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+        `;
+
+        const permOptions: { perm: InspectViewPermission; label: string; desc: string }[] = [
+            { perm: "Prompt", label: "Prompt Me (Recommended)", desc: "Asks you each time someone requests inspection" },
+            { perm: "Owner", label: "Owner Only", desc: "Only your Club Owner can inspect" },
+            { perm: "Lovers", label: "Owner & Lovers", desc: "Your Owner and Lovers can inspect" },
+            { perm: "Whitelist", label: "Whitelist / Friends", desc: "Only players on your whitelist can inspect" },
+            { perm: "Anyone", label: "Anyone in Room", desc: "Any player in the same room can inspect" },
+            { perm: "Disabled", label: "Disabled (Nobody)", desc: "Blocks all remote inspection queries" }
+        ];
+
+        permOptions.forEach(opt => {
+            const isSelected = modStorage.inspector.viewPermission === opt.perm;
+            const btn = document.createElement("div");
+            btn.style.cssText = `
+                padding: 12px 14px;
+                border-radius: 6px;
+                cursor: pointer;
+                background: ${isSelected ? "rgba(25, 118, 210, 0.25)" : "rgba(35, 45, 60, 0.6)"};
+                border: 1px solid ${isSelected ? "#42a5f5" : "rgba(80, 100, 140, 0.35)"};
+                transition: all 0.15s ease;
+            `;
+            btn.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; color: ${isSelected ? "#64b5f6" : "#e0e6ed"};">
+                    <span>${isSelected ? "●" : "○"}</span>
+                    <span>${opt.label}</span>
+                </div>
+                <div style="font-size: 11px; color: #90a4ae; margin-top: 4px; margin-left: 20px;">
+                    ${opt.desc}
+                </div>
+            `;
+            btn.addEventListener("click", () => {
+                modStorage.inspector.viewPermission = opt.perm;
+                saveStorage();
+                syncStorage();
+                this.createUI();
+            });
+            permGrid.appendChild(btn);
+        });
+        permCard.appendChild(permGrid);
+        body.appendChild(permCard);
+
+        // Section D: Status & Full Manager Launcher
+        const loadedMods = getLoadedMods();
+        const rules = modStorage.inspector.rules;
+        const compliance = checkComplianceAgainstRules(loadedMods, rules);
+
+        const statusBanner = document.createElement("div");
+        statusBanner.style.cssText = `
+            background: rgba(30, 36, 48, 0.9);
+            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        `;
+
+        const statusInfo = document.createElement("div");
+        statusInfo.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: ${compliance.isCompliant ? "#81c784" : "#ef5350"};">
+                ${compliance.isCompliant ? "✓ Compliant with All Addon Rules" : `⚠️ Non-Compliant (${compliance.missing.length} missing, ${compliance.forbidden.length} forbidden)`}
+            </div>
+            <div style="font-size: 13px; color: #b0bec5; margin-top: 4px;">
+                <b>${loadedMods.length}</b> addons loaded &nbsp;•&nbsp; <b>${rules.length}</b> rules active on your character
+            </div>
+        `;
+
+        const openManagerBtn = document.createElement("button");
+        openManagerBtn.textContent = "🔍 Open Full Addon & Policy Manager";
+        openManagerBtn.style.cssText = `
+            padding: 12px 24px;
+            background: #1976d2;
+            border: 1px solid #42a5f5;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            white-space: nowrap;
+        `;
+        openManagerBtn.addEventListener("mouseover", () => { openManagerBtn.style.background = "#1e88e5"; });
+        openManagerBtn.addEventListener("mouseout", () => { openManagerBtn.style.background = "#1976d2"; });
+        openManagerBtn.addEventListener("click", () => {
+            this.cleanup();
+            setSubscreen(new InspectorSubscreen(typeof Player !== "undefined" ? Player : null));
+        });
+
+        statusBanner.appendChild(statusInfo);
+        statusBanner.appendChild(openManagerBtn);
+        body.appendChild(statusBanner);
+
+        // Footer Tip
+        const tip = document.createElement("div");
+        tip.style.cssText = `
+            font-size: 12px;
+            color: #8fa0b5;
+            text-align: center;
+            padding: 4px 0;
+        `;
+        tip.innerHTML = `💡 <b>Tip:</b> You can also inspect other players in your room by opening their character profile and clicking the <b>Shield icon</b> under the LSCG button!`;
+        body.appendChild(tip);
+
+        container.appendChild(body);
+        backdrop.appendChild(container);
+        document.body.appendChild(backdrop);
+
+        this.rootElement = backdrop;
+    }
+
+    private createCardElement(title: string, subtitle?: string): HTMLElement {
+        const card = document.createElement("div");
+        card.style.cssText = `
+            background: rgba(30, 36, 48, 0.85);
+            border: 1px solid rgba(80, 100, 140, 0.35);
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-sizing: border-box;
+        `;
+        let headerHtml = `<div style="font-size: 16px; font-weight: bold; color: #64b5f6;">${title}</div>`;
+        if (subtitle) {
+            headerHtml += `<div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${subtitle}</div>`;
+        }
+        card.innerHTML = headerHtml;
+        return card;
+    }
+
+    private createToggleRow(title: string, desc: string, isChecked: boolean, onToggle: () => void): HTMLElement {
+        const row = document.createElement("div");
+        row.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(80, 100, 140, 0.2);
+            cursor: pointer;
+        `;
+        row.addEventListener("click", onToggle);
+
+        const textBox = document.createElement("div");
+        textBox.style.cssText = "padding-right: 16px;";
+        textBox.innerHTML = `
+            <div style="font-size: 15px; font-weight: 600; color: #e0e6ed;">${title}</div>
+            <div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${desc}</div>
+        `;
+
+        const switchEl = document.createElement("div");
+        switchEl.style.cssText = `
+            width: 48px;
+            height: 26px;
+            background: ${isChecked ? "#1976d2" : "rgba(60, 70, 90, 0.7)"};
+            border-radius: 13px;
+            position: relative;
+            flex-shrink: 0;
+            transition: background 0.2s ease;
+            border: 1px solid ${isChecked ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
+        `;
+
+        const knob = document.createElement("div");
+        knob.style.cssText = `
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: ${isChecked ? "24px" : "3px"};
+            transition: left 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        `;
+        switchEl.appendChild(knob);
+
+        row.appendChild(textBox);
+        row.appendChild(switchEl);
+        return row;
     }
 }
