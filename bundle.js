@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.5";
+  var version2 = "1.0.6";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -7584,6 +7584,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     // ==========================================
     renderSelfAddons() {
       if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
       const loadedMods = getLoadedMods();
       const countHeader = document.createElement("div");
       countHeader.style.cssText = "font-size: 16px; font-weight: bold; color: #90caf9; margin-bottom: 6px;";
@@ -7625,6 +7626,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
     renderSelfRules() {
       if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
       const loadedMods = getLoadedMods();
       const rules = modStorage.inspector.rules;
       const compliance = checkComplianceAgainstRules(loadedMods, rules);
@@ -7688,6 +7690,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
     renderSelfSettings() {
       if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
       const container = document.createElement("div");
       container.style.cssText = "display: flex; flex-direction: column; gap: 18px;";
       const createCheckboxRow = (label, checked, onChange) => {
@@ -7800,6 +7803,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
     renderTargetAddons() {
       if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
       if (this.isLoading) {
         this.contentArea.innerHTML = "<div style='font-size: 16px; color: #64b5f6; padding: 20px;'>Querying target player's Quality of Club manifest...</div>";
         return;
@@ -7844,6 +7848,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
     renderTargetRules() {
       if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
       const canEnforce = this.target && hasRuleAuthorityOver(this.target);
       if (!canEnforce) {
         this.contentArea.innerHTML = "<div style='font-size: 15px; color: #ffa726; padding: 20px;'>Permission Restricted: Only an Owner (or Lover/Whitelisted partner if enabled by target) can set locked addon rules.</div>";
