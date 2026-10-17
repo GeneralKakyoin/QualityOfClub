@@ -1,9 +1,10 @@
-import { BaseSubscreen, getRelativeX, getRelativeY, getRelativeWidth } from "zois-core/ui";
+import { BaseSubscreen, getRelativeX, getRelativeY, getRelativeWidth, setSubscreen } from "zois-core/ui";
 import { modStorage, saveStorage } from "modules/storage";
 import { applyChatDimensions, setSplitPercent } from "modules/chatResizer";
 import { MOD_NAME, MOD_VERSION, DEFAULT_SPLIT_PERCENT, MIN_SPLIT_PERCENT, MAX_SPLIT_PERCENT } from "src/constants";
 
 export class MainSubscreen extends BaseSubscreen {
+    private sliderContainer: HTMLDivElement | null = null;
     private sliderInput: HTMLInputElement | null = null;
     private sliderValueLabel: HTMLSpanElement | null = null;
 
@@ -25,6 +26,20 @@ export class MainSubscreen extends BaseSubscreen {
                 }
             ]
         });
+    }
+
+    protected onExit(): void {
+        this.unloadInterfaceTab();
+        setSubscreen(null);
+        if (typeof PreferenceSubscreenExtensionsClear === "function") {
+            try {
+                PreferenceSubscreenExtensionsClear();
+            } catch (e) {
+                console.warn("[QoC] Error clearing extension screen", e);
+            }
+        } else if (typeof PreferenceOpenSubscreen === "function") {
+            PreferenceOpenSubscreen("Extensions");
+        }
     }
 
     private loadInterfaceTab(): void {
@@ -109,22 +124,30 @@ export class MainSubscreen extends BaseSubscreen {
             btn.style.fontWeight = "bold";
         });
 
-        // 7. Informational / Helpful Hint
+        // 7. Informational Hint
         const hint = this.createText({
             x: 120,
             y: 720,
             fontSize: 3,
-            text: "💡 Tip: In any chatroom, drag the vertical line between the canvas and chat to resize live! Double-click the line to reset to 50/50."
+            text: "Tip: In any chatroom, drag the vertical line between the canvas and chat to resize live! Double-click the line to reset to 50/50."
         });
         hint.style.color = "#777";
     }
 
     private unloadInterfaceTab(): void {
+        if (this.sliderContainer) {
+            this.sliderContainer.remove();
+            this.sliderContainer = null;
+        }
         this.sliderInput = null;
         this.sliderValueLabel = null;
     }
 
     private createSliderControl(x: number, y: number): void {
+        if (this.sliderContainer) {
+            this.sliderContainer.remove();
+        }
+
         const container = document.createElement("div");
         Object.assign(container.style, {
             position: "fixed",
@@ -168,6 +191,7 @@ export class MainSubscreen extends BaseSubscreen {
         container.appendChild(label);
         document.body.appendChild(container);
 
+        this.sliderContainer = container;
         this.sliderInput = slider;
         this.sliderValueLabel = label;
     }

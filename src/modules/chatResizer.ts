@@ -30,8 +30,6 @@ export function setSplitPercent(percent: number): void {
 export function applyChatDimensions(): void {
     const graphicWidth = getGraphicWidth();
 
-    // In Bondage Club, ChatRoomDivRect defines [x, y, width, height] for #chat-room-div
-    // Default vanilla is [1005, 2, 988, 998]
     if (typeof ChatRoomDivRect !== "undefined" && Array.isArray(ChatRoomDivRect)) {
         ChatRoomDivRect[0] = graphicWidth + 5;
         ChatRoomDivRect[1] = 2;
@@ -58,7 +56,12 @@ export function applyChatDimensions(): void {
 export function updateDividerPosition(): void {
     if (!dividerElement) return;
 
-    if (typeof CurrentScreen === "undefined" || CurrentScreen !== "ChatRoom" || !modStorage.chatResizer.enabled || !modStorage.chatResizer.showDivider) {
+    if (
+        typeof CurrentScreen === "undefined" ||
+        CurrentScreen !== "ChatRoom" ||
+        !modStorage.chatResizer.enabled ||
+        !modStorage.chatResizer.showDivider
+    ) {
         dividerElement.style.display = "none";
         return;
     }
@@ -116,7 +119,6 @@ function createDividerElement(): void {
 
     dividerElement.appendChild(innerLine);
 
-    // Hover styling
     dividerElement.addEventListener("mouseenter", () => {
         if (!isDragging) {
             innerLine.style.backgroundColor = "rgba(100, 180, 255, 0.85)";
@@ -131,7 +133,6 @@ function createDividerElement(): void {
         }
     });
 
-    // Drag handling via PointerEvents
     dividerElement.addEventListener("pointerdown", (e: PointerEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -166,7 +167,6 @@ function createDividerElement(): void {
     dividerElement.addEventListener("pointerup", endDrag);
     dividerElement.addEventListener("pointercancel", endDrag);
 
-    // Double-click resets to default
     dividerElement.addEventListener("dblclick", (e: MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -180,7 +180,6 @@ function createDividerElement(): void {
  * Initializes the Chat Resizer module, hooks, and responsive CSS styling.
  */
 export function initChatResizer(): void {
-    // 1. Inject responsive CSS adjustments to ensure narrow chat doesn't clip
     const styleEl = document.createElement("style");
     styleEl.id = "qoc-resizer-styles";
     styleEl.innerHTML = `
@@ -202,10 +201,9 @@ export function initChatResizer(): void {
     `;
     document.head.appendChild(styleEl);
 
-    // 2. Setup the DOM divider
     createDividerElement();
 
-    // 3. Hook ChatRoomResize to enforce our rect dimensions
+    // Hook ChatRoomResize to enforce our rect dimensions
     hookFunction("ChatRoomResize", HookPriority.ADD_BEHAVIOR, (args, next) => {
         if (modStorage.chatResizer.enabled) {
             const w = getGraphicWidth();
@@ -221,11 +219,10 @@ export function initChatResizer(): void {
         return result;
     });
 
-    // 4. Hook ChatRoomClick to allow avatar clicking across the entire graphic width
+    // Hook ChatRoomClick to allow avatar clicking across the entire graphic width
     hookFunction("ChatRoomClick", HookPriority.OVERRIDE_BEHAVIOR, (args, next) => {
         const event = args[0];
 
-        // Orgasm mini-game check from vanilla BC
         if (
             Player.ArousalSettings != null &&
             Player.ArousalSettings.OrgasmTimer != null &&
@@ -244,88 +241,92 @@ export function initChatResizer(): void {
         }
     });
 
-    // 5. Hook ChatRoomCharacterViewLoopCharacters to dynamically distribute & scale avatars
+    /**
+     * SINGLE-LINE CHARACTER LAYOUT:
+     * Keeps all characters on a single, continuous ground line side-by-side.
+     * Prevents any multi-row stacking or out-of-bounds zoom.
+     */
     hookFunction("ChatRoomCharacterViewLoopCharacters", HookPriority.OVERRIDE_BEHAVIOR, (args) => {
         const callback = args[0] as (charIdx: number, charX: number, charY: number, space: number, zoom: number) => boolean | void;
 
-        const charCount = ChatRoomCharacterViewCharacterCount;
-        const charsPerRow = ChatRoomCharacterViewCharactersPerRow;
+        const charCount = typeof ChatRoomCharacterDrawlist !== "undefined" ? ChatRoomCharacterDrawlist.length : 0;
+        if (charCount === 0) return;
+
         const viewWidth = getGraphicWidth();
-        const viewHeight = ChatRoomCharacterViewHeight;
+        const viewHeight = typeof ChatRoomCharacterViewHeight !== "undefined" ? ChatRoomCharacterViewHeight : 1000;
 
-        // Space dynamically calculated using the wider viewWidth
-        const Space = charCount >= 2 ? viewWidth / Math.min(charCount, 5) : viewWidth / 2;
+        let targetZoom: number;
+        let Space: number;
+        let startX: number;
 
-        let weight = ChatRoomCharacterViewSlideWeight;
-        const frametimeAdjustment = TimerRunInterval / (1000 / 30);
+        if (charCount === 1) {
+            targetZoom = 1.0;
+            Space = viewWidth / 2;
+            startX = (viewWidth - 500 * targetZoom) / 2;
+        } else {
+            // Space per character evenly distributed across viewWidth
+            Space = viewWidth / charCount;
+
+            // Target zoom: keeps characters proportional to available space without overlapping excessively
+            targetZoom = Math.min(1.0, Math.max(0.35, Space / 380));
+
+            const totalVisualWidth = (charCount - 1) * Space + 500 * targetZoom;
+
+            if (totalVisualWidth > viewWidth) {
+                Space = (viewWidth - 500 * targetZoom) / (charCount - 1);
+                startX = 0;
+            } else {
+                startX = (viewWidth - totalVisualWidth) / 2;
+            }
+        }
+
+        // Smooth zoom interpolation
+        let weight = typeof ChatRoomCharacterViewSlideWeight !== "undefined" ? ChatRoomCharacterViewSlideWeight : 9;
+        const frametimeAdjustment = typeof TimerRunInterval !== "undefined" ? TimerRunInterval / (1000 / 30) : 1;
+
         if (ChatRoomCharacterViewInitialize || !(Player.GraphicsSettings && Player.GraphicsSettings.SmoothZoom)) {
             ChatRoomCharacterViewInitialize = false;
             weight = 0;
         }
 
-        const zoomFrameStep = (current: number) => (current * weight + (charCount >= 3 ? Space / 400 : 1)) / (weight + 1);
-        const slideUpperFrameStep = (current: number) => (current * weight + (viewWidth / 2) - 0.5 * Space * Math.min(charCount, charsPerRow)) / (weight + 1);
-        const slideLowerFrameStep = (current: number) => (current * weight + (viewWidth / 2) - 0.5 * Space * Math.max(1, charCount - charsPerRow)) / (weight + 1);
+        const zoomFrameStep = (current: number) => (current * weight + targetZoom) / (weight + 1);
 
-        let zoom = ChatRoomCharacterViewZoom;
-        let upperX = ChatRoomCharacterViewX_Upper;
-        let lowerX = ChatRoomCharacterViewX_Lower;
-
+        let zoom = typeof ChatRoomCharacterViewZoom !== "undefined" ? ChatRoomCharacterViewZoom : targetZoom;
         for (let i = 0; i < frametimeAdjustment; i++) {
             const nextZoom = zoomFrameStep(zoom);
-            const nextUpperX = slideUpperFrameStep(upperX);
-            const nextLowerX = slideLowerFrameStep(lowerX);
-
             if (weight === 0) {
                 zoom = nextZoom;
-                upperX = nextUpperX;
-                lowerX = nextLowerX;
                 break;
             }
-
-            const frametimeRemainder = frametimeAdjustment - i;
-            if (frametimeRemainder >= 1) {
+            const remainder = frametimeAdjustment - i;
+            if (remainder >= 1) {
                 zoom = nextZoom;
-                upperX = nextUpperX;
-                lowerX = nextLowerX;
             } else {
-                zoom += (nextZoom - zoom) * frametimeRemainder;
-                upperX += (nextUpperX - upperX) * frametimeRemainder;
-                lowerX += (nextLowerX - lowerX) * frametimeRemainder;
+                zoom += (nextZoom - zoom) * remainder;
             }
         }
 
         ChatRoomCharacterViewZoom = zoom;
-        ChatRoomCharacterViewX_Upper = upperX;
-        ChatRoomCharacterViewX_Lower = lowerX;
 
-        const Zoom = zoom;
-        const X = charCount >= 3 ? (Space - (viewWidth / 2) * Zoom) / 2 : 0;
-        const Y = charCount <= 5 ? viewHeight * (1 - Zoom) / 2 : 0;
+        // Position feet naturally near the floor, vertically centering the avatar safely
+        const Y = Math.max(0, (viewHeight * (1 - zoom)) / 2);
 
-        for (let C = 0; C < ChatRoomCharacterDrawlist.length; C++) {
-            let offsetX = 0;
-            if (Player.GraphicsSettings?.CenterChatrooms) {
-                offsetX = C >= charsPerRow ? lowerX : upperX;
-            }
-            const CharX = offsetX + (charCount === 1 ? (viewWidth - 500 * Zoom) / 2 : X + (C % charsPerRow) * Space);
-            const CharY = charCount === 1 ? 0 : Y + Math.floor(C / charsPerRow) * CanvasDrawWidth;
+        for (let C = 0; C < charCount; C++) {
+            const CharX = startX + C * Space;
+            const CharY = Y;
 
-            if (charCount === 1 && ChatRoomCharacterViewCharacterCountTotal <= 10 && !ChatRoomCharacterDrawlist[C].IsPlayer()) {
-                continue;
-            }
-
-            if (callback(C, CharX, CharY, Space, Zoom)) break;
+            if (callback(C, CharX, CharY, Space, zoom)) break;
         }
     });
 
-    // 6. Hook ChatRoomCharacterViewDraw to draw the background filling the wider view
+    /**
+     * SINGLE FULL-HEIGHT ROOM BACKGROUND:
+     * Draws the room background once across the entire expanded canvas width.
+     */
     hookFunction("ChatRoomCharacterViewDraw", HookPriority.OVERRIDE_BEHAVIOR, () => {
         const backgroundURL = DrawGetBackgroundURL(false);
-        const charCount = ChatRoomCharacterViewCharacterCount;
-        const charsPerRow = ChatRoomCharacterViewCharactersPerRow;
         const viewWidth = getGraphicWidth();
-        const viewHeight = ChatRoomCharacterViewHeight;
+        const viewHeight = typeof ChatRoomCharacterViewHeight !== "undefined" ? ChatRoomCharacterViewHeight : 1000;
         const opts = {
             inverted: Player.GraphicsSettings?.InvertRoom && Player.IsInverted(),
             blur: typeof Player.GetBlurLevel === "function" ? Player.GetBlurLevel() : 0,
@@ -334,31 +335,24 @@ export function initChatResizer(): void {
             sizeMode: ChatRoomData?.Custom?.SizeMode,
         };
 
-        let hasDrawnBackground = false;
-
-        ChatRoomCharacterViewLoopCharacters((charIdx, charX, charY, _space, roomZoom) => {
-            if (backgroundURL && charIdx % charsPerRow === 0) {
-                const Y = charCount <= charsPerRow ? viewHeight * (1 - roomZoom) / 2 : 0;
-                const bgRect = RectMakeRect(0, Y + charIdx * 100, viewWidth, viewHeight * roomZoom);
-                DrawRoomBackground(backgroundURL, bgRect, opts);
-                hasDrawnBackground = true;
-            }
-
-            DrawCharacter(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-            DrawStatus(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-            if (ChatRoomCharacterDrawlist[charIdx].MemberNumber != null) {
-                ChatRoomCharacterViewDrawOverlay(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-            }
-        });
-
-        // Fallback if no characters or room background not yet drawn
-        if (!hasDrawnBackground && backgroundURL) {
+        // Draw the background once across the whole graphic area
+        if (backgroundURL) {
             const bgRect = RectMakeRect(0, 0, viewWidth, viewHeight);
             DrawRoomBackground(backgroundURL, bgRect, opts);
         }
+
+        // Draw all characters along the single line
+        ChatRoomCharacterViewLoopCharacters((charIdx, charX, charY, _space, roomZoom) => {
+            if (ChatRoomCharacterDrawlist && ChatRoomCharacterDrawlist[charIdx]) {
+                DrawCharacter(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
+                DrawStatus(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
+                if (ChatRoomCharacterDrawlist[charIdx].MemberNumber != null) {
+                    ChatRoomCharacterViewDrawOverlay(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
+                }
+            }
+        });
     });
 
-    // 7. Update divider on room load / screen load / window resize
     hookFunction("ChatRoomLoad", HookPriority.ADD_BEHAVIOR, (args, next) => {
         const result = next(args);
         applyChatDimensions();

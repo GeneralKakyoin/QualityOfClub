@@ -4447,69 +4447,61 @@ One of mods you are using is using an old version of SDK. It will work for now b
     });
     hookFunction("ChatRoomCharacterViewLoopCharacters", HookPriority.OVERRIDE_BEHAVIOR, (args) => {
       const callback = args[0];
-      const charCount = ChatRoomCharacterViewCharacterCount;
-      const charsPerRow = ChatRoomCharacterViewCharactersPerRow;
+      const charCount = typeof ChatRoomCharacterDrawlist !== "undefined" ? ChatRoomCharacterDrawlist.length : 0;
+      if (charCount === 0) return;
       const viewWidth = getGraphicWidth();
-      const viewHeight = ChatRoomCharacterViewHeight;
-      const Space = charCount >= 2 ? viewWidth / Math.min(charCount, 5) : viewWidth / 2;
-      let weight = ChatRoomCharacterViewSlideWeight;
-      const frametimeAdjustment = TimerRunInterval / (1e3 / 30);
+      const viewHeight = typeof ChatRoomCharacterViewHeight !== "undefined" ? ChatRoomCharacterViewHeight : 1e3;
+      let targetZoom;
+      let Space;
+      let startX;
+      if (charCount === 1) {
+        targetZoom = 1;
+        Space = viewWidth / 2;
+        startX = (viewWidth - 500 * targetZoom) / 2;
+      } else {
+        Space = viewWidth / charCount;
+        targetZoom = Math.min(1, Math.max(0.35, Space / 380));
+        const totalVisualWidth = (charCount - 1) * Space + 500 * targetZoom;
+        if (totalVisualWidth > viewWidth) {
+          Space = (viewWidth - 500 * targetZoom) / (charCount - 1);
+          startX = 0;
+        } else {
+          startX = (viewWidth - totalVisualWidth) / 2;
+        }
+      }
+      let weight = typeof ChatRoomCharacterViewSlideWeight !== "undefined" ? ChatRoomCharacterViewSlideWeight : 9;
+      const frametimeAdjustment = typeof TimerRunInterval !== "undefined" ? TimerRunInterval / (1e3 / 30) : 1;
       if (ChatRoomCharacterViewInitialize || !(Player.GraphicsSettings && Player.GraphicsSettings.SmoothZoom)) {
         ChatRoomCharacterViewInitialize = false;
         weight = 0;
       }
-      const zoomFrameStep = (current) => (current * weight + (charCount >= 3 ? Space / 400 : 1)) / (weight + 1);
-      const slideUpperFrameStep = (current) => (current * weight + viewWidth / 2 - 0.5 * Space * Math.min(charCount, charsPerRow)) / (weight + 1);
-      const slideLowerFrameStep = (current) => (current * weight + viewWidth / 2 - 0.5 * Space * Math.max(1, charCount - charsPerRow)) / (weight + 1);
-      let zoom = ChatRoomCharacterViewZoom;
-      let upperX = ChatRoomCharacterViewX_Upper;
-      let lowerX = ChatRoomCharacterViewX_Lower;
+      const zoomFrameStep = (current) => (current * weight + targetZoom) / (weight + 1);
+      let zoom = typeof ChatRoomCharacterViewZoom !== "undefined" ? ChatRoomCharacterViewZoom : targetZoom;
       for (let i = 0; i < frametimeAdjustment; i++) {
         const nextZoom = zoomFrameStep(zoom);
-        const nextUpperX = slideUpperFrameStep(upperX);
-        const nextLowerX = slideLowerFrameStep(lowerX);
         if (weight === 0) {
           zoom = nextZoom;
-          upperX = nextUpperX;
-          lowerX = nextLowerX;
           break;
         }
-        const frametimeRemainder = frametimeAdjustment - i;
-        if (frametimeRemainder >= 1) {
+        const remainder = frametimeAdjustment - i;
+        if (remainder >= 1) {
           zoom = nextZoom;
-          upperX = nextUpperX;
-          lowerX = nextLowerX;
         } else {
-          zoom += (nextZoom - zoom) * frametimeRemainder;
-          upperX += (nextUpperX - upperX) * frametimeRemainder;
-          lowerX += (nextLowerX - lowerX) * frametimeRemainder;
+          zoom += (nextZoom - zoom) * remainder;
         }
       }
       ChatRoomCharacterViewZoom = zoom;
-      ChatRoomCharacterViewX_Upper = upperX;
-      ChatRoomCharacterViewX_Lower = lowerX;
-      const Zoom = zoom;
-      const X = charCount >= 3 ? (Space - viewWidth / 2 * Zoom) / 2 : 0;
-      const Y = charCount <= 5 ? viewHeight * (1 - Zoom) / 2 : 0;
-      for (let C = 0; C < ChatRoomCharacterDrawlist.length; C++) {
-        let offsetX = 0;
-        if (Player.GraphicsSettings?.CenterChatrooms) {
-          offsetX = C >= charsPerRow ? lowerX : upperX;
-        }
-        const CharX = offsetX + (charCount === 1 ? (viewWidth - 500 * Zoom) / 2 : X + C % charsPerRow * Space);
-        const CharY = charCount === 1 ? 0 : Y + Math.floor(C / charsPerRow) * CanvasDrawWidth;
-        if (charCount === 1 && ChatRoomCharacterViewCharacterCountTotal <= 10 && !ChatRoomCharacterDrawlist[C].IsPlayer()) {
-          continue;
-        }
-        if (callback(C, CharX, CharY, Space, Zoom)) break;
+      const Y = Math.max(0, viewHeight * (1 - zoom) / 2);
+      for (let C = 0; C < charCount; C++) {
+        const CharX = startX + C * Space;
+        const CharY = Y;
+        if (callback(C, CharX, CharY, Space, zoom)) break;
       }
     });
     hookFunction("ChatRoomCharacterViewDraw", HookPriority.OVERRIDE_BEHAVIOR, () => {
       const backgroundURL = DrawGetBackgroundURL(false);
-      const charCount = ChatRoomCharacterViewCharacterCount;
-      const charsPerRow = ChatRoomCharacterViewCharactersPerRow;
       const viewWidth = getGraphicWidth();
-      const viewHeight = ChatRoomCharacterViewHeight;
+      const viewHeight = typeof ChatRoomCharacterViewHeight !== "undefined" ? ChatRoomCharacterViewHeight : 1e3;
       const opts = {
         inverted: Player.GraphicsSettings?.InvertRoom && Player.IsInverted(),
         blur: typeof Player.GetBlurLevel === "function" ? Player.GetBlurLevel() : 0,
@@ -4517,24 +4509,19 @@ One of mods you are using is using an old version of SDK. It will work for now b
         tints: typeof Player.GetTints === "function" ? Player.GetTints() : [],
         sizeMode: ChatRoomData?.Custom?.SizeMode
       };
-      let hasDrawnBackground = false;
-      ChatRoomCharacterViewLoopCharacters((charIdx, charX, charY, _space, roomZoom) => {
-        if (backgroundURL && charIdx % charsPerRow === 0) {
-          const Y = charCount <= charsPerRow ? viewHeight * (1 - roomZoom) / 2 : 0;
-          const bgRect = RectMakeRect(0, Y + charIdx * 100, viewWidth, viewHeight * roomZoom);
-          DrawRoomBackground(backgroundURL, bgRect, opts);
-          hasDrawnBackground = true;
-        }
-        DrawCharacter(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-        DrawStatus(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-        if (ChatRoomCharacterDrawlist[charIdx].MemberNumber != null) {
-          ChatRoomCharacterViewDrawOverlay(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-        }
-      });
-      if (!hasDrawnBackground && backgroundURL) {
+      if (backgroundURL) {
         const bgRect = RectMakeRect(0, 0, viewWidth, viewHeight);
         DrawRoomBackground(backgroundURL, bgRect, opts);
       }
+      ChatRoomCharacterViewLoopCharacters((charIdx, charX, charY, _space, roomZoom) => {
+        if (ChatRoomCharacterDrawlist && ChatRoomCharacterDrawlist[charIdx]) {
+          DrawCharacter(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
+          DrawStatus(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
+          if (ChatRoomCharacterDrawlist[charIdx].MemberNumber != null) {
+            ChatRoomCharacterViewDrawOverlay(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
+          }
+        }
+      });
     });
     hookFunction("ChatRoomLoad", HookPriority.ADD_BEHAVIOR, (args, next) => {
       const result = next(args);
@@ -4548,6 +4535,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
 
   // src/subscreens/mainSubscreen.ts
   var MainSubscreen2 = class extends BaseSubscreen {
+    sliderContainer = null;
     sliderInput = null;
     sliderValueLabel = null;
     get name() {
@@ -4567,6 +4555,19 @@ One of mods you are using is using an old version of SDK. It will work for now b
           }
         ]
       });
+    }
+    onExit() {
+      this.unloadInterfaceTab();
+      setSubscreen(null);
+      if (typeof PreferenceSubscreenExtensionsClear === "function") {
+        try {
+          PreferenceSubscreenExtensionsClear();
+        } catch (e) {
+          console.warn("[QoC] Error clearing extension screen", e);
+        }
+      } else if (typeof PreferenceOpenSubscreen === "function") {
+        PreferenceOpenSubscreen("Extensions");
+      }
     }
     loadInterfaceTab() {
       this.createCheckbox({
@@ -4641,15 +4642,22 @@ One of mods you are using is using an old version of SDK. It will work for now b
         x: 120,
         y: 720,
         fontSize: 3,
-        text: "\u{1F4A1} Tip: In any chatroom, drag the vertical line between the canvas and chat to resize live! Double-click the line to reset to 50/50."
+        text: "Tip: In any chatroom, drag the vertical line between the canvas and chat to resize live! Double-click the line to reset to 50/50."
       });
       hint.style.color = "#777";
     }
     unloadInterfaceTab() {
+      if (this.sliderContainer) {
+        this.sliderContainer.remove();
+        this.sliderContainer = null;
+      }
       this.sliderInput = null;
       this.sliderValueLabel = null;
     }
     createSliderControl(x, y) {
+      if (this.sliderContainer) {
+        this.sliderContainer.remove();
+      }
       const container = document.createElement("div");
       Object.assign(container.style, {
         position: "fixed",
@@ -4688,6 +4696,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
       container.appendChild(slider);
       container.appendChild(label);
       document.body.appendChild(container);
+      this.sliderContainer = container;
       this.sliderInput = slider;
       this.sliderValueLabel = label;
     }
@@ -4721,7 +4730,10 @@ One of mods you are using is using an old version of SDK. It will work for now b
       resize: () => {
         getCurrentSubscreen()?.resize();
       },
-      exit: () => false,
+      exit: () => {
+        setSubscreen(null);
+        return true;
+      },
       load: () => {
         setSubscreen(new MainSubscreen2());
       }
