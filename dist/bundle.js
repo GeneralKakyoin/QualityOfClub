@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.7";
+  var version2 = "1.0.8";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4985,835 +4985,6 @@ One of mods you are using is using an old version of SDK. It will work for now b
       row.appendChild(textBox);
       row.appendChild(switchEl);
       return row;
-    }
-  };
-
-  // src/modules/authority.ts
-  var PERMISSION_DEFINITIONS = [
-    // Authority module
-    {
-      key: "authority_edit_roles",
-      name: "Allow managing Owner & Mistress roles",
-      description: "Permits adding or removing member numbers from the custom QoC Owner and Mistress lists.",
-      category: "Authority"
-    },
-    {
-      key: "authority_edit_min_role",
-      name: "Allow lowest access modification",
-      description: "Permits modifying the lowest permitted role required for any permission.",
-      category: "Authority"
-    },
-    {
-      key: "authority_edit_self_access",
-      name: "Allow modifying self access",
-      description: "Permits granting or revoking self-access on permissions (required to gift or reclaim control).",
-      category: "Authority"
-    },
-    // Inspection
-    {
-      key: "inspect_view_addons",
-      name: "Allow inspecting loaded addons",
-      description: "Permits querying and viewing the list of external addons loaded in this character's browser session.",
-      category: "Inspection"
-    },
-    {
-      key: "inspect_view_rules",
-      name: "Allow viewing active addon rules",
-      description: "Permits viewing the active mandatory and forbidden addon rules currently locked on this character.",
-      category: "Inspection"
-    },
-    // Rules & Compliance
-    {
-      key: "rules_lock_mandatory",
-      name: "Allow locking mandatory addons",
-      description: "Permits locking mandatory addon requirements and forcing auto-injection on this character.",
-      category: "Rules"
-    },
-    {
-      key: "rules_lock_forbidden",
-      name: "Allow locking forbidden addons",
-      description: "Permits locking forbidden addon bans and policy violation notices on this character.",
-      category: "Rules"
-    },
-    {
-      key: "rules_remove_rules",
-      name: "Allow removing active rules",
-      description: "Permits removing, resetting, or clearing active addon rules from this character.",
-      category: "Rules"
-    },
-    {
-      key: "rules_edit_autoload_mode",
-      name: "Allow changing auto-load behavior",
-      description: "Permits toggling between Silent Auto-Load and Prompt First confirmation for missing addons.",
-      category: "Rules"
-    },
-    {
-      key: "rules_force_compliance",
-      name: "Allow forcing compliance evaluations",
-      description: "Permits triggering remote compliance checks, auto-injections, and violation alerts.",
-      category: "Rules"
-    },
-    // General
-    {
-      key: "menu_open_settings",
-      name: "Allow opening QoC settings menu",
-      description: "Controls whether this character is allowed to open the Quality of Club configuration menu.",
-      category: "General"
-    }
-  ];
-  function getCharacterAccessLevel(character) {
-    if (character === null || character === void 0) return 7 /* public */;
-    const memberNumber = typeof character === "number" ? character : character.MemberNumber;
-    if (typeof Player !== "undefined" && Player.MemberNumber === memberNumber) {
-      return 0 /* self */;
-    }
-    if (memberNumber !== null && typeof memberNumber === "number") {
-      if (typeof Player !== "undefined" && typeof Player.IsOwnedByMemberNumber === "function" && Player.IsOwnedByMemberNumber(memberNumber)) {
-        return 1 /* clubowner */;
-      }
-      if (Array.isArray(modStorage.authority?.owners) && modStorage.authority.owners.includes(memberNumber)) {
-        return 2 /* owner */;
-      }
-      if (typeof Player !== "undefined" && typeof Player.IsLoverOfMemberNumber === "function" && Player.IsLoverOfMemberNumber(memberNumber)) {
-        return 3 /* lover */;
-      }
-      if (Array.isArray(modStorage.authority?.mistresses) && modStorage.authority.mistresses.includes(memberNumber)) {
-        return 4 /* mistress */;
-      }
-      if (typeof Player !== "undefined" && Array.isArray(Player.WhiteList) && Player.WhiteList.includes(memberNumber)) {
-        return 5 /* whitelist */;
-      }
-      if (typeof Player !== "undefined" && Array.isArray(Player.FriendList) && Player.FriendList.includes(memberNumber)) {
-        return 6 /* friend */;
-      }
-    }
-    return 7 /* public */;
-  }
-  function checkPermissionAccess(perm, character) {
-    const permSetting = modStorage.authority?.permissions?.[perm];
-    if (!permSetting) return true;
-    const accessLevel = getCharacterAccessLevel(character !== void 0 ? character : Player?.MemberNumber);
-    if (accessLevel === 0 /* self */) {
-      return permSetting.self || permSetting.min === 0 /* self */;
-    }
-    return accessLevel <= permSetting.min;
-  }
-  function addRoleMember(role, memberNumber, byCharacter) {
-    if (!checkPermissionAccess("authority_edit_roles", byCharacter)) {
-      return { success: false, message: "Permission Denied: You do not have authority to edit roles." };
-    }
-    if (!Number.isInteger(memberNumber) || memberNumber <= 0) {
-      return { success: false, message: "Invalid Member Number." };
-    }
-    if (typeof Player !== "undefined" && memberNumber === Player.MemberNumber) {
-      return { success: false, message: "You cannot add yourself to an external role list." };
-    }
-    const listKey = role === "owner" ? "owners" : "mistresses";
-    if (!Array.isArray(modStorage.authority[listKey])) {
-      modStorage.authority[listKey] = [];
-    }
-    if (modStorage.authority[listKey].includes(memberNumber)) {
-      return { success: false, message: `Member #${memberNumber} is already in the ${role} list.` };
-    }
-    modStorage.authority[listKey].push(memberNumber);
-    saveStorage();
-    syncStorage();
-    return { success: true, message: `Added Member #${memberNumber} as ${role === "owner" ? "Owner" : "Mistress"}.` };
-  }
-  function removeRoleMember(role, memberNumber, byCharacter) {
-    if (!checkPermissionAccess("authority_edit_roles", byCharacter)) {
-      return { success: false, message: "Permission Denied: You do not have authority to edit roles." };
-    }
-    const listKey = role === "owner" ? "owners" : "mistresses";
-    if (!Array.isArray(modStorage.authority[listKey])) {
-      return { success: false, message: "List is empty." };
-    }
-    modStorage.authority[listKey] = modStorage.authority[listKey].filter((id) => id !== memberNumber);
-    saveStorage();
-    syncStorage();
-    return { success: true, message: `Removed Member #${memberNumber} from ${role} list.` };
-  }
-  function setPermissionMinRole(perm, minRole, byCharacter) {
-    if (!checkPermissionAccess("authority_edit_min_role", byCharacter)) {
-      return { success: false, message: "Permission Denied: You do not have authority to modify minimum access roles." };
-    }
-    if (!modStorage.authority.permissions[perm]) {
-      return { success: false, message: "Invalid permission." };
-    }
-    modStorage.authority.permissions[perm].min = minRole;
-    saveStorage();
-    syncStorage();
-    return { success: true, message: `Updated lowest permitted role for ${perm} to ${ACCESS_LEVEL_NAMES[minRole]}.` };
-  }
-  function setPermissionSelfAccess(perm, selfAllowed, byCharacter) {
-    if (!checkPermissionAccess("authority_edit_self_access", byCharacter)) {
-      return { success: false, message: "Permission Denied: You do not have authority to modify self-access." };
-    }
-    if (!modStorage.authority.permissions[perm]) {
-      return { success: false, message: "Invalid permission." };
-    }
-    modStorage.authority.permissions[perm].self = selfAllowed;
-    saveStorage();
-    syncStorage();
-    return { success: true, message: `Updated self-access for ${perm} to ${selfAllowed ? "permitted" : "forbidden"}.` };
-  }
-
-  // src/subscreens/authoritySubscreen.ts
-  var AuthoritySubscreen = class extends BaseSubscreen {
-    rootElement = null;
-    activeTab = "roles";
-    filterText = "";
-    modalElement = null;
-    get name() {
-      return "";
-    }
-    onRun() {
-      DrawRect(0, 0, 2e3, 1e3, "#191f2b");
-    }
-    onLoad() {
-      this.createUI();
-    }
-    exit() {
-      this.cleanup();
-      setSubscreen(new MainSubscreen2());
-    }
-    onUnload() {
-      this.cleanup();
-    }
-    onExit() {
-      this.cleanup();
-    }
-    cleanup() {
-      if (this.modalElement) {
-        this.modalElement.remove();
-        this.modalElement = null;
-      }
-      if (this.rootElement) {
-        this.rootElement.remove();
-        this.rootElement = null;
-      }
-    }
-    createUI() {
-      this.cleanup();
-      const playerName = typeof Player !== "undefined" ? Player.Name || "Player" : "Player";
-      const backdrop = document.createElement("div");
-      backdrop.style.cssText = `
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #191f2b;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            color: #e0e6ed;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            box-sizing: border-box;
-            user-select: none;
-        `;
-      const container = document.createElement("div");
-      container.style.cssText = `
-            width: min(94vw, 1350px);
-            height: min(92vh, 920px);
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            box-sizing: border-box;
-        `;
-      const header = document.createElement("div");
-      header.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 12px;
-            border-bottom: 1px solid rgba(80, 100, 140, 0.35);
-        `;
-      const titleBox = document.createElement("div");
-      titleBox.innerHTML = `
-            <div style="font-size: 24px; font-weight: bold; color: #64b5f6;">
-                Authority & Permissions Management for ${playerName}
-            </div>
-            <div style="font-size: 13px; color: #90a4ae; margin-top: 3px;">
-                Configure hierarchical roles, manage Owners/Mistresses, and set access thresholds.
-            </div>
-        `;
-      const backBtn = document.createElement("button");
-      backBtn.textContent = "\u2715 Close";
-      backBtn.style.cssText = `
-            padding: 10px 24px;
-            background: rgba(220, 50, 50, 0.85);
-            border: 1px solid #ef5350;
-            color: white;
-            font-size: 15px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.15s ease;
-        `;
-      backBtn.addEventListener("click", () => this.exit());
-      header.appendChild(titleBox);
-      header.appendChild(backBtn);
-      container.appendChild(header);
-      const tabBar = document.createElement("div");
-      tabBar.style.cssText = "display: flex; gap: 12px;";
-      const tabs = [
-        { id: "roles", label: "\u{1F451} Role Management" },
-        { id: "permissions", label: "\u{1F6E1}\uFE0F Permission Settings" }
-      ];
-      tabs.forEach((t) => {
-        const isSel = this.activeTab === t.id;
-        const b = document.createElement("button");
-        b.textContent = t.label;
-        b.style.cssText = `
-                padding: 10px 22px;
-                border-radius: 6px;
-                font-size: 14px;
-                font-weight: bold;
-                cursor: pointer;
-                background: ${isSel ? "#1976d2" : "rgba(45, 55, 75, 0.8)"};
-                border: 1px solid ${isSel ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
-                color: ${isSel ? "white" : "#90a4ae"};
-                transition: all 0.15s ease;
-            `;
-        b.addEventListener("click", () => {
-          this.activeTab = t.id;
-          this.createUI();
-        });
-        tabBar.appendChild(b);
-      });
-      container.appendChild(tabBar);
-      const contentArea = document.createElement("div");
-      contentArea.style.cssText = `
-            flex: 1;
-            overflow-y: auto;
-            background: rgba(25, 31, 43, 0.95);
-            border: 1px solid rgba(80, 100, 140, 0.35);
-            border-radius: 8px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            box-sizing: border-box;
-        `;
-      if (this.activeTab === "roles") {
-        this.renderRoleManagement(contentArea, playerName);
-      } else {
-        this.renderPermissionSettings(contentArea, playerName);
-      }
-      container.appendChild(contentArea);
-      backdrop.appendChild(container);
-      document.body.appendChild(backdrop);
-      this.rootElement = backdrop;
-    }
-    // ==========================================
-    // TAB 1: ROLE MANAGEMENT (BCX Image 1 Style)
-    // ==========================================
-    renderRoleManagement(content, playerName) {
-      const canEditRoles = checkPermissionAccess("authority_edit_roles");
-      const topRow = document.createElement("div");
-      topRow.style.cssText = "display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;";
-      const leftCol = document.createElement("div");
-      leftCol.style.cssText = "flex: 1; display: flex; flex-direction: column; gap: 16px;";
-      const addCard = document.createElement("div");
-      addCard.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 18px;";
-      addCard.innerHTML = `
-            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
-                Assign Custom Dominant Roles
-            </div>
-            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 14px;">
-                Enter a player's Member Number to grant them custom Owner or Mistress authority in Quality of Club.
-            </div>
-        `;
-      const inputRow = document.createElement("div");
-      inputRow.style.cssText = "display: flex; align-items: center; gap: 12px; flex-wrap: wrap;";
-      const numInput = document.createElement("input");
-      numInput.type = "number";
-      numInput.placeholder = "Member Number";
-      numInput.disabled = !canEditRoles;
-      numInput.style.cssText = `
-            padding: 8px 14px;
-            background: rgba(20, 26, 38, 0.9);
-            border: 1px solid rgba(80, 100, 140, 0.5);
-            color: white;
-            font-size: 14px;
-            border-radius: 6px;
-            width: 180px;
-        `;
-      const addOwnerBtn = document.createElement("button");
-      addOwnerBtn.textContent = "Add as Owner";
-      addOwnerBtn.disabled = !canEditRoles;
-      addOwnerBtn.style.cssText = `
-            padding: 9px 18px;
-            background: ${canEditRoles ? "#1976d2" : "#455a64"};
-            border: 1px solid #42a5f5;
-            color: white;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: ${canEditRoles ? "pointer" : "not-allowed"};
-        `;
-      addOwnerBtn.addEventListener("click", () => {
-        const val = parseInt(numInput.value.trim(), 10);
-        if (!val) return;
-        const res = addRoleMember("owner", val);
-        if (res.success) {
-          numInput.value = "";
-          this.createUI();
-        } else {
-          alert(res.message);
-        }
-      });
-      const addMistressBtn = document.createElement("button");
-      addMistressBtn.textContent = "Add as Mistress";
-      addMistressBtn.disabled = !canEditRoles;
-      addMistressBtn.style.cssText = `
-            padding: 9px 18px;
-            background: ${canEditRoles ? "#7b1fa2" : "#455a64"};
-            border: 1px solid #ba68c8;
-            color: white;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: ${canEditRoles ? "pointer" : "not-allowed"};
-        `;
-      addMistressBtn.addEventListener("click", () => {
-        const val = parseInt(numInput.value.trim(), 10);
-        if (!val) return;
-        const res = addRoleMember("mistress", val);
-        if (res.success) {
-          numInput.value = "";
-          this.createUI();
-        } else {
-          alert(res.message);
-        }
-      });
-      inputRow.appendChild(numInput);
-      inputRow.appendChild(addOwnerBtn);
-      inputRow.appendChild(addMistressBtn);
-      addCard.appendChild(inputRow);
-      if (!canEditRoles) {
-        const lockNotice = document.createElement("div");
-        lockNotice.style.cssText = "color: #ef5350; font-size: 12px; margin-top: 8px; font-weight: bold;";
-        lockNotice.textContent = "\u{1F512} Role editing is restricted by your current authority settings.";
-        addCard.appendChild(lockNotice);
-      }
-      leftCol.appendChild(addCard);
-      const listsCard = document.createElement("div");
-      listsCard.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 14px;";
-      const ownersHeader = document.createElement("div");
-      ownersHeader.innerHTML = `<span style="font-weight: bold; color: #64b5f6; font-size: 15px;">QoC Owners (${modStorage.authority.owners.length})</span>`;
-      listsCard.appendChild(ownersHeader);
-      const ownersBox = document.createElement("div");
-      ownersBox.style.cssText = "display: flex; flex-wrap: wrap; gap: 8px;";
-      if (modStorage.authority.owners.length === 0) {
-        ownersBox.innerHTML = "<span style='color: #8fa0b5; font-size: 13px;'>No custom owners assigned.</span>";
-      } else {
-        modStorage.authority.owners.forEach((id) => {
-          const tag = document.createElement("div");
-          tag.style.cssText = "display: flex; align-items: center; gap: 8px; background: rgba(25, 118, 210, 0.3); border: 1px solid #42a5f5; padding: 4px 12px; border-radius: 4px; font-size: 13px;";
-          tag.innerHTML = `<span>Member #${id}</span>`;
-          if (canEditRoles) {
-            const rm = document.createElement("button");
-            rm.textContent = "\u2715";
-            rm.style.cssText = "background: none; border: none; color: #ef5350; cursor: pointer; font-weight: bold; font-size: 14px; margin-left: 4px;";
-            rm.addEventListener("click", () => {
-              removeRoleMember("owner", id);
-              this.createUI();
-            });
-            tag.appendChild(rm);
-          }
-          ownersBox.appendChild(tag);
-        });
-      }
-      listsCard.appendChild(ownersBox);
-      const mistressHeader = document.createElement("div");
-      mistressHeader.style.cssText = "margin-top: 10px;";
-      mistressHeader.innerHTML = `<span style="font-weight: bold; color: #ba68c8; font-size: 15px;">QoC Mistresses (${modStorage.authority.mistresses.length})</span>`;
-      listsCard.appendChild(mistressHeader);
-      const mistressBox = document.createElement("div");
-      mistressBox.style.cssText = "display: flex; flex-wrap: wrap; gap: 8px;";
-      if (modStorage.authority.mistresses.length === 0) {
-        mistressBox.innerHTML = "<span style='color: #8fa0b5; font-size: 13px;'>No custom mistresses assigned.</span>";
-      } else {
-        modStorage.authority.mistresses.forEach((id) => {
-          const tag = document.createElement("div");
-          tag.style.cssText = "display: flex; align-items: center; gap: 8px; background: rgba(123, 31, 162, 0.3); border: 1px solid #ba68c8; padding: 4px 12px; border-radius: 4px; font-size: 13px;";
-          tag.innerHTML = `<span>Member #${id}</span>`;
-          if (canEditRoles) {
-            const rm = document.createElement("button");
-            rm.textContent = "\u2715";
-            rm.style.cssText = "background: none; border: none; color: #ef5350; cursor: pointer; font-weight: bold; font-size: 14px; margin-left: 4px;";
-            rm.addEventListener("click", () => {
-              removeRoleMember("mistress", id);
-              this.createUI();
-            });
-            tag.appendChild(rm);
-          }
-          mistressBox.appendChild(tag);
-        });
-      }
-      listsCard.appendChild(mistressBox);
-      leftCol.appendChild(listsCard);
-      topRow.appendChild(leftCol);
-      const rightCol = document.createElement("div");
-      rightCol.style.cssText = "width: 280px; display: flex; flex-direction: column; align-items: center; background: rgba(30, 36, 48, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
-      const pyramidTitle = document.createElement("div");
-      pyramidTitle.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 16px; text-align: center;";
-      pyramidTitle.textContent = "Hierarchy of Roles";
-      rightCol.appendChild(pyramidTitle);
-      const rolesList = [
-        { name: playerName, color: "#00e5ff", width: 140 },
-        { name: "Clubowner", color: "#e0e6ed", width: 150 },
-        { name: "Owner", color: "#e0e6ed", width: 160 },
-        { name: "Lover", color: "#e0e6ed", width: 170 },
-        { name: "Mistress", color: "#e0e6ed", width: 180 },
-        { name: "Whitelist", color: "#e0e6ed", width: 190 },
-        { name: "Friend", color: "#e0e6ed", width: 200 },
-        { name: "Public", color: "#e0e6ed", width: 210 }
-      ];
-      rolesList.forEach((r, idx) => {
-        const block = document.createElement("div");
-        block.style.cssText = `
-                width: ${r.width}px;
-                padding: 6px 0;
-                margin-bottom: 4px;
-                background: ${idx === 0 ? "rgba(0, 229, 255, 0.15)" : "rgba(45, 55, 75, 0.8)"};
-                border: 1px solid ${idx === 0 ? "#00e5ff" : "rgba(80, 100, 140, 0.4)"};
-                color: ${r.color};
-                font-size: 13px;
-                font-weight: bold;
-                text-align: center;
-                border-radius: 4px;
-            `;
-        block.textContent = r.name;
-        rightCol.appendChild(block);
-        if (idx < rolesList.length - 1) {
-          const arrow = document.createElement("div");
-          arrow.style.cssText = "font-size: 10px; color: #607d8b; line-height: 10px; margin: -2px 0 2px 0;";
-          arrow.textContent = "\u25BC";
-          rightCol.appendChild(arrow);
-        }
-      });
-      topRow.appendChild(rightCol);
-      content.appendChild(topRow);
-    }
-    // ==========================================
-    // TAB 2: PERMISSION SETTINGS (BCX Image 2 & 3)
-    // ==========================================
-    renderPermissionSettings(content, playerName) {
-      const canEditMin = checkPermissionAccess("authority_edit_min_role");
-      const canEditSelf = checkPermissionAccess("authority_edit_self_access");
-      const filterBar = document.createElement("div");
-      filterBar.style.cssText = "display: flex; align-items: center; gap: 12px; margin-bottom: 6px;";
-      const filterLabel = document.createElement("span");
-      filterLabel.textContent = "Filter:";
-      filterLabel.style.cssText = "font-weight: bold; color: #90a4ae; font-size: 14px;";
-      const filterInput = document.createElement("input");
-      filterInput.type = "text";
-      filterInput.placeholder = "Search permission by name or description...";
-      filterInput.value = this.filterText;
-      filterInput.style.cssText = `
-            flex: 1;
-            padding: 8px 14px;
-            background: rgba(20, 26, 38, 0.9);
-            border: 1px solid rgba(80, 100, 140, 0.4);
-            color: white;
-            font-size: 14px;
-            border-radius: 6px;
-        `;
-      filterInput.addEventListener("input", () => {
-        this.filterText = filterInput.value.toLowerCase().trim();
-        this.updatePermissionsList(listContainer, playerName, canEditMin, canEditSelf);
-      });
-      filterBar.appendChild(filterLabel);
-      filterBar.appendChild(filterInput);
-      content.appendChild(filterBar);
-      const headerRow = document.createElement("div");
-      headerRow.style.cssText = `
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 16px;
-            background: rgba(30, 36, 48, 0.6);
-            border-bottom: 2px solid rgba(80, 100, 140, 0.4);
-            font-weight: bold;
-            font-size: 13px;
-            color: #90caf9;
-        `;
-      headerRow.innerHTML = `
-            <div style="flex: 1;">Permission Name & Scope</div>
-            <div style="display: flex; align-items: center; gap: 40px; padding-right: 20px;">
-                <span style="min-width: 140px; text-align: center;">${playerName} is permitted</span>
-                <span style="min-width: 160px; text-align: center;">Lowest permitted role</span>
-            </div>
-        `;
-      content.appendChild(headerRow);
-      const listContainer = document.createElement("div");
-      listContainer.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
-      content.appendChild(listContainer);
-      this.updatePermissionsList(listContainer, playerName, canEditMin, canEditSelf);
-    }
-    updatePermissionsList(container, playerName, canEditMin, canEditSelf) {
-      container.innerHTML = "";
-      const filtered = PERMISSION_DEFINITIONS.filter((def) => {
-        if (!this.filterText) return true;
-        return def.name.toLowerCase().includes(this.filterText) || def.description.toLowerCase().includes(this.filterText);
-      });
-      if (filtered.length === 0) {
-        const empty = document.createElement("div");
-        empty.style.cssText = "color: #90a4ae; padding: 24px; text-align: center;";
-        empty.textContent = "No matching permissions found.";
-        container.appendChild(empty);
-        return;
-      }
-      filtered.forEach((def) => {
-        const currentSetting = modStorage.authority.permissions[def.key] || { self: true, min: 2 /* owner */ };
-        const row = document.createElement("div");
-        row.style.cssText = `
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 12px 16px;
-                background: rgba(35, 43, 60, 0.85);
-                border: 1px solid rgba(80, 100, 140, 0.35);
-                border-radius: 6px;
-                gap: 16px;
-                transition: background 0.15s ease;
-            `;
-        const left = document.createElement("div");
-        left.style.cssText = "flex: 1; display: flex; align-items: center; gap: 12px;";
-        left.innerHTML = `
-                <span style="font-size: 18px;">\u{1F512}</span>
-                <div>
-                    <div style="font-size: 15px; font-weight: bold; color: #e0e6ed;">${def.name}</div>
-                    <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">${def.description}</div>
-                </div>
-            `;
-        const right = document.createElement("div");
-        right.style.cssText = "display: flex; align-items: center; gap: 40px; padding-right: 10px;";
-        const selfBoxContainer = document.createElement("div");
-        selfBoxContainer.style.cssText = "min-width: 140px; display: flex; justify-content: center;";
-        const selfCheckbox = document.createElement("input");
-        selfCheckbox.type = "checkbox";
-        selfCheckbox.checked = currentSetting.self;
-        selfCheckbox.disabled = !canEditSelf;
-        selfCheckbox.style.cssText = `
-                width: 22px;
-                height: 22px;
-                cursor: ${canEditSelf ? "pointer" : "not-allowed"};
-                accent-color: #1976d2;
-            `;
-        selfCheckbox.addEventListener("change", () => {
-          const newVal = selfCheckbox.checked;
-          if (!newVal && (def.key === "authority_edit_self_access" || def.key === "authority_edit_min_role")) {
-            const ok = confirm(`\u26A0\uFE0F Surrendering Self-Access:
-
-Are you sure you want to disable your own access to "${def.name}"?
-
-You will lose the ability to modify or reclaim this permission yourself \u2014 only an authorized Owner or Mistress will be able to restore it.`);
-            if (!ok) {
-              selfCheckbox.checked = true;
-              return;
-            }
-          }
-          setPermissionSelfAccess(def.key, newVal);
-          this.updatePermissionsList(container, playerName, checkPermissionAccess("authority_edit_min_role"), checkPermissionAccess("authority_edit_self_access"));
-        });
-        selfBoxContainer.appendChild(selfCheckbox);
-        const roleBtnContainer = document.createElement("div");
-        roleBtnContainer.style.cssText = "min-width: 160px; display: flex; justify-content: center;";
-        const roleBtn = document.createElement("button");
-        roleBtn.textContent = ACCESS_LEVEL_NAMES[currentSetting.min];
-        roleBtn.disabled = !canEditMin;
-        roleBtn.style.cssText = `
-                padding: 8px 18px;
-                width: 130px;
-                text-align: center;
-                background: ${currentSetting.min === 0 /* self */ ? "#00838f" : currentSetting.min <= 4 /* mistress */ ? "#1565c0" : "#455a64"};
-                border: 1px solid ${canEditMin ? "#42a5f5" : "#607d8b"};
-                color: white;
-                font-size: 13px;
-                font-weight: bold;
-                border-radius: 4px;
-                cursor: ${canEditMin ? "pointer" : "not-allowed"};
-                transition: all 0.15s ease;
-            `;
-        roleBtn.addEventListener("click", () => {
-          if (canEditMin) {
-            this.openRoleSelectorModal(def, currentSetting.min, playerName);
-          }
-        });
-        roleBtnContainer.appendChild(roleBtn);
-        right.appendChild(selfBoxContainer);
-        right.appendChild(roleBtnContainer);
-        row.appendChild(left);
-        row.appendChild(right);
-        container.appendChild(row);
-      });
-    }
-    // ==========================================
-    // ROLE SELECTION MODAL (BCX Image 3 Style)
-    // ==========================================
-    openRoleSelectorModal(def, currentMin, playerName) {
-      if (this.modalElement) this.modalElement.remove();
-      let selectedRole = currentMin;
-      const modalBackdrop = document.createElement("div");
-      modalBackdrop.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            user-select: none;
-        `;
-      const dialog = document.createElement("div");
-      dialog.style.cssText = `
-            width: min(90vw, 850px);
-            background: #191f2b;
-            border: 2px solid #64b5f6;
-            border-radius: 8px;
-            padding: 28px 32px;
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-            color: #e0e6ed;
-            box-sizing: border-box;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-        `;
-      dialog.innerHTML = `
-            <div style="font-size: 18px; font-weight: bold; color: #64b5f6; border-bottom: 1px solid rgba(80,100,140,0.3); padding-bottom: 8px;">
-                Authority: Changing minimum access to "${def.name}"
-            </div>
-            <div style="font-size: 14px; text-align: center; color: #cfd8dc; margin-top: 4px;">
-                Please select the new lowest role that should still have this permission.
-            </div>
-            <div id="qoc-role-info" style="font-size: 13px; text-align: center; color: #90a4ae;">
-                Currently set role: <b>${ACCESS_LEVEL_NAMES[currentMin]}</b> &nbsp;\u2192&nbsp; Newly selected role: <b id="qoc-selected-label" style="color: #64b5f6;">${ACCESS_LEVEL_NAMES[selectedRole]}</b>
-            </div>
-            <div style="font-size: 12px; text-align: center; color: #78909c;">
-                All roles to the left of the selected one will also automatically get access.
-            </div>
-        `;
-      const chainContainer = document.createElement("div");
-      chainContainer.style.cssText = "display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 10px 0;";
-      const selfBtn = document.createElement("button");
-      selfBtn.textContent = playerName;
-      selfBtn.style.cssText = `
-            padding: 10px 28px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-            background: ${selectedRole === 0 /* self */ ? "#00e5ff" : "rgba(45, 55, 75, 0.8)"};
-            border: 1px solid #00e5ff;
-            color: ${selectedRole === 0 /* self */ ? "black" : "#00e5ff"};
-            transition: all 0.15s ease;
-        `;
-      selfBtn.addEventListener("click", () => {
-        selectedRole = 0 /* self */;
-        updateSelection();
-      });
-      chainContainer.appendChild(selfBtn);
-      const lowerRow = document.createElement("div");
-      lowerRow.style.cssText = "display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px;";
-      const chainRoles = [
-        1 /* clubowner */,
-        2 /* owner */,
-        3 /* lover */,
-        4 /* mistress */,
-        5 /* whitelist */,
-        6 /* friend */,
-        7 /* public */
-      ];
-      const roleButtons = [];
-      chainRoles.forEach((lvl, idx) => {
-        const b = document.createElement("button");
-        b.textContent = ACCESS_LEVEL_NAMES[lvl];
-        b.style.cssText = `
-                padding: 8px 14px;
-                font-size: 13px;
-                font-weight: bold;
-                cursor: pointer;
-                border-radius: 4px;
-                background: ${selectedRole === lvl ? "#1976d2" : "rgba(45, 55, 75, 0.8)"};
-                border: 1px solid ${selectedRole === lvl ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
-                color: ${selectedRole === lvl ? "white" : "#cfd8dc"};
-                transition: all 0.15s ease;
-            `;
-        b.addEventListener("click", () => {
-          selectedRole = lvl;
-          updateSelection();
-        });
-        roleButtons.push({ level: lvl, btn: b });
-        lowerRow.appendChild(b);
-        if (idx < chainRoles.length - 1) {
-          const separator = document.createElement("span");
-          separator.textContent = ">";
-          separator.style.cssText = "color: #78909c; font-weight: bold; font-size: 14px;";
-          lowerRow.appendChild(separator);
-        }
-      });
-      chainContainer.appendChild(lowerRow);
-      dialog.appendChild(chainContainer);
-      const updateSelection = () => {
-        const labelEl = dialog.querySelector("#qoc-selected-label");
-        if (labelEl) labelEl.textContent = ACCESS_LEVEL_NAMES[selectedRole];
-        selfBtn.style.background = selectedRole === 0 /* self */ ? "#00e5ff" : "rgba(45, 55, 75, 0.8)";
-        selfBtn.style.color = selectedRole === 0 /* self */ ? "black" : "#00e5ff";
-        roleButtons.forEach((r) => {
-          const isMatch = r.level === selectedRole;
-          r.btn.style.background = isMatch ? "#1976d2" : "rgba(45, 55, 75, 0.8)";
-          r.btn.style.borderColor = isMatch ? "#42a5f5" : "rgba(80, 100, 140, 0.4)";
-          r.btn.style.color = isMatch ? "white" : "#cfd8dc";
-        });
-      };
-      const actionRow = document.createElement("div");
-      actionRow.style.cssText = "display: flex; justify-content: center; gap: 16px; margin-top: 10px;";
-      const confirmBtn = document.createElement("button");
-      confirmBtn.textContent = "Confirm";
-      confirmBtn.style.cssText = `
-            padding: 10px 32px;
-            background: #2e7d32;
-            border: 1px solid #4caf50;
-            color: white;
-            font-size: 15px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-        `;
-      confirmBtn.addEventListener("click", () => {
-        setPermissionMinRole(def.key, selectedRole);
-        modalBackdrop.remove();
-        this.modalElement = null;
-        this.createUI();
-      });
-      const cancelBtn = document.createElement("button");
-      cancelBtn.textContent = "Cancel";
-      cancelBtn.style.cssText = `
-            padding: 10px 32px;
-            background: rgba(60, 70, 90, 0.8);
-            border: 1px solid rgba(80, 100, 140, 0.5);
-            color: white;
-            font-size: 15px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-        `;
-      cancelBtn.addEventListener("click", () => {
-        modalBackdrop.remove();
-        this.modalElement = null;
-      });
-      actionRow.appendChild(confirmBtn);
-      actionRow.appendChild(cancelBtn);
-      dialog.appendChild(actionRow);
-      modalBackdrop.appendChild(dialog);
-      document.body.appendChild(modalBackdrop);
-      this.modalElement = modalBackdrop;
     }
   };
 
@@ -8015,7 +7186,197 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
   };
   var messagesManager = new MessagesManager();
 
+  // src/modules/authority.ts
+  var PERMISSION_DEFINITIONS = [
+    // Authority module
+    {
+      key: "authority_edit_roles",
+      name: "Allow managing Owner & Mistress roles",
+      description: "Permits adding or removing member numbers from the custom QoC Owner and Mistress lists.",
+      category: "Authority"
+    },
+    {
+      key: "authority_edit_min_role",
+      name: "Allow lowest access modification",
+      description: "Permits modifying the lowest permitted role required for any permission.",
+      category: "Authority"
+    },
+    {
+      key: "authority_edit_self_access",
+      name: "Allow modifying self access",
+      description: "Permits granting or revoking self-access on permissions (required to gift or reclaim control).",
+      category: "Authority"
+    },
+    // Inspection
+    {
+      key: "inspect_view_addons",
+      name: "Allow inspecting loaded addons",
+      description: "Permits querying and viewing the list of external addons loaded in this character's browser session.",
+      category: "Inspection"
+    },
+    {
+      key: "inspect_view_rules",
+      name: "Allow viewing active addon rules",
+      description: "Permits viewing the active mandatory and forbidden addon rules currently locked on this character.",
+      category: "Inspection"
+    },
+    // Rules & Compliance
+    {
+      key: "rules_lock_mandatory",
+      name: "Allow locking mandatory addons",
+      description: "Permits locking mandatory addon requirements and forcing auto-injection on this character.",
+      category: "Rules"
+    },
+    {
+      key: "rules_lock_forbidden",
+      name: "Allow locking forbidden addons",
+      description: "Permits locking forbidden addon bans and policy violation notices on this character.",
+      category: "Rules"
+    },
+    {
+      key: "rules_remove_rules",
+      name: "Allow removing active rules",
+      description: "Permits removing, resetting, or clearing active addon rules from this character.",
+      category: "Rules"
+    },
+    {
+      key: "rules_edit_autoload_mode",
+      name: "Allow changing auto-load behavior",
+      description: "Permits toggling between Silent Auto-Load and Prompt First confirmation for missing addons.",
+      category: "Rules"
+    },
+    {
+      key: "rules_force_compliance",
+      name: "Allow forcing compliance evaluations",
+      description: "Permits triggering remote compliance checks, auto-injections, and violation alerts.",
+      category: "Rules"
+    },
+    // General
+    {
+      key: "menu_open_settings",
+      name: "Allow opening QoC settings menu",
+      description: "Controls whether this character is allowed to open the Quality of Club configuration menu.",
+      category: "General"
+    }
+  ];
+  function getCharacterAccessLevel(character) {
+    if (character === null || character === void 0) return 7 /* public */;
+    const memberNumber = typeof character === "number" ? character : character.MemberNumber;
+    if (typeof Player !== "undefined" && Player.MemberNumber === memberNumber) {
+      return 0 /* self */;
+    }
+    if (memberNumber !== null && typeof memberNumber === "number") {
+      if (typeof Player !== "undefined" && typeof Player.IsOwnedByMemberNumber === "function" && Player.IsOwnedByMemberNumber(memberNumber)) {
+        return 1 /* clubowner */;
+      }
+      if (Array.isArray(modStorage.authority?.owners) && modStorage.authority.owners.includes(memberNumber)) {
+        return 2 /* owner */;
+      }
+      if (typeof Player !== "undefined" && typeof Player.IsLoverOfMemberNumber === "function" && Player.IsLoverOfMemberNumber(memberNumber)) {
+        return 3 /* lover */;
+      }
+      if (Array.isArray(modStorage.authority?.mistresses) && modStorage.authority.mistresses.includes(memberNumber)) {
+        return 4 /* mistress */;
+      }
+      if (typeof Player !== "undefined" && Array.isArray(Player.WhiteList) && Player.WhiteList.includes(memberNumber)) {
+        return 5 /* whitelist */;
+      }
+      if (typeof Player !== "undefined" && Array.isArray(Player.FriendList) && Player.FriendList.includes(memberNumber)) {
+        return 6 /* friend */;
+      }
+    }
+    return 7 /* public */;
+  }
+  function checkPermissionAccess(perm, character) {
+    const permSetting = modStorage.authority?.permissions?.[perm];
+    if (!permSetting) return true;
+    const accessLevel = getCharacterAccessLevel(character !== void 0 ? character : Player?.MemberNumber);
+    if (accessLevel === 0 /* self */) {
+      return permSetting.self || permSetting.min === 0 /* self */;
+    }
+    return accessLevel <= permSetting.min;
+  }
+  function addRoleMember(role, memberNumber, byCharacter) {
+    if (!checkPermissionAccess("authority_edit_roles", byCharacter)) {
+      return { success: false, message: "Permission Denied: You do not have authority to edit roles." };
+    }
+    if (!Number.isInteger(memberNumber) || memberNumber <= 0) {
+      return { success: false, message: "Invalid Member Number." };
+    }
+    if (typeof Player !== "undefined" && memberNumber === Player.MemberNumber) {
+      return { success: false, message: "You cannot add yourself to an external role list." };
+    }
+    const listKey = role === "owner" ? "owners" : "mistresses";
+    if (!Array.isArray(modStorage.authority[listKey])) {
+      modStorage.authority[listKey] = [];
+    }
+    if (modStorage.authority[listKey].includes(memberNumber)) {
+      return { success: false, message: `Member #${memberNumber} is already in the ${role} list.` };
+    }
+    modStorage.authority[listKey].push(memberNumber);
+    saveStorage();
+    syncStorage();
+    return { success: true, message: `Added Member #${memberNumber} as ${role === "owner" ? "Owner" : "Mistress"}.` };
+  }
+  function removeRoleMember(role, memberNumber, byCharacter) {
+    if (!checkPermissionAccess("authority_edit_roles", byCharacter)) {
+      return { success: false, message: "Permission Denied: You do not have authority to edit roles." };
+    }
+    const listKey = role === "owner" ? "owners" : "mistresses";
+    if (!Array.isArray(modStorage.authority[listKey])) {
+      return { success: false, message: "List is empty." };
+    }
+    modStorage.authority[listKey] = modStorage.authority[listKey].filter((id) => id !== memberNumber);
+    saveStorage();
+    syncStorage();
+    return { success: true, message: `Removed Member #${memberNumber} from ${role} list.` };
+  }
+  function setPermissionMinRole(perm, minRole, byCharacter) {
+    if (!checkPermissionAccess("authority_edit_min_role", byCharacter)) {
+      return { success: false, message: "Permission Denied: You do not have authority to modify minimum access roles." };
+    }
+    if (!modStorage.authority.permissions[perm]) {
+      return { success: false, message: "Invalid permission." };
+    }
+    modStorage.authority.permissions[perm].min = minRole;
+    saveStorage();
+    syncStorage();
+    return { success: true, message: `Updated lowest permitted role for ${perm} to ${ACCESS_LEVEL_NAMES[minRole]}.` };
+  }
+  function setPermissionSelfAccess(perm, selfAllowed, byCharacter) {
+    if (!checkPermissionAccess("authority_edit_self_access", byCharacter)) {
+      return { success: false, message: "Permission Denied: You do not have authority to modify self-access." };
+    }
+    if (!modStorage.authority.permissions[perm]) {
+      return { success: false, message: "Invalid permission." };
+    }
+    modStorage.authority.permissions[perm].self = selfAllowed;
+    saveStorage();
+    syncStorage();
+    return { success: true, message: `Updated self-access for ${perm} to ${selfAllowed ? "permitted" : "forbidden"}.` };
+  }
+
   // src/modules/networkSync.ts
+  function getCallerPermissions(senderId) {
+    const perms = [
+      "authority_edit_roles",
+      "authority_edit_min_role",
+      "authority_edit_self_access",
+      "inspect_view_addons",
+      "inspect_view_rules",
+      "rules_lock_mandatory",
+      "rules_lock_forbidden",
+      "rules_remove_rules",
+      "rules_edit_autoload_mode",
+      "rules_force_compliance",
+      "menu_open_settings"
+    ];
+    const res = {};
+    for (const p of perms) {
+      res[p] = checkPermissionAccess(p, senderId);
+    }
+    return res;
+  }
   function canSenderInspect(senderId) {
     if (!modStorage.inspector.enabled) {
       return { allowed: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
@@ -8037,9 +7398,6 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       return { allowed: false, reason: "Permission Denied: You do not meet the minimum role required to enforce addon rules on this player." };
     }
     return { allowed: true };
-  }
-  function hasRuleAuthorityOver(target) {
-    return true;
   }
   function sendSilentRoomTelemetry() {
     if (typeof ChatRoomCharacter === "undefined" || !Array.isArray(ChatRoomCharacter)) return;
@@ -8082,6 +7440,10 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
             allowed: true,
             mods: getLoadedMods(),
             rules: modStorage.inspector.rules,
+            autoLoadMode: modStorage.inspector.autoLoadMode,
+            authority: modStorage.authority,
+            callerAccessLevel: getCharacterAccessLevel(senderId),
+            callerPermissions: getCallerPermissions(senderId),
             version: version2
           } : {
             allowed: false,
@@ -8121,6 +7483,49 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
           }, senderId);
           return;
         }
+        if (dictData.message === "qoc_updateAuthority") {
+          const req = dictData.data;
+          let resData;
+          if (!req || typeof req.action !== "string") {
+            resData = { success: false, reason: "Invalid request format." };
+          } else if (req.action === "add_role") {
+            const res = addRoleMember(req.role, req.memberNumber, senderId);
+            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+          } else if (req.action === "remove_role") {
+            const res = removeRoleMember(req.role, req.memberNumber, senderId);
+            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+          } else if (req.action === "set_min_role") {
+            const res = setPermissionMinRole(req.perm, req.minRole, senderId);
+            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+          } else if (req.action === "set_self_access") {
+            const res = setPermissionSelfAccess(req.perm, req.selfAllowed, senderId);
+            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+          } else if (req.action === "set_autoload_mode") {
+            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+              resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
+            } else {
+              modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
+              saveStorage();
+              syncStorage();
+              resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
+            }
+          } else {
+            resData = { success: false, reason: "Unknown action." };
+          }
+          if (resData.success) {
+            toastsManager.info({
+              title: `${MOD_NAME} Authority Updated`,
+              message: `Authority updated by ${senderName}.`,
+              duration: 4e3
+            });
+          }
+          messagesManager.sendPacket("requestResponse", {
+            requestId: dictData.requestId,
+            message: dictData.message,
+            data: resData
+          }, senderId);
+          return;
+        }
       }
       if (dictMsg === "qoc_telemetry" && dictData) {
         const senderId = msg.Sender;
@@ -8153,12 +7558,18 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       }
       if (data && data.type === `${MOD_KEY}_request` && typeof data.requestId === "string") {
         const senderId = beep.MemberNumber;
+        const senderChar = typeof Character !== "undefined" && typeof Character.find === "function" ? Character.find((c) => c.MemberNumber === senderId) : null;
+        const senderName = senderChar?.Name || `Member #${senderId}`;
         if (data.message === "qoc_inspect") {
           const permCheck = canSenderInspect(senderId);
           const responseData = permCheck.allowed ? {
             allowed: true,
             mods: getLoadedMods(),
             rules: modStorage.inspector.rules,
+            autoLoadMode: modStorage.inspector.autoLoadMode,
+            authority: modStorage.authority,
+            callerAccessLevel: getCharacterAccessLevel(senderId),
+            callerPermissions: getCallerPermissions(senderId),
             version: version2
           } : {
             allowed: false,
@@ -8189,6 +7600,50 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
             requestId: data.requestId,
             message: data.message,
             data: responseData
+          }, senderId);
+          return;
+        }
+        if (data.message === "qoc_updateAuthority") {
+          const req = data.data;
+          let resData;
+          if (!req || typeof req.action !== "string") {
+            resData = { success: false, reason: "Invalid request format." };
+          } else if (req.action === "add_role") {
+            const res = addRoleMember(req.role, req.memberNumber, senderId);
+            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+          } else if (req.action === "remove_role") {
+            const res = removeRoleMember(req.role, req.memberNumber, senderId);
+            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+          } else if (req.action === "set_min_role") {
+            const res = setPermissionMinRole(req.perm, req.minRole, senderId);
+            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+          } else if (req.action === "set_self_access") {
+            const res = setPermissionSelfAccess(req.perm, req.selfAllowed, senderId);
+            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+          } else if (req.action === "set_autoload_mode") {
+            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+              resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
+            } else {
+              modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
+              saveStorage();
+              syncStorage();
+              resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
+            }
+          } else {
+            resData = { success: false, reason: "Unknown action." };
+          }
+          if (resData.success) {
+            toastsManager.info({
+              title: `${MOD_NAME} Authority Updated`,
+              message: `Authority updated by ${senderName}.`,
+              duration: 4e3
+            });
+          }
+          messagesManager.sendBeep({
+            type: `${MOD_KEY}_requestResponse`,
+            requestId: data.requestId,
+            message: data.message,
+            data: resData
           }, senderId);
           return;
         }
@@ -8282,6 +7737,45 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       };
     }
   }
+  async function requestUpdateAuthority(targetMemberNumber, update) {
+    try {
+      let res = await messagesManager.sendRequest({
+        message: "qoc_updateAuthority",
+        data: update,
+        target: targetMemberNumber,
+        type: "packet"
+      });
+      if (res.isError || !res.data) {
+        res = await messagesManager.sendRequest({
+          message: "qoc_updateAuthority",
+          data: update,
+          target: targetMemberNumber,
+          type: "beep"
+        });
+      }
+      if (res.isError || !res.data) {
+        return {
+          success: false,
+          error: "Target player did not respond. Quality of Club may not be running on their client."
+        };
+      }
+      if (!res.data.success) {
+        return {
+          success: false,
+          error: res.data.reason || "Target rejected authority update."
+        };
+      }
+      return {
+        success: true,
+        data: res.data
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err?.message || "Failed to transmit authority update."
+      };
+    }
+  }
 
   // src/subscreens/inspectorSubscreen.ts
   var InspectorSubscreen = class extends BaseSubscreen {
@@ -8290,17 +7784,20 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
     targetData = null;
     isLoading = false;
     errorMessage = null;
-    // Working copy of rules being edited on a target
+    // Working copy of rules being edited on target
     targetRulesCopy = [];
-    // Root UI container
+    // Filter text for permissions tab
+    permissionFilter = "";
+    // Root UI container & content area
     rootElement = null;
     contentArea = null;
+    modalElement = null;
     activeTab = "addons";
-    constructor(target = null) {
+    constructor(target = null, initialTab = "addons") {
       super();
       this.target = target;
       this.isSelf = !target || typeof target.IsPlayer === "function" && target.IsPlayer();
-      this.activeTab = this.isSelf ? "addons" : "target_addons";
+      this.activeTab = initialTab;
     }
     get name() {
       return "";
@@ -8337,14 +7834,25 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       this.cleanup();
     }
     cleanup() {
+      if (this.modalElement) {
+        this.modalElement.remove();
+        this.modalElement = null;
+      }
       if (this.rootElement) {
         this.rootElement.remove();
         this.rootElement = null;
       }
       this.contentArea = null;
     }
+    getSubjectName() {
+      if (this.isSelf) {
+        return typeof Player !== "undefined" ? Player.Name || "Player" : "Player";
+      }
+      return this.target?.Name || (typeof this.target?.MemberNumber === "number" ? `Member #${this.target.MemberNumber}` : "Target");
+    }
     createRootUI() {
       this.cleanup();
+      const subjectName = this.getSubjectName();
       const backdrop = document.createElement("div");
       backdrop.style.cssText = `
             position: fixed;
@@ -8358,17 +7866,17 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
             align-items: center;
             z-index: 100;
             color: #e0e6ed;
-            font-family: inherit;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             box-sizing: border-box;
             user-select: none;
         `;
       const container = document.createElement("div");
       container.style.cssText = `
             width: ${getRelativeWidth(1800)}px;
-            height: ${getRelativeHeight(880)}px;
+            height: ${getRelativeHeight(900)}px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
             box-sizing: border-box;
         `;
       const header = document.createElement("div");
@@ -8377,12 +7885,17 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
             align-items: center;
             justify-content: space-between;
             padding-bottom: 12px;
-            border-bottom: 1px solid rgba(80, 100, 140, 0.4);
+            border-bottom: 1px solid rgba(80, 100, 140, 0.35);
         `;
-      const titleText = document.createElement("div");
-      titleText.style.cssText = "font-size: calc(6px * var(--size-unit, 4px)); font-weight: bold; color: #64b5f6; letter-spacing: 1px;";
-      const targetName = this.target?.Name || `Member #${this.target?.MemberNumber}`;
-      titleText.textContent = this.isSelf ? `${MOD_NAME} \u2022 My Addons & Policy Manager` : `${MOD_NAME} \u2022 Inspecting ${targetName}`;
+      const titleBox = document.createElement("div");
+      titleBox.innerHTML = `
+            <div style="font-size: 22px; font-weight: bold; color: #64b5f6;">
+                Quality of Club \u2022 ${this.isSelf ? subjectName : `Inspecting ${subjectName}`}
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-top: 2px;">
+                ${this.isSelf ? "Manage your loaded addons, locked rules, authority roles, and permissions." : `Remote inspector and authority manager for ${subjectName}.`}
+            </div>
+        `;
       const backBtn = document.createElement("button");
       backBtn.textContent = "\u2715 Close";
       backBtn.style.cssText = `
@@ -8390,43 +7903,39 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
             background: rgba(220, 50, 50, 0.85);
             border: 1px solid #ef5350;
             color: white;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
             transition: background 0.15s ease;
         `;
       backBtn.addEventListener("click", () => this.exit());
-      header.appendChild(titleText);
+      header.appendChild(titleBox);
       header.appendChild(backBtn);
       container.appendChild(header);
       const tabBar = document.createElement("div");
-      tabBar.style.cssText = `
-            display: flex;
-            gap: 12px;
-        `;
-      const tabs = this.isSelf ? [
-        { id: "addons", label: "\u{1F4E6} My Loaded Addons" },
-        { id: "rules", label: "\u{1F6E1}\uFE0F Rules on Me & Compliance" },
-        { id: "settings", label: "\u2699\uFE0F Consent & Preferences" }
-      ] : [
-        { id: "target_addons", label: "\u{1F4E6} Inspected Addons" },
-        { id: "enforce_rules", label: "\u{1F512} Enforce Rules" }
+      tabBar.style.cssText = "display: flex; gap: 10px; flex-wrap: wrap;";
+      const tabs = [
+        { id: "addons", label: "\u{1F4E6} Addons & Compliance" },
+        { id: "rules", label: "\u{1F512} Enforce Rules" },
+        { id: "roles", label: "\u{1F451} Role Management" },
+        { id: "permissions", label: "\u{1F6E1}\uFE0F Permission Settings" },
+        { id: "settings", label: "\u2699\uFE0F Preferences" }
       ];
       tabs.forEach((tab) => {
+        const isSelected = this.activeTab === tab.id;
         const tabBtn = document.createElement("button");
         tabBtn.textContent = tab.label;
-        const isSelected = this.activeTab === tab.id;
         tabBtn.style.cssText = `
-                padding: 10px 22px;
+                padding: 10px 20px;
                 border-radius: 6px;
-                font-size: 14px;
+                font-size: 13.5px;
                 font-weight: bold;
                 cursor: pointer;
                 background: ${isSelected ? "#1976d2" : "rgba(45, 55, 75, 0.8)"};
                 border: 1px solid ${isSelected ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
                 color: ${isSelected ? "white" : "#90a4ae"};
-                transition: background 0.15s ease;
+                transition: all 0.15s ease;
             `;
         tabBtn.addEventListener("click", () => {
           this.activeTab = tab.id;
@@ -8446,7 +7955,7 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 16px;
             box-sizing: border-box;
         `;
       container.appendChild(contentArea);
@@ -8455,229 +7964,6 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       this.rootElement = backdrop;
       this.contentArea = contentArea;
     }
-    renderTabContent() {
-      if (!this.contentArea) return;
-      this.contentArea.innerHTML = "";
-      if (this.isSelf) {
-        if (this.activeTab === "addons") this.renderSelfAddons();
-        else if (this.activeTab === "rules") this.renderSelfRules();
-        else if (this.activeTab === "settings") this.renderSelfSettings();
-      } else {
-        if (this.activeTab === "target_addons") this.renderTargetAddons();
-        else if (this.activeTab === "enforce_rules") this.renderTargetRules();
-      }
-    }
-    // ==========================================
-    // SELF TAB RENDERING
-    // ==========================================
-    renderSelfAddons() {
-      if (!this.contentArea) return;
-      this.contentArea.innerHTML = "";
-      const loadedMods = getLoadedMods();
-      const countHeader = document.createElement("div");
-      countHeader.style.cssText = "font-size: 16px; font-weight: bold; color: #90caf9; margin-bottom: 6px;";
-      countHeader.textContent = `Detected Addons in Current Session (${loadedMods.length})`;
-      this.contentArea.appendChild(countHeader);
-      if (loadedMods.length === 0) {
-        const empty = document.createElement("div");
-        empty.style.cssText = "color: #90a4ae; padding: 20px;";
-        empty.textContent = "No external addons detected in this browser session.";
-        this.contentArea.appendChild(empty);
-        return;
-      }
-      for (const mod of loadedMods) {
-        const card = document.createElement("div");
-        card.style.cssText = `
-                background: rgba(35, 43, 60, 0.85);
-                border: 1px solid rgba(80, 100, 140, 0.4);
-                border-radius: 6px;
-                padding: 12px 18px;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-            `;
-        const left = document.createElement("div");
-        left.innerHTML = `
-                <div style="font-size: 16px; font-weight: bold; color: #64b5f6;">${mod.name}</div>
-                <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">ID: ${mod.id}${mod.repository ? ` \u2022 Repo: ${mod.repository}` : ""}</div>
-            `;
-        const right = document.createElement("div");
-        right.style.cssText = "display: flex; gap: 10px;";
-        right.innerHTML = `
-                <span style="background: rgba(41, 121, 255, 0.2); border: 1px solid #2979ff; color: #82b1ff; padding: 4px 10px; border-radius: 4px; font-size: 12px;">v${mod.version || "1.0.0"}</span>
-                <span style="background: rgba(46, 125, 50, 0.25); border: 1px solid #4caf50; color: #81c784; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">ACTIVE</span>
-            `;
-        card.appendChild(left);
-        card.appendChild(right);
-        this.contentArea.appendChild(card);
-      }
-    }
-    renderSelfRules() {
-      if (!this.contentArea) return;
-      this.contentArea.innerHTML = "";
-      const loadedMods = getLoadedMods();
-      const rules = modStorage.inspector.rules;
-      const compliance = checkComplianceAgainstRules(loadedMods, rules);
-      const banner = document.createElement("div");
-      banner.style.cssText = `
-            padding: 14px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: bold;
-            background: ${compliance.isCompliant ? "rgba(46, 125, 50, 0.25)" : "rgba(198, 40, 40, 0.3)"};
-            border: 1px solid ${compliance.isCompliant ? "#4caf50" : "#ef5350"};
-            color: ${compliance.isCompliant ? "#a5d6a7" : "#ffcdd2"};
-            margin-bottom: 10px;
-        `;
-      banner.textContent = compliance.isCompliant ? "\u2713 COMPLIANT: All mandatory addons are loaded, and no forbidden addons are detected." : `\u26A0\uFE0F NON-COMPLIANT: ${compliance.missing.length} missing mandatory addons, ${compliance.forbidden.length} forbidden addons detected.`;
-      this.contentArea.appendChild(banner);
-      const countHeader = document.createElement("div");
-      countHeader.style.cssText = "font-size: 16px; font-weight: bold; color: #90caf9;";
-      countHeader.textContent = `Active Addon Policies on You (${rules.length})`;
-      this.contentArea.appendChild(countHeader);
-      if (rules.length === 0) {
-        const empty = document.createElement("div");
-        empty.style.cssText = "color: #90a4ae; padding: 20px;";
-        empty.textContent = "No mandatory or forbidden addon rules are currently placed on you.";
-        this.contentArea.appendChild(empty);
-        return;
-      }
-      for (const rule of rules) {
-        const card = document.createElement("div");
-        const isMandatory = rule.type === "required";
-        card.style.cssText = `
-                background: rgba(35, 43, 60, 0.85);
-                border-left: 5px solid ${isMandatory ? "#4caf50" : "#ef5350"};
-                border: 1px solid rgba(80, 100, 140, 0.4);
-                border-radius: 6px;
-                padding: 12px 18px;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-            `;
-        const left = document.createElement("div");
-        left.innerHTML = `
-                <div style="font-size: 16px; font-weight: bold;">${rule.modName}</div>
-                <div style="font-size: 12px; color: #8fa0b5;">Enforced by: Member #${rule.enforcedBy}${rule.enforcedByName ? ` (${rule.enforcedByName})` : ""}</div>
-            `;
-        const badge = document.createElement("span");
-        badge.style.cssText = `
-                background: ${isMandatory ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"};
-                color: ${isMandatory ? "#81c784" : "#e57373"};
-                border: 1px solid ${isMandatory ? "#4caf50" : "#f44336"};
-                padding: 5px 12px;
-                border-radius: 4px;
-                font-size: 12px;
-                font-weight: bold;
-            `;
-        badge.textContent = isMandatory ? "MANDATORY" : "FORBIDDEN";
-        card.appendChild(left);
-        card.appendChild(badge);
-        this.contentArea.appendChild(card);
-      }
-    }
-    renderSelfSettings() {
-      if (!this.contentArea) return;
-      this.contentArea.innerHTML = "";
-      const container = document.createElement("div");
-      container.style.cssText = "display: flex; flex-direction: column; gap: 20px;";
-      const canEditAutoLoad = checkPermissionAccess("rules_edit_autoload_mode");
-      const autoLoadSection = document.createElement("div");
-      autoLoadSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 18px;";
-      autoLoadSection.innerHTML = `
-            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
-                Mandatory Addon Auto-Injection Behavior
-            </div>
-            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 14px;">
-                Choose how Quality of Club acts when entering a room or checking compliance if a mandatory addon is missing.
-            </div>
-        `;
-      const autoModes = [
-        { mode: "Prompt", label: "Prompt First (Recommended)", desc: "Prompts you with a confirmation dialog before loading missing addons." },
-        { mode: "Silent", label: "Silent Auto-Injection", desc: "Silently auto-injects missing mandatory scripts automatically in the background." }
-      ];
-      const autoRow = document.createElement("div");
-      autoRow.style.cssText = "display: flex; flex-direction: column; gap: 10px;";
-      autoModes.forEach((m) => {
-        const isSel = modStorage.inspector.autoLoadMode === m.mode;
-        const btn = document.createElement("button");
-        btn.disabled = !canEditAutoLoad;
-        btn.style.cssText = `
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 12px 18px;
-                border-radius: 6px;
-                background: ${isSel ? "rgba(25, 118, 210, 0.3)" : "rgba(45, 55, 75, 0.7)"};
-                border: 1px solid ${isSel ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
-                color: ${isSel ? "#90caf9" : "#cfd8dc"};
-                cursor: ${canEditAutoLoad ? "pointer" : "not-allowed"};
-                text-align: left;
-                transition: all 0.15s ease;
-            `;
-        btn.innerHTML = `
-                <div>
-                    <div style="font-size: 14px; font-weight: bold;">${isSel ? "\u25CF " : "\u25CB "}${m.label}</div>
-                    <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">${m.desc}</div>
-                </div>
-            `;
-        btn.addEventListener("click", () => {
-          if (!canEditAutoLoad) return;
-          modStorage.inspector.autoLoadMode = m.mode;
-          saveStorage();
-          syncStorage();
-          this.renderTabContent();
-        });
-        autoRow.appendChild(btn);
-      });
-      autoLoadSection.appendChild(autoRow);
-      if (!canEditAutoLoad) {
-        const lockMsg = document.createElement("div");
-        lockMsg.style.cssText = "color: #ef5350; font-size: 12px; margin-top: 10px; font-weight: bold;";
-        lockMsg.textContent = "\u{1F512} Auto-Load modification is restricted by your Owner / Mistress.";
-        autoLoadSection.appendChild(lockMsg);
-      }
-      container.appendChild(autoLoadSection);
-      const authSection = document.createElement("div");
-      authSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 18px;";
-      authSection.innerHTML = `
-            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
-                Authority & Addon Policy Settings
-            </div>
-            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 14px;">
-                Addon inspection permissions, mandatory/forbidden rule enforcement, and Owner/Mistress lists are managed in the Authority system.
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; background: rgba(20, 26, 38, 0.6); padding: 12px 16px; border-radius: 6px; border: 1px solid rgba(80, 100, 140, 0.3); margin-bottom: 16px;">
-                <div><span style="color: #90a4ae;">Inspect Addons:</span> <b>${ACCESS_LEVEL_NAMES[modStorage.authority.permissions.inspect_view_addons?.min ?? 7 /* public */]}</b></div>
-                <div><span style="color: #90a4ae;">Lock Mandatory Rules:</span> <b>${ACCESS_LEVEL_NAMES[modStorage.authority.permissions.rules_lock_mandatory?.min ?? 2 /* owner */]}</b></div>
-                <div><span style="color: #90a4ae;">Lock Forbidden Rules:</span> <b>${ACCESS_LEVEL_NAMES[modStorage.authority.permissions.rules_lock_forbidden?.min ?? 2 /* owner */]}</b></div>
-                <div><span style="color: #90a4ae;">Remove / Reset Rules:</span> <b>${ACCESS_LEVEL_NAMES[modStorage.authority.permissions.rules_remove_rules?.min ?? 2 /* owner */]}</b></div>
-            </div>
-        `;
-      const openAuthBtn = document.createElement("button");
-      openAuthBtn.textContent = "\u{1F6E1}\uFE0F Open Authority & Role Management Subscreen";
-      openAuthBtn.style.cssText = `
-            padding: 12px 24px;
-            background: #1976d2;
-            border: 1px solid #42a5f5;
-            color: white;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.15s ease;
-        `;
-      openAuthBtn.addEventListener("click", () => {
-        this.cleanup();
-        setSubscreen(new AuthoritySubscreen());
-      });
-      authSection.appendChild(openAuthBtn);
-      container.appendChild(authSection);
-      this.contentArea.appendChild(container);
-    }
-    // ==========================================
-    // TARGET TAB RENDERING
-    // ==========================================
     async loadTargetData() {
       if (!this.target || typeof this.target.MemberNumber !== "number") {
         this.errorMessage = "Invalid target character.";
@@ -8697,28 +7983,59 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       }
       this.renderTabContent();
     }
-    renderTargetAddons() {
+    renderTabContent() {
       if (!this.contentArea) return;
       this.contentArea.innerHTML = "";
-      if (this.isLoading) {
-        this.contentArea.innerHTML = "<div style='font-size: 16px; color: #64b5f6; padding: 20px;'>Querying target player's Quality of Club manifest...</div>";
+      if (!this.isSelf && this.isLoading) {
+        this.contentArea.innerHTML = "<div style='font-size: 16px; color: #64b5f6; padding: 24px; text-align: center;'>Querying Quality of Club manifest and authority from target player...</div>";
         return;
       }
-      if (this.errorMessage) {
+      if (!this.isSelf && this.errorMessage) {
         this.contentArea.innerHTML = `
-                <div style='font-size: 15px; color: #ef5350; padding: 15px;'>Inspection Error: ${this.errorMessage}</div>
-                <button id='zc-retry-inspect' style='padding: 8px 18px; border-radius: 4px; background: #1976d2; color: white; border: none; font-weight: bold; width: fit-content; cursor: pointer;'>Retry Inspection</button>
+                <div style='font-size: 15px; color: #ef5350; padding: 18px; background: rgba(239, 83, 80, 0.1); border: 1px solid #ef5350; border-radius: 6px;'>
+                    Inspection Error: ${this.errorMessage}
+                </div>
+                <button id='zc-retry-inspect' style='padding: 10px 22px; border-radius: 6px; background: #1976d2; color: white; border: none; font-weight: bold; width: fit-content; cursor: pointer; margin-top: 10px;'>
+                    \u{1F504} Retry Inspection
+                </button>
             `;
         const retry = this.contentArea.querySelector("#zc-retry-inspect");
         retry?.addEventListener("click", () => this.loadTargetData());
         return;
       }
-      const mods = this.targetData?.mods || [];
-      const rules = this.targetData?.rules || [];
+      switch (this.activeTab) {
+        case "addons":
+          this.renderAddonsTab();
+          break;
+        case "rules":
+          this.renderRulesTab();
+          break;
+        case "roles":
+          this.renderRolesTab();
+          break;
+        case "permissions":
+          this.renderPermissionsTab();
+          break;
+        case "settings":
+          this.renderSettingsTab();
+          break;
+        default:
+          this.renderAddonsTab();
+          break;
+      }
+    }
+    // ==========================================
+    // TAB 1: ADDONS & COMPLIANCE
+    // ==========================================
+    renderAddonsTab() {
+      if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
+      const mods = this.isSelf ? getLoadedMods() : this.targetData?.mods || [];
+      const rules = this.isSelf ? modStorage.inspector.rules : this.targetData?.rules || [];
       const compliance = checkComplianceAgainstRules(mods, rules);
       const banner = document.createElement("div");
       banner.style.cssText = `
-            padding: 12px 18px;
+            padding: 14px 20px;
             border-radius: 6px;
             font-size: 14px;
             font-weight: bold;
@@ -8727,82 +8044,132 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
             color: ${compliance.isCompliant ? "#a5d6a7" : "#ffcdd2"};
             margin-bottom: 8px;
         `;
-      banner.textContent = compliance.isCompliant ? "\u2713 COMPLIANT: Player meets all active addon rules." : `\u26A0\uFE0F NON-COMPLIANT: ${compliance.missing.length} missing mandatory addons, ${compliance.forbidden.length} forbidden addons detected.`;
+      banner.textContent = compliance.isCompliant ? "\u2713 COMPLIANT: Player meets all active addon rules." : `\u26A0\uFE0F NON-COMPLIANT: ${compliance.missing.length} missing mandatory addon(s), ${compliance.forbidden.length} forbidden addon(s) detected.`;
       this.contentArea.appendChild(banner);
+      if (mods.length === 0) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "color: #90a4ae; padding: 24px; text-align: center;";
+        empty.textContent = "No external addons detected in session.";
+        this.contentArea.appendChild(empty);
+        return;
+      }
       for (const mod of mods) {
         const card = document.createElement("div");
         card.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;";
         card.innerHTML = `
                 <div>
-                    <div style="font-size: 16px; font-weight: bold; color: #64b5f6;">${mod.name}</div>
-                    <div style="font-size: 12px; color: #8fa0b5;">ID: ${mod.id}${mod.repository ? ` \u2022 Repo: ${mod.repository}` : ""}</div>
+                    <div style="font-size: 15px; font-weight: bold; color: #64b5f6;">${mod.name}</div>
+                    <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">ID: ${mod.id}${mod.repository ? ` \u2022 Repo: ${mod.repository}` : ""}</div>
                 </div>
-                <span style="background: rgba(41, 121, 255, 0.2); border: 1px solid #2979ff; color: #82b1ff; padding: 4px 10px; border-radius: 4px; font-size: 12px;">v${mod.version || "Active"}</span>
+                <span style="background: rgba(41, 121, 255, 0.2); border: 1px solid #2979ff; color: #82b1ff; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                    v${mod.version || "Active"}
+                </span>
             `;
         this.contentArea.appendChild(card);
       }
     }
-    renderTargetRules() {
+    // ==========================================
+    // TAB 2: ENFORCE RULES
+    // ==========================================
+    renderRulesTab() {
       if (!this.contentArea) return;
       this.contentArea.innerHTML = "";
-      const canEnforce = this.target && hasRuleAuthorityOver(this.target);
-      if (!canEnforce) {
-        this.contentArea.innerHTML = "<div style='font-size: 15px; color: #ffa726; padding: 20px;'>Permission Restricted: Only an Owner (or Lover/Whitelisted partner if enabled by target) can set locked addon rules.</div>";
+      if (this.isSelf) {
+        const rules = modStorage.inspector.rules;
+        if (rules.length === 0) {
+          this.contentArea.innerHTML = `
+                    <div style="padding: 24px; text-align: center; color: #90a4ae;">
+                        No addon rules are currently locked on you. Your Dominant(s) can set mandatory or forbidden rules via their inspector.
+                    </div>
+                `;
+          return;
+        }
+        for (const rule of rules) {
+          const isMandatory = rule.type === "required";
+          const card = document.createElement("div");
+          card.style.cssText = `
+                    background: rgba(35, 43, 60, 0.85);
+                    border-left: 5px solid ${isMandatory ? "#4caf50" : "#ef5350"};
+                    border: 1px solid rgba(80, 100, 140, 0.4);
+                    border-radius: 6px;
+                    padding: 12px 18px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                `;
+          card.innerHTML = `
+                    <div>
+                        <div style="font-size: 15px; font-weight: bold; color: #e0e6ed;">${rule.modName}</div>
+                        <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">Enforced by: Member #${rule.enforcedBy}${rule.enforcedByName ? ` (${rule.enforcedByName})` : ""}</div>
+                    </div>
+                    <span style="background: ${isMandatory ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMandatory ? "#81c784" : "#e57373"}; border: 1px solid ${isMandatory ? "#4caf50" : "#f44336"}; padding: 5px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                        ${isMandatory ? "MANDATORY" : "FORBIDDEN"}
+                    </span>
+                `;
+          this.contentArea.appendChild(card);
+        }
         return;
       }
+      const canMandatory = this.targetData?.callerPermissions?.rules_lock_mandatory ?? false;
+      const canForbidden = this.targetData?.callerPermissions?.rules_lock_forbidden ?? false;
+      const canRemove = this.targetData?.callerPermissions?.rules_remove_rules ?? false;
       const curatedList = Object.values(CURATED_MOD_CATALOG);
       for (const item of curatedList) {
         const row = document.createElement("div");
         row.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;";
         const left = document.createElement("div");
         left.innerHTML = `
-                <div style="font-size: 16px; font-weight: bold; color: #64b5f6;">${item.name}</div>
-                <div style="font-size: 12px; color: #8fa0b5;">${item.description}</div>
+                <div style="font-size: 15px; font-weight: bold; color: #64b5f6;">${item.name}</div>
+                <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">${item.description}</div>
             `;
         const existingRule = this.targetRulesCopy.find((r) => r.modId === item.id);
         const currentState = existingRule ? existingRule.type : "none";
         const btnGroup = document.createElement("div");
         btnGroup.style.cssText = "display: flex; gap: 8px;";
-        const createChoiceBtn = (state, label, color) => {
+        const createChoiceBtn = (state, label, color, enabled) => {
           const b = document.createElement("button");
           b.textContent = label;
+          b.disabled = !enabled;
           const isSelected = currentState === state;
           b.style.cssText = `
-                    padding: 6px 14px;
+                    padding: 7px 16px;
                     border-radius: 4px;
                     font-size: 13px;
                     font-weight: ${isSelected ? "bold" : "normal"};
-                    cursor: pointer;
+                    cursor: ${enabled ? "pointer" : "not-allowed"};
                     background: ${isSelected ? color : "rgba(60, 70, 90, 0.4)"};
                     border: 1px solid ${isSelected ? color : "rgba(100, 120, 150, 0.4)"};
                     color: ${isSelected ? "white" : "#b0bec5"};
+                    opacity: ${enabled ? "1" : "0.5"};
+                    transition: all 0.15s ease;
                 `;
           b.addEventListener("click", () => {
+            if (!enabled) return;
             this.targetRulesCopy = this.targetRulesCopy.filter((r) => r.modId !== item.id);
             if (state !== "none") {
               this.targetRulesCopy.push({
                 modId: item.id,
                 modName: item.name,
                 type: state,
-                enforcedBy: Player.MemberNumber,
-                enforcedByName: Player.Name,
+                enforcedBy: typeof Player !== "undefined" ? Player.MemberNumber || 0 : 0,
+                enforcedByName: typeof Player !== "undefined" ? Player.Name : void 0,
                 enforcedAt: Date.now()
               });
             }
-            this.renderTargetRules();
+            this.renderRulesTab();
           });
           return b;
         };
-        btnGroup.appendChild(createChoiceBtn("none", "Neutral", "#78909c"));
-        btnGroup.appendChild(createChoiceBtn("required", "Mandatory", "#2e7d32"));
-        btnGroup.appendChild(createChoiceBtn("forbidden", "Forbidden", "#c62828"));
+        btnGroup.appendChild(createChoiceBtn("none", "Neutral", "#78909c", canRemove));
+        btnGroup.appendChild(createChoiceBtn("required", "Mandatory", "#2e7d32", canMandatory));
+        btnGroup.appendChild(createChoiceBtn("forbidden", "Forbidden", "#c62828", canForbidden));
         row.appendChild(left);
         row.appendChild(btnGroup);
         this.contentArea.appendChild(row);
       }
       const saveBtn = document.createElement("button");
       saveBtn.textContent = "\u{1F4BE} Save & Sync Rules to Target";
-      saveBtn.style.cssText = "padding: 12px 24px; border-radius: 6px; background: #2e7d32; border: 1px solid #4caf50; color: white; font-weight: bold; font-size: 15px; cursor: pointer; width: fit-content; margin-top: 10px;";
+      saveBtn.style.cssText = "padding: 12px 28px; border-radius: 6px; background: #2e7d32; border: 1px solid #4caf50; color: white; font-weight: bold; font-size: 15px; cursor: pointer; width: fit-content; margin-top: 10px;";
       saveBtn.addEventListener("click", async () => {
         if (!this.target || typeof this.target.MemberNumber !== "number") return;
         toastsManager.info({
@@ -8812,9 +8179,9 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
         });
         const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
         if (res.success) {
-          modStorage.managedRules[this.target.MemberNumber] = structuredClone(this.targetRulesCopy);
-          saveStorage();
-          syncStorage();
+          if (this.targetData) {
+            this.targetData.rules = structuredClone(this.targetRulesCopy);
+          }
           toastsManager.success({
             title: `${MOD_NAME} Rules Synced`,
             message: "Addon rules successfully locked on target!",
@@ -8829,6 +8196,669 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
         }
       });
       this.contentArea.appendChild(saveBtn);
+    }
+    // ==========================================
+    // TAB 3: ROLE MANAGEMENT
+    // ==========================================
+    renderRolesTab() {
+      if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
+      const subjectName = this.getSubjectName();
+      const authority = this.isSelf ? modStorage.authority : this.targetData?.authority || { owners: [], mistresses: [], permissions: structuredClone(DEFAULT_PERMISSIONS) };
+      const canEditRoles = this.isSelf ? checkPermissionAccess("authority_edit_roles") : this.targetData?.callerPermissions?.authority_edit_roles ?? false;
+      const topRow = document.createElement("div");
+      topRow.style.cssText = "display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;";
+      const leftCol = document.createElement("div");
+      leftCol.style.cssText = "flex: 1; display: flex; flex-direction: column; gap: 16px;";
+      const addCard = document.createElement("div");
+      addCard.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 18px;";
+      addCard.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
+                Assign Custom Dominant Roles for ${subjectName}
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 14px;">
+                Enter a player's Member Number to grant them custom Owner or Mistress authority in Quality of Club.
+            </div>
+        `;
+      const inputRow = document.createElement("div");
+      inputRow.style.cssText = "display: flex; align-items: center; gap: 12px; flex-wrap: wrap;";
+      const numInput = document.createElement("input");
+      numInput.type = "number";
+      numInput.placeholder = "Member Number";
+      numInput.disabled = !canEditRoles;
+      numInput.style.cssText = `
+            padding: 8px 14px;
+            background: rgba(20, 26, 38, 0.9);
+            border: 1px solid rgba(80, 100, 140, 0.5);
+            color: white;
+            font-size: 14px;
+            border-radius: 6px;
+            width: 180px;
+        `;
+      const addOwnerBtn = document.createElement("button");
+      addOwnerBtn.textContent = "Add as Owner";
+      addOwnerBtn.disabled = !canEditRoles;
+      addOwnerBtn.style.cssText = `
+            padding: 9px 18px;
+            background: ${canEditRoles ? "#1976d2" : "#455a64"};
+            border: 1px solid #42a5f5;
+            color: white;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: ${canEditRoles ? "pointer" : "not-allowed"};
+        `;
+      addOwnerBtn.addEventListener("click", async () => {
+        const val = parseInt(numInput.value.trim(), 10);
+        if (!val) return;
+        if (this.isSelf) {
+          const res = addRoleMember("owner", val);
+          if (res.success) {
+            numInput.value = "";
+            this.renderRolesTab();
+          } else {
+            alert(res.message);
+          }
+        } else if (this.target && typeof this.target.MemberNumber === "number") {
+          const res = await requestUpdateAuthority(this.target.MemberNumber, { action: "add_role", role: "owner", memberNumber: val });
+          if (res.success && res.data?.authority) {
+            this.targetData.authority = res.data.authority;
+            numInput.value = "";
+            this.renderRolesTab();
+          } else {
+            alert(res.error || "Failed to add role.");
+          }
+        }
+      });
+      const addMistressBtn = document.createElement("button");
+      addMistressBtn.textContent = "Add as Mistress";
+      addMistressBtn.disabled = !canEditRoles;
+      addMistressBtn.style.cssText = `
+            padding: 9px 18px;
+            background: ${canEditRoles ? "#7b1fa2" : "#455a64"};
+            border: 1px solid #ba68c8;
+            color: white;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: ${canEditRoles ? "pointer" : "not-allowed"};
+        `;
+      addMistressBtn.addEventListener("click", async () => {
+        const val = parseInt(numInput.value.trim(), 10);
+        if (!val) return;
+        if (this.isSelf) {
+          const res = addRoleMember("mistress", val);
+          if (res.success) {
+            numInput.value = "";
+            this.renderRolesTab();
+          } else {
+            alert(res.message);
+          }
+        } else if (this.target && typeof this.target.MemberNumber === "number") {
+          const res = await requestUpdateAuthority(this.target.MemberNumber, { action: "add_role", role: "mistress", memberNumber: val });
+          if (res.success && res.data?.authority) {
+            this.targetData.authority = res.data.authority;
+            numInput.value = "";
+            this.renderRolesTab();
+          } else {
+            alert(res.error || "Failed to add role.");
+          }
+        }
+      });
+      inputRow.appendChild(numInput);
+      inputRow.appendChild(addOwnerBtn);
+      inputRow.appendChild(addMistressBtn);
+      addCard.appendChild(inputRow);
+      if (!canEditRoles) {
+        const lockNotice = document.createElement("div");
+        lockNotice.style.cssText = "color: #ef5350; font-size: 12px; margin-top: 8px; font-weight: bold;";
+        lockNotice.textContent = "\u{1F512} Role editing is restricted by authority settings.";
+        addCard.appendChild(lockNotice);
+      }
+      leftCol.appendChild(addCard);
+      const listsCard = document.createElement("div");
+      listsCard.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 14px;";
+      const ownersHeader = document.createElement("div");
+      ownersHeader.innerHTML = `<span style="font-weight: bold; color: #64b5f6; font-size: 15px;">QoC Owners (${authority.owners.length})</span>`;
+      listsCard.appendChild(ownersHeader);
+      const ownersBox = document.createElement("div");
+      ownersBox.style.cssText = "display: flex; flex-wrap: wrap; gap: 8px;";
+      if (authority.owners.length === 0) {
+        ownersBox.innerHTML = "<span style='color: #8fa0b5; font-size: 13px;'>No custom owners assigned.</span>";
+      } else {
+        authority.owners.forEach((id) => {
+          const tag = document.createElement("div");
+          tag.style.cssText = "display: flex; align-items: center; gap: 8px; background: rgba(25, 118, 210, 0.3); border: 1px solid #42a5f5; padding: 4px 12px; border-radius: 4px; font-size: 13px;";
+          tag.innerHTML = `<span>Member #${id}</span>`;
+          if (canEditRoles) {
+            const rm = document.createElement("button");
+            rm.textContent = "\u2715";
+            rm.style.cssText = "background: none; border: none; color: #ef5350; cursor: pointer; font-weight: bold; font-size: 14px; margin-left: 4px;";
+            rm.addEventListener("click", async () => {
+              if (this.isSelf) {
+                removeRoleMember("owner", id);
+                this.renderRolesTab();
+              } else if (this.target && typeof this.target.MemberNumber === "number") {
+                const res = await requestUpdateAuthority(this.target.MemberNumber, { action: "remove_role", role: "owner", memberNumber: id });
+                if (res.success && res.data?.authority) {
+                  this.targetData.authority = res.data.authority;
+                  this.renderRolesTab();
+                }
+              }
+            });
+            tag.appendChild(rm);
+          }
+          ownersBox.appendChild(tag);
+        });
+      }
+      listsCard.appendChild(ownersBox);
+      const mistressHeader = document.createElement("div");
+      mistressHeader.style.cssText = "margin-top: 10px;";
+      mistressHeader.innerHTML = `<span style="font-weight: bold; color: #ba68c8; font-size: 15px;">QoC Mistresses (${authority.mistresses.length})</span>`;
+      listsCard.appendChild(mistressHeader);
+      const mistressBox = document.createElement("div");
+      mistressBox.style.cssText = "display: flex; flex-wrap: wrap; gap: 8px;";
+      if (authority.mistresses.length === 0) {
+        mistressBox.innerHTML = "<span style='color: #8fa0b5; font-size: 13px;'>No custom mistresses assigned.</span>";
+      } else {
+        authority.mistresses.forEach((id) => {
+          const tag = document.createElement("div");
+          tag.style.cssText = "display: flex; align-items: center; gap: 8px; background: rgba(123, 31, 162, 0.3); border: 1px solid #ba68c8; padding: 4px 12px; border-radius: 4px; font-size: 13px;";
+          tag.innerHTML = `<span>Member #${id}</span>`;
+          if (canEditRoles) {
+            const rm = document.createElement("button");
+            rm.textContent = "\u2715";
+            rm.style.cssText = "background: none; border: none; color: #ef5350; cursor: pointer; font-weight: bold; font-size: 14px; margin-left: 4px;";
+            rm.addEventListener("click", async () => {
+              if (this.isSelf) {
+                removeRoleMember("mistress", id);
+                this.renderRolesTab();
+              } else if (this.target && typeof this.target.MemberNumber === "number") {
+                const res = await requestUpdateAuthority(this.target.MemberNumber, { action: "remove_role", role: "mistress", memberNumber: id });
+                if (res.success && res.data?.authority) {
+                  this.targetData.authority = res.data.authority;
+                  this.renderRolesTab();
+                }
+              }
+            });
+            tag.appendChild(rm);
+          }
+          mistressBox.appendChild(tag);
+        });
+      }
+      listsCard.appendChild(mistressBox);
+      leftCol.appendChild(listsCard);
+      topRow.appendChild(leftCol);
+      const rightCol = document.createElement("div");
+      rightCol.style.cssText = "width: 280px; display: flex; flex-direction: column; align-items: center; background: rgba(30, 36, 48, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
+      const pyramidTitle = document.createElement("div");
+      pyramidTitle.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 16px; text-align: center;";
+      pyramidTitle.textContent = "Hierarchy of Roles";
+      rightCol.appendChild(pyramidTitle);
+      const rolesList = [
+        { name: subjectName, color: "#00e5ff", width: 140 },
+        { name: "Clubowner", color: "#e0e6ed", width: 150 },
+        { name: "Owner", color: "#e0e6ed", width: 160 },
+        { name: "Lover", color: "#e0e6ed", width: 170 },
+        { name: "Mistress", color: "#e0e6ed", width: 180 },
+        { name: "Whitelist", color: "#e0e6ed", width: 190 },
+        { name: "Friend", color: "#e0e6ed", width: 200 },
+        { name: "Public", color: "#e0e6ed", width: 210 }
+      ];
+      rolesList.forEach((r, idx) => {
+        const block = document.createElement("div");
+        block.style.cssText = `
+                width: ${r.width}px;
+                padding: 6px 0;
+                margin-bottom: 4px;
+                background: ${idx === 0 ? "rgba(0, 229, 255, 0.15)" : "rgba(45, 55, 75, 0.8)"};
+                border: 1px solid ${idx === 0 ? "#00e5ff" : "rgba(80, 100, 140, 0.4)"};
+                color: ${r.color};
+                font-size: 13px;
+                font-weight: bold;
+                text-align: center;
+                border-radius: 4px;
+            `;
+        block.textContent = r.name;
+        rightCol.appendChild(block);
+        if (idx < rolesList.length - 1) {
+          const arrow = document.createElement("div");
+          arrow.style.cssText = "font-size: 10px; color: #607d8b; line-height: 10px; margin: -2px 0 2px 0;";
+          arrow.textContent = "\u25BC";
+          rightCol.appendChild(arrow);
+        }
+      });
+      topRow.appendChild(rightCol);
+      this.contentArea.appendChild(topRow);
+    }
+    // ==========================================
+    // TAB 4: PERMISSION SETTINGS
+    // ==========================================
+    renderPermissionsTab() {
+      if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
+      const subjectName = this.getSubjectName();
+      const canEditMin = this.isSelf ? checkPermissionAccess("authority_edit_min_role") : this.targetData?.callerPermissions?.authority_edit_min_role ?? false;
+      const canEditSelf = this.isSelf ? checkPermissionAccess("authority_edit_self_access") : this.targetData?.callerPermissions?.authority_edit_self_access ?? false;
+      const filterBar = document.createElement("div");
+      filterBar.style.cssText = "display: flex; align-items: center; gap: 12px; margin-bottom: 4px;";
+      const filterLabel = document.createElement("span");
+      filterLabel.textContent = "Filter:";
+      filterLabel.style.cssText = "font-weight: bold; color: #90a4ae; font-size: 14px;";
+      const filterInput = document.createElement("input");
+      filterInput.type = "text";
+      filterInput.placeholder = "Search permission by name or description...";
+      filterInput.value = this.permissionFilter;
+      filterInput.style.cssText = `
+            flex: 1;
+            padding: 8px 14px;
+            background: rgba(20, 26, 38, 0.9);
+            border: 1px solid rgba(80, 100, 140, 0.4);
+            color: white;
+            font-size: 14px;
+            border-radius: 6px;
+        `;
+      filterInput.addEventListener("input", () => {
+        this.permissionFilter = filterInput.value.toLowerCase().trim();
+        this.updatePermissionsList(listContainer, subjectName, canEditMin, canEditSelf);
+      });
+      filterBar.appendChild(filterLabel);
+      filterBar.appendChild(filterInput);
+      this.contentArea.appendChild(filterBar);
+      const headerRow = document.createElement("div");
+      headerRow.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: rgba(30, 36, 48, 0.6);
+            border-bottom: 2px solid rgba(80, 100, 140, 0.4);
+            font-weight: bold;
+            font-size: 13px;
+            color: #90caf9;
+        `;
+      headerRow.innerHTML = `
+            <div style="flex: 1;">Permission Name & Scope</div>
+            <div style="display: flex; align-items: center; gap: 40px; padding-right: 20px;">
+                <span style="min-width: 150px; text-align: center;">${subjectName} is permitted</span>
+                <span style="min-width: 160px; text-align: center;">Lowest permitted role</span>
+            </div>
+        `;
+      this.contentArea.appendChild(headerRow);
+      const listContainer = document.createElement("div");
+      listContainer.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
+      this.contentArea.appendChild(listContainer);
+      this.updatePermissionsList(listContainer, subjectName, canEditMin, canEditSelf);
+    }
+    updatePermissionsList(container, subjectName, canEditMin, canEditSelf) {
+      container.innerHTML = "";
+      const authority = this.isSelf ? modStorage.authority : this.targetData?.authority || { owners: [], mistresses: [], permissions: structuredClone(DEFAULT_PERMISSIONS) };
+      const filtered = PERMISSION_DEFINITIONS.filter((def) => {
+        if (!this.permissionFilter) return true;
+        return def.name.toLowerCase().includes(this.permissionFilter) || def.description.toLowerCase().includes(this.permissionFilter);
+      });
+      if (filtered.length === 0) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "color: #90a4ae; padding: 24px; text-align: center;";
+        empty.textContent = "No matching permissions found.";
+        container.appendChild(empty);
+        return;
+      }
+      filtered.forEach((def) => {
+        const currentSetting = authority.permissions[def.key] || { self: true, min: 2 /* owner */ };
+        const row = document.createElement("div");
+        row.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 16px;
+                background: rgba(35, 43, 60, 0.85);
+                border: 1px solid rgba(80, 100, 140, 0.35);
+                border-radius: 6px;
+                gap: 16px;
+                transition: background 0.15s ease;
+            `;
+        const left = document.createElement("div");
+        left.style.cssText = "flex: 1; display: flex; align-items: center; gap: 12px;";
+        left.innerHTML = `
+                <span style="font-size: 18px;">\u{1F512}</span>
+                <div>
+                    <div style="font-size: 15px; font-weight: bold; color: #e0e6ed;">${def.name}</div>
+                    <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">${def.description}</div>
+                </div>
+            `;
+        const right = document.createElement("div");
+        right.style.cssText = "display: flex; align-items: center; gap: 40px; padding-right: 10px;";
+        const selfBoxContainer = document.createElement("div");
+        selfBoxContainer.style.cssText = "min-width: 150px; display: flex; justify-content: center;";
+        const selfCheckbox = document.createElement("input");
+        selfCheckbox.type = "checkbox";
+        selfCheckbox.checked = currentSetting.self;
+        selfCheckbox.disabled = !canEditSelf;
+        selfCheckbox.style.cssText = `
+                width: 22px;
+                height: 22px;
+                cursor: ${canEditSelf ? "pointer" : "not-allowed"};
+                accent-color: #1976d2;
+            `;
+        selfCheckbox.addEventListener("change", async () => {
+          const newVal = selfCheckbox.checked;
+          if (this.isSelf) {
+            if (!newVal && (def.key === "authority_edit_self_access" || def.key === "authority_edit_min_role")) {
+              const ok = confirm(`\u26A0\uFE0F Surrendering Self-Access:
+
+Are you sure you want to disable your own access to "${def.name}"?
+
+You will lose the ability to modify or reclaim this permission yourself \u2014 only an authorized Owner or Mistress will be able to restore it.`);
+              if (!ok) {
+                selfCheckbox.checked = true;
+                return;
+              }
+            }
+            setPermissionSelfAccess(def.key, newVal);
+            this.updatePermissionsList(container, subjectName, canEditMin, canEditSelf);
+          } else if (this.target && typeof this.target.MemberNumber === "number") {
+            const res = await requestUpdateAuthority(this.target.MemberNumber, { action: "set_self_access", perm: def.key, selfAllowed: newVal });
+            if (res.success && res.data?.authority) {
+              this.targetData.authority = res.data.authority;
+              this.updatePermissionsList(container, subjectName, canEditMin, canEditSelf);
+            } else {
+              selfCheckbox.checked = !newVal;
+              alert(res.error || "Failed to update target's self access.");
+            }
+          }
+        });
+        selfBoxContainer.appendChild(selfCheckbox);
+        const roleBtnContainer = document.createElement("div");
+        roleBtnContainer.style.cssText = "min-width: 160px; display: flex; justify-content: center;";
+        const roleBtn = document.createElement("button");
+        roleBtn.textContent = ACCESS_LEVEL_NAMES[currentSetting.min];
+        roleBtn.disabled = !canEditMin;
+        roleBtn.style.cssText = `
+                padding: 8px 18px;
+                width: 130px;
+                text-align: center;
+                background: ${currentSetting.min === 0 /* self */ ? "#00838f" : currentSetting.min <= 4 /* mistress */ ? "#1565c0" : "#455a64"};
+                border: 1px solid ${canEditMin ? "#42a5f5" : "#607d8b"};
+                color: white;
+                font-size: 13px;
+                font-weight: bold;
+                border-radius: 4px;
+                cursor: ${canEditMin ? "pointer" : "not-allowed"};
+                transition: all 0.15s ease;
+            `;
+        roleBtn.addEventListener("click", () => {
+          if (canEditMin) {
+            this.openRoleSelectorModal(def, currentSetting.min, subjectName);
+          }
+        });
+        roleBtnContainer.appendChild(roleBtn);
+        right.appendChild(selfBoxContainer);
+        right.appendChild(roleBtnContainer);
+        row.appendChild(left);
+        row.appendChild(right);
+        container.appendChild(row);
+      });
+    }
+    // ==========================================
+    // ROLE SELECTION MODAL
+    // ==========================================
+    openRoleSelectorModal(def, currentMin, subjectName) {
+      if (this.modalElement) this.modalElement.remove();
+      let selectedRole = currentMin;
+      const modalBackdrop = document.createElement("div");
+      modalBackdrop.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            user-select: none;
+        `;
+      const dialog = document.createElement("div");
+      dialog.style.cssText = `
+            width: min(90vw, 850px);
+            background: #191f2b;
+            border: 2px solid #64b5f6;
+            border-radius: 8px;
+            padding: 28px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            color: #e0e6ed;
+            box-sizing: border-box;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        `;
+      dialog.innerHTML = `
+            <div style="font-size: 18px; font-weight: bold; color: #64b5f6; border-bottom: 1px solid rgba(80,100,140,0.3); padding-bottom: 8px;">
+                Authority: Changing minimum access to "${def.name}" for ${subjectName}
+            </div>
+            <div style="font-size: 14px; text-align: center; color: #cfd8dc; margin-top: 4px;">
+                Please select the new lowest role that should still have this permission.
+            </div>
+            <div id="qoc-role-info" style="font-size: 13px; text-align: center; color: #90a4ae;">
+                Currently set role: <b>${ACCESS_LEVEL_NAMES[currentMin]}</b> &nbsp;\u2192&nbsp; Newly selected role: <b id="qoc-selected-label" style="color: #64b5f6;">${ACCESS_LEVEL_NAMES[selectedRole]}</b>
+            </div>
+            <div style="font-size: 12px; text-align: center; color: #78909c;">
+                All roles to the left of the selected one will also automatically get access.
+            </div>
+        `;
+      const chainContainer = document.createElement("div");
+      chainContainer.style.cssText = "display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 10px 0;";
+      const selfBtn = document.createElement("button");
+      selfBtn.textContent = subjectName;
+      selfBtn.style.cssText = `
+            padding: 10px 28px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            background: ${selectedRole === 0 /* self */ ? "#00e5ff" : "rgba(45, 55, 75, 0.8)"};
+            border: 1px solid #00e5ff;
+            color: ${selectedRole === 0 /* self */ ? "black" : "#00e5ff"};
+            transition: all 0.15s ease;
+        `;
+      selfBtn.addEventListener("click", () => {
+        selectedRole = 0 /* self */;
+        updateSelection();
+      });
+      chainContainer.appendChild(selfBtn);
+      const lowerRow = document.createElement("div");
+      lowerRow.style.cssText = "display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px;";
+      const chainRoles = [
+        1 /* clubowner */,
+        2 /* owner */,
+        3 /* lover */,
+        4 /* mistress */,
+        5 /* whitelist */,
+        6 /* friend */,
+        7 /* public */
+      ];
+      const roleButtons = [];
+      chainRoles.forEach((lvl, idx) => {
+        const b = document.createElement("button");
+        b.textContent = ACCESS_LEVEL_NAMES[lvl];
+        b.style.cssText = `
+                padding: 8px 14px;
+                font-size: 13px;
+                font-weight: bold;
+                cursor: pointer;
+                border-radius: 4px;
+                background: ${selectedRole === lvl ? "#1976d2" : "rgba(45, 55, 75, 0.8)"};
+                border: 1px solid ${selectedRole === lvl ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
+                color: ${selectedRole === lvl ? "white" : "#cfd8dc"};
+                transition: all 0.15s ease;
+            `;
+        b.addEventListener("click", () => {
+          selectedRole = lvl;
+          updateSelection();
+        });
+        roleButtons.push({ level: lvl, btn: b });
+        lowerRow.appendChild(b);
+        if (idx < chainRoles.length - 1) {
+          const separator = document.createElement("span");
+          separator.textContent = ">";
+          separator.style.cssText = "color: #78909c; font-weight: bold; font-size: 14px;";
+          lowerRow.appendChild(separator);
+        }
+      });
+      chainContainer.appendChild(lowerRow);
+      dialog.appendChild(chainContainer);
+      const updateSelection = () => {
+        const labelEl = dialog.querySelector("#qoc-selected-label");
+        if (labelEl) labelEl.textContent = ACCESS_LEVEL_NAMES[selectedRole];
+        selfBtn.style.background = selectedRole === 0 /* self */ ? "#00e5ff" : "rgba(45, 55, 75, 0.8)";
+        selfBtn.style.color = selectedRole === 0 /* self */ ? "black" : "#00e5ff";
+        roleButtons.forEach((r) => {
+          const isMatch = r.level === selectedRole;
+          r.btn.style.background = isMatch ? "#1976d2" : "rgba(45, 55, 75, 0.8)";
+          r.btn.style.borderColor = isMatch ? "#42a5f5" : "rgba(80, 100, 140, 0.4)";
+          r.btn.style.color = isMatch ? "white" : "#cfd8dc";
+        });
+      };
+      const actionRow = document.createElement("div");
+      actionRow.style.cssText = "display: flex; justify-content: center; gap: 16px; margin-top: 10px;";
+      const confirmBtn = document.createElement("button");
+      confirmBtn.textContent = "Confirm";
+      confirmBtn.style.cssText = `
+            padding: 10px 32px;
+            background: #2e7d32;
+            border: 1px solid #4caf50;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        `;
+      confirmBtn.addEventListener("click", async () => {
+        if (this.isSelf) {
+          setPermissionMinRole(def.key, selectedRole);
+          modalBackdrop.remove();
+          this.modalElement = null;
+          this.renderPermissionsTab();
+        } else if (this.target && typeof this.target.MemberNumber === "number") {
+          const res = await requestUpdateAuthority(this.target.MemberNumber, { action: "set_min_role", perm: def.key, minRole: selectedRole });
+          if (res.success && res.data?.authority) {
+            this.targetData.authority = res.data.authority;
+            modalBackdrop.remove();
+            this.modalElement = null;
+            this.renderPermissionsTab();
+          } else {
+            alert(res.error || "Failed to update minimum role on target.");
+          }
+        }
+      });
+      const cancelBtn = document.createElement("button");
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.style.cssText = `
+            padding: 10px 32px;
+            background: rgba(60, 70, 90, 0.8);
+            border: 1px solid rgba(80, 100, 140, 0.5);
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        `;
+      cancelBtn.addEventListener("click", () => {
+        modalBackdrop.remove();
+        this.modalElement = null;
+      });
+      actionRow.appendChild(confirmBtn);
+      actionRow.appendChild(cancelBtn);
+      dialog.appendChild(actionRow);
+      modalBackdrop.appendChild(dialog);
+      document.body.appendChild(modalBackdrop);
+      this.modalElement = modalBackdrop;
+    }
+    // ==========================================
+    // TAB 5: PREFERENCES (Auto-Load Behavior)
+    // ==========================================
+    renderSettingsTab() {
+      if (!this.contentArea) return;
+      this.contentArea.innerHTML = "";
+      const subjectName = this.getSubjectName();
+      const canEditAutoLoad = this.isSelf ? checkPermissionAccess("rules_edit_autoload_mode") : this.targetData?.callerPermissions?.rules_edit_autoload_mode ?? false;
+      const currentMode = this.isSelf ? modStorage.inspector.autoLoadMode : this.targetData?.autoLoadMode || "Prompt";
+      const container = document.createElement("div");
+      container.style.cssText = "display: flex; flex-direction: column; gap: 20px;";
+      const autoLoadSection = document.createElement("div");
+      autoLoadSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
+      autoLoadSection.innerHTML = `
+            <div style="font-size: 16px; font-weight: bold; color: #64b5f6; margin-bottom: 6px;">
+                Mandatory Addon Auto-Injection Behavior for ${subjectName}
+            </div>
+            <div style="font-size: 13px; color: #90a4ae; margin-bottom: 16px;">
+                Configure how Quality of Club acts when entering a room or checking compliance if a mandatory addon is missing.
+            </div>
+        `;
+      const autoModes = [
+        { mode: "Prompt", label: "Prompt First (Recommended)", desc: "Prompts with a confirmation dialog before injecting missing addons." },
+        { mode: "Silent", label: "Silent Auto-Injection", desc: "Silently auto-injects missing mandatory scripts automatically in the background." }
+      ];
+      const autoRow = document.createElement("div");
+      autoRow.style.cssText = "display: flex; flex-direction: column; gap: 10px;";
+      autoModes.forEach((m) => {
+        const isSel = currentMode === m.mode;
+        const btn = document.createElement("button");
+        btn.disabled = !canEditAutoLoad;
+        btn.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 14px 20px;
+                border-radius: 6px;
+                background: ${isSel ? "rgba(25, 118, 210, 0.3)" : "rgba(45, 55, 75, 0.7)"};
+                border: 1px solid ${isSel ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
+                color: ${isSel ? "#90caf9" : "#cfd8dc"};
+                cursor: ${canEditAutoLoad ? "pointer" : "not-allowed"};
+                text-align: left;
+                transition: all 0.15s ease;
+            `;
+        btn.innerHTML = `
+                <div>
+                    <div style="font-size: 15px; font-weight: bold;">${isSel ? "\u25CF " : "\u25CB "}${m.label}</div>
+                    <div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${m.desc}</div>
+                </div>
+            `;
+        btn.addEventListener("click", async () => {
+          if (!canEditAutoLoad) return;
+          if (this.isSelf) {
+            modStorage.inspector.autoLoadMode = m.mode;
+            saveStorage();
+            syncStorage();
+            this.renderSettingsTab();
+          } else if (this.target && typeof this.target.MemberNumber === "number") {
+            const res = await requestUpdateAuthority(this.target.MemberNumber, { action: "set_autoload_mode", autoLoadMode: m.mode });
+            if (res.success) {
+              this.targetData.autoLoadMode = m.mode;
+              this.renderSettingsTab();
+            } else {
+              alert(res.error || "Failed to update auto-load mode on target.");
+            }
+          }
+        });
+        autoRow.appendChild(btn);
+      });
+      autoLoadSection.appendChild(autoRow);
+      if (!canEditAutoLoad) {
+        const lockMsg = document.createElement("div");
+        lockMsg.style.cssText = "color: #ef5350; font-size: 12px; margin-top: 12px; font-weight: bold;";
+        lockMsg.textContent = "\u{1F512} Auto-Load modification is restricted by authority settings.";
+        autoLoadSection.appendChild(lockMsg);
+      }
+      container.appendChild(autoLoadSection);
+      this.contentArea.appendChild(container);
+    }
+  };
+
+  // src/subscreens/authoritySubscreen.ts
+  var AuthoritySubscreen = class extends InspectorSubscreen {
+    constructor(target = null) {
+      super(target || (typeof Player !== "undefined" ? Player : null), "roles");
     }
   };
 

@@ -1,10 +1,10 @@
 import { messagesManager } from "zois-core/messaging";
 import { toastsManager } from "zois-core/toasts";
 import { hookFunction, HookPriority } from "zois-core/mod-sdk";
-import { modStorage, syncStorage, ModRule, QoCPermission } from "./storage";
+import { modStorage, syncStorage, saveStorage, ModRule, QoCPermission, AuthorityData, AccessLevel, AutoLoadMode } from "./storage";
 import { DetectedMod, getLoadedMods } from "./modDetection";
 import { evaluateCompliance, checkComplianceAgainstRules } from "./compliance";
-import { checkPermissionAccess, getCharacterAccessLevel } from "./authority";
+import { checkPermissionAccess, getCharacterAccessLevel, addRoleMember, removeRoleMember, setPermissionMinRole, setPermissionSelfAccess } from "./authority";
 import { version } from "../../package.json";
 import { MOD_NAME, MOD_KEY } from "src/constants";
 
@@ -13,12 +13,54 @@ export interface InspectResponseData {
     reason?: string;
     mods?: DetectedMod[];
     rules?: ModRule[];
+    autoLoadMode?: AutoLoadMode;
+    authority?: AuthorityData;
+    callerAccessLevel?: AccessLevel;
+    callerPermissions?: Record<QoCPermission, boolean>;
     version?: string;
 }
 
 export interface SetRulesResponseData {
     success: boolean;
     reason?: string;
+}
+
+export interface AuthorityUpdateRequest {
+    action: "add_role" | "remove_role" | "set_min_role" | "set_self_access" | "set_autoload_mode";
+    role?: "owner" | "mistress";
+    memberNumber?: number;
+    perm?: QoCPermission;
+    minRole?: AccessLevel;
+    selfAllowed?: boolean;
+    autoLoadMode?: AutoLoadMode;
+}
+
+export interface AuthorityUpdateResponseData {
+    success: boolean;
+    reason?: string;
+    authority?: AuthorityData;
+    autoLoadMode?: AutoLoadMode;
+}
+
+function getCallerPermissions(senderId: number): Record<QoCPermission, boolean> {
+    const perms: QoCPermission[] = [
+        "authority_edit_roles",
+        "authority_edit_min_role",
+        "authority_edit_self_access",
+        "inspect_view_addons",
+        "inspect_view_rules",
+        "rules_lock_mandatory",
+        "rules_lock_forbidden",
+        "rules_remove_rules",
+        "rules_edit_autoload_mode",
+        "rules_force_compliance",
+        "menu_open_settings"
+    ];
+    const res: Record<string, boolean> = {};
+    for (const p of perms) {
+        res[p] = checkPermissionAccess(p, senderId);
+    }
+    return res as Record<QoCPermission, boolean>;
 }
 
 /**
@@ -122,6 +164,10 @@ export function initNetworkSync(): void {
                     allowed: true,
                     mods: getLoadedMods(),
                     rules: modStorage.inspector.rules,
+                    autoLoadMode: modStorage.inspector.autoLoadMode,
+                    authority: modStorage.authority,
+                    callerAccessLevel: getCharacterAccessLevel(senderId),
+                    callerPermissions: getCallerPermissions(senderId),
                     version
                 } : {
                     allowed: false,
@@ -168,6 +214,54 @@ export function initNetworkSync(): void {
                 }, senderId);
                 return;
             }
+
+            // Incoming Authority & Permissions Update
+            if (dictData.message === "qoc_updateAuthority") {
+                const req = dictData.data as AuthorityUpdateRequest;
+                let resData: AuthorityUpdateResponseData;
+
+                if (!req || typeof req.action !== "string") {
+                    resData = { success: false, reason: "Invalid request format." };
+                } else if (req.action === "add_role") {
+                    const res = addRoleMember(req.role!, req.memberNumber!, senderId);
+                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+                } else if (req.action === "remove_role") {
+                    const res = removeRoleMember(req.role!, req.memberNumber!, senderId);
+                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+                } else if (req.action === "set_min_role") {
+                    const res = setPermissionMinRole(req.perm!, req.minRole!, senderId);
+                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+                } else if (req.action === "set_self_access") {
+                    const res = setPermissionSelfAccess(req.perm!, req.selfAllowed!, senderId);
+                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+                } else if (req.action === "set_autoload_mode") {
+                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+                        resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
+                    } else {
+                        modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
+                        saveStorage();
+                        syncStorage();
+                        resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
+                    }
+                } else {
+                    resData = { success: false, reason: "Unknown action." };
+                }
+
+                if (resData.success) {
+                    toastsManager.info({
+                        title: `${MOD_NAME} Authority Updated`,
+                        message: `Authority updated by ${senderName}.`,
+                        duration: 4000
+                    });
+                }
+
+                messagesManager.sendPacket("requestResponse", {
+                    requestId: dictData.requestId,
+                    message: dictData.message,
+                    data: resData
+                }, senderId);
+                return;
+            }
         }
 
         // Silent Telemetry Packet from Submissive
@@ -209,6 +303,10 @@ export function initNetworkSync(): void {
 
         if (data && data.type === `${MOD_KEY}_request` && typeof data.requestId === "string") {
             const senderId = beep.MemberNumber;
+            const senderChar = typeof Character !== "undefined" && typeof Character.find === "function"
+                ? Character.find((c: Character) => c.MemberNumber === senderId)
+                : null;
+            const senderName = senderChar?.Name || `Member #${senderId}`;
 
             if (data.message === "qoc_inspect") {
                 const permCheck = canSenderInspect(senderId);
@@ -216,6 +314,10 @@ export function initNetworkSync(): void {
                     allowed: true,
                     mods: getLoadedMods(),
                     rules: modStorage.inspector.rules,
+                    autoLoadMode: modStorage.inspector.autoLoadMode,
+                    authority: modStorage.authority,
+                    callerAccessLevel: getCharacterAccessLevel(senderId),
+                    callerPermissions: getCallerPermissions(senderId),
                     version
                 } : {
                     allowed: false,
@@ -249,6 +351,54 @@ export function initNetworkSync(): void {
                     requestId: data.requestId,
                     message: data.message,
                     data: responseData
+                }, senderId);
+                return;
+            }
+
+            if (data.message === "qoc_updateAuthority") {
+                const req = data.data as AuthorityUpdateRequest;
+                let resData: AuthorityUpdateResponseData;
+
+                if (!req || typeof req.action !== "string") {
+                    resData = { success: false, reason: "Invalid request format." };
+                } else if (req.action === "add_role") {
+                    const res = addRoleMember(req.role!, req.memberNumber!, senderId);
+                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+                } else if (req.action === "remove_role") {
+                    const res = removeRoleMember(req.role!, req.memberNumber!, senderId);
+                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+                } else if (req.action === "set_min_role") {
+                    const res = setPermissionMinRole(req.perm!, req.minRole!, senderId);
+                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+                } else if (req.action === "set_self_access") {
+                    const res = setPermissionSelfAccess(req.perm!, req.selfAllowed!, senderId);
+                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+                } else if (req.action === "set_autoload_mode") {
+                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+                        resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
+                    } else {
+                        modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
+                        saveStorage();
+                        syncStorage();
+                        resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
+                    }
+                } else {
+                    resData = { success: false, reason: "Unknown action." };
+                }
+
+                if (resData.success) {
+                    toastsManager.info({
+                        title: `${MOD_NAME} Authority Updated`,
+                        message: `Authority updated by ${senderName}.`,
+                        duration: 4000
+                    });
+                }
+
+                messagesManager.sendBeep({
+                    type: `${MOD_KEY}_requestResponse`,
+                    requestId: data.requestId,
+                    message: data.message,
+                    data: resData
                 }, senderId);
                 return;
             }
@@ -360,6 +510,53 @@ export async function requestSetRules(targetMemberNumber: number, rules: ModRule
         return {
             success: false,
             error: err?.message || "Failed to send rule update to target."
+        };
+    }
+}
+
+/**
+ * Sends a request to update a target player's authority settings (roles, permissions, auto-load).
+ */
+export async function requestUpdateAuthority(targetMemberNumber: number, update: AuthorityUpdateRequest): Promise<{ success: boolean; data?: AuthorityUpdateResponseData; error?: string }> {
+    try {
+        let res = await messagesManager.sendRequest<AuthorityUpdateResponseData>({
+            message: "qoc_updateAuthority",
+            data: update,
+            target: targetMemberNumber,
+            type: "packet"
+        });
+
+        if (res.isError || !res.data) {
+            res = await messagesManager.sendRequest<AuthorityUpdateResponseData>({
+                message: "qoc_updateAuthority",
+                data: update,
+                target: targetMemberNumber,
+                type: "beep"
+            });
+        }
+
+        if (res.isError || !res.data) {
+            return {
+                success: false,
+                error: "Target player did not respond. Quality of Club may not be running on their client."
+            };
+        }
+
+        if (!res.data.success) {
+            return {
+                success: false,
+                error: res.data.reason || "Target rejected authority update."
+            };
+        }
+
+        return {
+            success: true,
+            data: res.data
+        };
+    } catch (err: any) {
+        return {
+            success: false,
+            error: err?.message || "Failed to transmit authority update."
         };
     }
 }
