@@ -4267,7 +4267,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.12";
+  var version2 = "1.0.13";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -5006,7 +5006,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
       name: "Bondage Club Extended (BCX)",
       description: "Rules, curses, statistics, extended room tools",
       scriptUrl: "https://jomshir98.github.io/bondage-club-extended/bcx.js",
-      detectKeys: ["bcx", "bondage club extended", "bondage-club-extended"],
+      detectKeys: ["bcx", "bondage club extended", "bondage-club-extended", "bondage club extended (bcx)"],
       repositoryMatch: "jomshir98/bondage-club-extended"
     },
     LSCG: {
@@ -5077,31 +5077,39 @@ One of mods you are using is using an old version of SDK. It will work for now b
     const mName = (mod.name || "").toLowerCase().trim();
     const mFull = (mod.fullName || "").toLowerCase().trim();
     const mRepo = (mod.repository || "").toLowerCase().trim();
-    const clean = (s) => s.replace(/[^a-z0-9]/g, "");
+    const clean = (s) => (s || "").toLowerCase().replace(/[\s\-_()[\]{}.,:;!?'"\/\\~`@#$%^&*+=<>]/g, "");
+    const cleanMId = clean(mId);
+    const cleanMName = clean(mName);
+    const cleanMFull = clean(mFull);
     if (curated) {
-      if (mId === curated.id.toLowerCase() || clean(mId) === clean(curated.id)) return true;
-      if (clean(mName) === clean(curated.id)) return true;
+      const curatedId = (curated.id || "").toLowerCase().trim();
+      const cleanCuratedId = clean(curated.id);
+      if (curatedId && (mId === curatedId || cleanCuratedId && cleanMId === cleanCuratedId)) return true;
+      if (cleanCuratedId && cleanMName === cleanCuratedId) return true;
       if (curated.repositoryMatch && mRepo && mRepo.includes(curated.repositoryMatch.toLowerCase())) {
         return true;
       }
-      const cleanCuratedId = clean(curated.id);
-      for (const rawKey of curated.detectKeys) {
-        const key = rawKey.toLowerCase().trim();
-        const cleanKey = clean(key);
-        if (mId === key || mName === key || mFull === key) return true;
-        if (clean(mId) === cleanKey || clean(mName) === cleanKey || clean(mFull) === cleanKey) return true;
-        if (key.includes(" ") || key.includes("-")) {
-          const strippedName = mName.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim();
-          const strippedFull = mFull.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim();
-          if (clean(strippedName) === cleanKey || clean(strippedFull) === cleanKey) return true;
-          if (clean(strippedName).startsWith(cleanKey) && clean(strippedName).includes(cleanCuratedId)) return true;
+      if (Array.isArray(curated.detectKeys)) {
+        for (const rawKey of curated.detectKeys) {
+          const key = (rawKey || "").toLowerCase().trim();
+          const cleanKey = clean(key);
+          if (!cleanKey) continue;
+          if (mId === key || mName === key || mFull === key) return true;
+          if (cleanMId === cleanKey || cleanMName === cleanKey || cleanMFull === cleanKey) return true;
+          const strippedName = clean(mName.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim());
+          const strippedFull = clean(mFull.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim());
+          if (strippedName && strippedName === cleanKey) return true;
+          if (strippedFull && strippedFull === cleanKey) return true;
         }
       }
       return false;
     }
     const target = (typeof identifierOrCurated === "string" ? identifierOrCurated : "").toLowerCase().trim();
     if (!target) return false;
-    return mId === target || mName === target || mFull === target || clean(mId) === clean(target) || clean(mName) === clean(target);
+    const cleanTarget = clean(target);
+    if (mId === target || mName === target || mFull === target) return true;
+    if (cleanTarget && (cleanMId === cleanTarget || cleanMName === cleanTarget || cleanMFull === cleanTarget)) return true;
+    return false;
   }
   function getLoadedMods() {
     const modsMap = /* @__PURE__ */ new Map();
@@ -5134,7 +5142,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
       if (typeof win.HTMLElement !== "undefined" && obj instanceof win.HTMLElement) return false;
       return true;
     };
-    const hasBcx = win.BCX_Loaded === true || typeof win.BCX_Loaded !== "undefined" && win.BCX_Loaded !== false || isRealGlobalObject(win.bcx) && typeof win.bcx.getApi === "function";
+    const hasBcx = win.BCX_Loaded === true || isRealGlobalObject(win.bcx) && (typeof win.bcx.getModApi === "function" || typeof win.bcx.inBcxSubscreen === "function");
     if (hasBcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
       modsMap.set("bcx", {
         id: "BCX",
@@ -5213,14 +5221,24 @@ One of mods you are using is using an old version of SDK. It will work for now b
       try {
         console.log(`[QoC] Injecting verified mod script for ${mod.name}: ${mod.scriptUrl}`);
         const script = document.createElement("script");
-        script.src = mod.scriptUrl;
+        const scriptUrl = mod.scriptUrl.includes("?") ? `${mod.scriptUrl}&_=${Date.now()}` : `${mod.scriptUrl}?_=${Date.now()}`;
+        script.src = scriptUrl;
+        script.crossOrigin = "anonymous";
         script.async = true;
         script.onload = () => {
           console.log(`[QoC] Successfully loaded ${mod.name}`);
+          try {
+            script.remove();
+          } catch (_) {
+          }
           resolve(true);
         };
         script.onerror = (err) => {
           console.error(`[QoC] Failed to load ${mod.name}:`, err);
+          try {
+            script.remove();
+          } catch (_) {
+          }
           resolve(false);
         };
         document.head.appendChild(script);
@@ -5382,6 +5400,10 @@ One of mods you are using is using an old version of SDK. It will work for now b
                   message: `Successfully loaded ${curated.name}!`,
                   duration: 4e3
                 });
+                if (isModLoaded(rule.modId) || isModLoaded(rule.modName)) {
+                  const idx = missingRequired.indexOf(rule);
+                  if (idx !== -1) missingRequired.splice(idx, 1);
+                }
               }
             } else if (modStorage.inspector.autoLoadMode === "Prompt") {
               if (!promptedMods.has(curated.id)) {
@@ -5393,15 +5415,18 @@ One of mods you are using is using an old version of SDK. It will work for now b
                   }).then(async (ok) => {
                     if (ok) {
                       await loadCuratedMod(curated.id);
+                      evaluateCompliance();
                     }
                   }).catch(async () => {
                     if (typeof window !== "undefined" && window.confirm(promptMsg)) {
                       await loadCuratedMod(curated.id);
+                      evaluateCompliance();
                     }
                   });
                 } catch {
                   if (typeof window !== "undefined" && window.confirm(promptMsg)) {
                     await loadCuratedMod(curated.id);
+                    evaluateCompliance();
                   }
                 }
               }
@@ -7653,8 +7678,8 @@ One of mods you are using is using an old version of SDK. It will work for now b
     const intervalSec = modStorage.inspector.evaluationInterval;
     if (intervalSec && intervalSec > 0) {
       periodicComplianceTimer = setInterval(() => {
+        evaluateCompliance();
         if (typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
-          evaluateCompliance();
           if (modStorage.inspector.silentTelemetry) {
             sendSilentRoomTelemetry();
           }
@@ -8442,6 +8467,13 @@ One of mods you are using is using an old version of SDK. It will work for now b
       const mods = this.isSelf ? getLoadedMods() : this.targetData?.mods || [];
       const rules = this.isSelf ? modStorage.inspector.rules : this.targetRulesCopy.length > 0 ? this.targetRulesCopy : this.targetData?.rules || [];
       const compliance = checkComplianceAgainstRules(mods, rules);
+      if (this.isSelf && compliance.hasRules && compliance.missing.length > 0 && modStorage.inspector.autoLoadMode === "Silent") {
+        evaluateCompliance().then((rep) => {
+          if (rep.isCompliant && this.activeTab === "addons") {
+            this.renderAddonsTab();
+          }
+        });
+      }
       if (canViewRules) {
         const banner = document.createElement("div");
         if (!compliance.hasRules) {
