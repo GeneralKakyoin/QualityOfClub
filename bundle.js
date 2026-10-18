@@ -4270,7 +4270,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.19";
+  var version2 = "1.0.20";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -6543,9 +6543,12 @@ One of mods you are using is using an old version of SDK. It will work for now b
       details
     };
   }
+  var lastRoomAlertTimes = /* @__PURE__ */ new Map();
   var lockoutElement = null;
   function triggerLockoutOverlay(rule) {
-    if (lockoutElement && document.body.contains(lockoutElement)) {
+    const existing = document.getElementById("qoc-lockout-overlay");
+    if (existing) {
+      lockoutElement = existing;
       return;
     }
     const overlay = document.createElement("div");
@@ -6556,45 +6559,56 @@ One of mods you are using is using an old version of SDK. It will work for now b
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: rgba(18, 5, 8, 0.96);
-        z-index: 100000;
+        background: rgba(15, 6, 9, 0.96);
+        backdrop-filter: blur(8px);
+        z-index: 2147483647;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         color: #ff5252;
-        font-family: Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         text-align: center;
         padding: 40px;
         box-sizing: border-box;
         user-select: none;
+        pointer-events: auto;
     `;
+    overlay.addEventListener("mousedown", (e) => e.stopPropagation());
+    overlay.addEventListener("mouseup", (e) => e.stopPropagation());
+    overlay.addEventListener("click", (e) => e.stopPropagation());
     const enforcer = rule.enforcedByName || `Member #${rule.enforcedBy}`;
     overlay.innerHTML = `
         <div style="font-size: 72px; margin-bottom: 16px; filter: drop-shadow(0 0 20px rgba(255, 82, 82, 0.6));">\u{1F6AB}</div>
         <div style="font-size: 28px; font-weight: bold; color: #ff5252; margin-bottom: 12px; letter-spacing: 1.5px;">
             QUALITY OF CLUB POLICY VIOLATION: INTERFACE LOCKED
         </div>
-        <div style="font-size: 17px; color: #ffcdd2; max-width: 650px; line-height: 1.6; margin-bottom: 20px;">
-            You are actively running the forbidden addon: <b style="color: #ff8a80;">${rule.modName}</b>.<br>
-            Access to Bondage Club has been locked until this forbidden addon is disabled or uninstalled.
+        <div style="font-size: 17px; color: #ffcdd2; max-width: 650px; line-height: 1.6; margin-bottom: 16px;">
+            You are actively running the forbidden addon: <b style="color: #ff8a80; background: rgba(255, 82, 82, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid #ff5252;">${rule.modName}</b>.<br>
+            Game interface interaction is locked until this forbidden addon is disabled or uninstalled.
         </div>
-        <div style="font-size: 14px; color: #ef9a9a; margin-bottom: 30px;">
+        <div style="font-size: 14px; color: #ef9a9a; margin-bottom: 24px;">
             Policy enforced by: <b>${enforcer}</b>
         </div>
-        <div style="display: flex; gap: 16px;">
-            <button id="qoc-lockout-reload" style="padding: 12px 30px; background: #c62828; border: 1px solid #ff5252; color: white; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+        <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+            <button id="qoc-lockout-reload" style="padding: 12px 28px; background: #c62828; border: 1px solid #ff5252; color: white; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                 \u{1F504} Reload Game Page
             </button>
-            <button id="qoc-lockout-recheck" style="padding: 12px 30px; background: rgba(55, 71, 79, 0.9); border: 1px solid #78909c; color: white; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+            <button id="qoc-lockout-recheck" style="padding: 12px 28px; background: rgba(55, 71, 79, 0.95); border: 1px solid #78909c; color: white; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
                 \u26A1 Re-check Compliance
             </button>
         </div>
+        <div id="qoc-lockout-status" style="font-size: 13.5px; min-height: 24px; color: #ffb74d; font-weight: 500; max-width: 600px;"></div>
     `;
     overlay.querySelector("#qoc-lockout-reload")?.addEventListener("click", () => {
       window.location.reload();
     });
+    const statusEl = overlay.querySelector("#qoc-lockout-status");
     overlay.querySelector("#qoc-lockout-recheck")?.addEventListener("click", async () => {
+      if (statusEl) {
+        statusEl.style.color = "#90caf9";
+        statusEl.textContent = "\u23F3 Evaluating loaded addons...";
+      }
       const report = await evaluateCompliance();
       if (report.detectedForbidden.length === 0) {
         clearLockoutOverlay();
@@ -6604,11 +6618,11 @@ One of mods you are using is using an old version of SDK. It will work for now b
           duration: 4e3
         });
       } else {
-        toastsManager.error({
-          title: `${MOD_NAME} Still Non-Compliant`,
-          message: "Forbidden addon is still running in this session.",
-          duration: 4e3
-        });
+        if (statusEl) {
+          statusEl.style.color = "#ef5350";
+          const forbiddenNames = report.detectedForbidden.map((f) => f.modName || f.modId).join(", ");
+          statusEl.textContent = `\u274C Still non-compliant: [${forbiddenNames}] is still detected running. Disable it in your userscript manager or addons, then re-check or reload.`;
+        }
       }
     });
     document.body.appendChild(overlay);
@@ -6618,6 +6632,10 @@ One of mods you are using is using an old version of SDK. It will work for now b
     if (lockoutElement) {
       lockoutElement.remove();
       lockoutElement = null;
+    }
+    const existing = document.getElementById("qoc-lockout-overlay");
+    if (existing) {
+      existing.remove();
     }
   }
   async function evaluateCompliance() {
@@ -6717,12 +6735,24 @@ One of mods you are using is using an old version of SDK. It will work for now b
               message: `Addon '${rule.modName}' is FORBIDDEN! Public room alert announced.`,
               duration: 9e3
             });
-            if (typeof ServerSend === "function" && typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
-              const pName = typeof Player !== "undefined" ? Player.Name : "Player";
-              ServerSend("ChatRoomChat", {
-                Content: `* [${MOD_NAME} Violation] ${pName} is actively running forbidden addon '${rule.modName}'! *`,
-                Type: "Emote"
-              });
+            if (typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
+              const now = Date.now();
+              const lastSent = lastRoomAlertTimes.get(rule.modId) || 0;
+              if (now - lastSent > 45e3) {
+                lastRoomAlertTimes.set(rule.modId, now);
+                const pName = typeof Player !== "undefined" && Player.Name ? Player.Name : "Player";
+                const alertMsg = `* [${MOD_NAME} Violation] ${pName} is actively running forbidden addon '${rule.modName}'! *`;
+                if (typeof window.ChatRoomSendChat === "function") {
+                  window.ChatRoomSendChat(alertMsg);
+                } else if (typeof window.ChatRoomSendEmote === "function") {
+                  window.ChatRoomSendEmote(alertMsg);
+                } else if (typeof ServerSend === "function") {
+                  ServerSend("ChatRoomChat", {
+                    Content: alertMsg,
+                    Type: "Chat"
+                  });
+                }
+              }
             }
           } else if (violationAction === "lockout") {
             triggerLockoutOverlay(rule);
@@ -6738,7 +6768,8 @@ One of mods you are using is using an old version of SDK. It will work for now b
           }
         }
       }
-      if (detectedForbidden.length === 0) {
+      const currentAction = modStorage.inspector.violationAction || "toast";
+      if (detectedForbidden.length === 0 || currentAction !== "lockout") {
         clearLockoutOverlay();
       }
     } catch (e) {
@@ -9059,6 +9090,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
         saveStorage();
         syncStorage();
         restartPeriodicComplianceTimer();
+        evaluateCompliance();
         resData = {
           success: true,
           preferences: {
@@ -10994,6 +11026,7 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
           saveStorage();
           syncStorage();
           restartPeriodicComplianceTimer();
+          evaluateCompliance();
           toastsManager.info({ title: `${MOD_NAME} Preferences`, message: "Preferences updated.", duration: 2500 });
           this.renderSettingsTab();
         } else if (this.target && typeof this.target.MemberNumber === "number") {
