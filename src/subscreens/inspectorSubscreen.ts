@@ -14,13 +14,14 @@ import {
     AuthorityData,
     DEFAULT_PERMISSIONS
 } from "modules/storage";
-import { getLoadedMods, CURATED_MOD_CATALOG, getAllCatalogMods, DetectedMod } from "modules/modDetection";
+import { getLoadedMods, CURATED_MOD_CATALOG, getAllCatalogMods, DetectedMod, loadCuratedMod } from "modules/modDetection";
 import { checkComplianceAgainstRules, evaluateCompliance } from "modules/compliance";
 import {
     requestInspect,
     requestSetRules,
     requestUpdateAuthority,
     requestTriggerCompliance,
+    requestForceInject,
     restartPeriodicComplianceTimer,
     InspectResponseData
 } from "modules/networkSync";
@@ -460,6 +461,35 @@ export class InspectorSubscreen extends BaseSubscreen {
                     forceBtn.textContent = "⚡ Force Compliance Evaluation Now";
                 });
                 toolbar.appendChild(forceBtn);
+
+                if (!this.isSelf && compliance.missing.length > 0) {
+                    const forceInjectAllBtn = document.createElement("button");
+                    forceInjectAllBtn.textContent = `💉 Force Inject All Missing Addons (${compliance.missing.length})`;
+                    forceInjectAllBtn.style.cssText = "padding: 9px 18px; border-radius: 5px; background: rgba(76, 175, 80, 0.3); border: 1px solid #4caf50; color: #a5d6a7; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;";
+                    forceInjectAllBtn.addEventListener("click", async () => {
+                        if (!this.target || typeof this.target.MemberNumber !== "number") return;
+                        forceInjectAllBtn.disabled = true;
+                        forceInjectAllBtn.textContent = "⏳ Injecting Addons...";
+                        const res = await requestForceInject(this.target.MemberNumber, "all");
+                        if (res.success) {
+                            toastsManager.success({
+                                title: `${MOD_NAME} Injection Complete`,
+                                message: `Injected missing addons on ${subjectName}.`,
+                                duration: 5000
+                            });
+                            await this.loadTargetData();
+                        } else {
+                            toastsManager.error({
+                                title: `${MOD_NAME} Injection Failed`,
+                                message: res.error || "Failed to inject addons on target.",
+                                duration: 5000
+                            });
+                            forceInjectAllBtn.disabled = false;
+                            forceInjectAllBtn.textContent = `💉 Force Inject All Missing Addons (${compliance.missing.length})`;
+                        }
+                    });
+                    toolbar.appendChild(forceInjectAllBtn);
+                }
             }
 
             if (canRemoveRules && rules.length > 0) {
@@ -532,6 +562,66 @@ export class InspectorSubscreen extends BaseSubscreen {
                 badge.style.cssText = `background: ${isMet ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMet ? "#81c784" : "#e57373"}; border: 1px solid ${isMet ? "#4caf50" : "#f44336"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;`;
                 badge.textContent = isMet ? "MET" : "VIOLATION";
                 rightDiv.appendChild(badge);
+
+                if (isMandatory && !isMet) {
+                    if (!this.isSelf && canForceCompliance) {
+                        const forceInjectBtn = document.createElement("button");
+                        forceInjectBtn.textContent = "💉 Force Inject";
+                        forceInjectBtn.title = `Remotely force injection of ${detail.rule.modName} on ${subjectName}`;
+                        forceInjectBtn.style.cssText = "padding: 4px 10px; border-radius: 4px; background: rgba(76, 175, 80, 0.25); border: 1px solid #4caf50; color: #a5d6a7; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.15s;";
+                        forceInjectBtn.addEventListener("click", async () => {
+                            if (!this.target || typeof this.target.MemberNumber !== "number") return;
+                            forceInjectBtn.disabled = true;
+                            forceInjectBtn.textContent = "⏳ Injecting...";
+                            const res = await requestForceInject(this.target.MemberNumber, detail.rule.modId);
+                            if (res.success) {
+                                toastsManager.success({
+                                    title: `${MOD_NAME} Addon Injected`,
+                                    message: `${detail.rule.modName} injected on ${subjectName}!`,
+                                    duration: 4000
+                                });
+                                await this.loadTargetData();
+                            } else {
+                                toastsManager.error({
+                                    title: `${MOD_NAME} Injection Failed`,
+                                    message: res.error || "Target client rejected addon injection.",
+                                    duration: 4000
+                                });
+                                forceInjectBtn.disabled = false;
+                                forceInjectBtn.textContent = "💉 Force Inject";
+                            }
+                        });
+                        rightDiv.appendChild(forceInjectBtn);
+                    } else if (this.isSelf) {
+                        const injectSelfBtn = document.createElement("button");
+                        injectSelfBtn.textContent = "💉 Inject Now";
+                        injectSelfBtn.title = `Inject ${detail.rule.modName} into your session now`;
+                        injectSelfBtn.style.cssText = "padding: 4px 10px; border-radius: 4px; background: rgba(76, 175, 80, 0.25); border: 1px solid #4caf50; color: #a5d6a7; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.15s;";
+                        injectSelfBtn.addEventListener("click", async () => {
+                            injectSelfBtn.disabled = true;
+                            injectSelfBtn.textContent = "⏳ Injecting...";
+                            const ok = await loadCuratedMod(detail.rule.modId);
+                            if (ok) {
+                                toastsManager.success({
+                                    title: `${MOD_NAME} Addon Injected`,
+                                    message: `${detail.rule.modName} has been injected and activated!`,
+                                    duration: 3500
+                                });
+                                await evaluateCompliance();
+                                this.renderAddonsTab();
+                            } else {
+                                toastsManager.error({
+                                    title: `${MOD_NAME} Injection Failed`,
+                                    message: `Could not load ${detail.rule.modName}. Check URL or network console.`,
+                                    duration: 4000
+                                });
+                                injectSelfBtn.disabled = false;
+                                injectSelfBtn.textContent = "💉 Inject Now";
+                            }
+                        });
+                        rightDiv.appendChild(injectSelfBtn);
+                    }
+                }
 
                 if (canRemoveRules) {
                     const removeBtn = document.createElement("button");
@@ -1614,6 +1704,10 @@ export class InspectorSubscreen extends BaseSubscreen {
             ? (typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true)
             : (this.targetData?.preferences?.showProfileButton ?? true);
 
+        const currentAllowForcedInjection: boolean = this.isSelf
+            ? (typeof modStorage.inspector.allowForcedInjection === "boolean" ? modStorage.inspector.allowForcedInjection : false)
+            : (this.targetData?.preferences?.allowForcedInjection ?? false);
+
         const customCatalog: CuratedModInfo[] = this.isSelf
             ? (modStorage.inspector.customCatalog || [])
             : (this.targetData?.customCatalog || []);
@@ -1624,6 +1718,7 @@ export class InspectorSubscreen extends BaseSubscreen {
             evaluationInterval: number;
             silentTelemetry: boolean;
             showProfileButton: boolean;
+            allowForcedInjection: boolean;
         }>) => {
             if (!canEditPreferences) return;
 
@@ -1633,6 +1728,7 @@ export class InspectorSubscreen extends BaseSubscreen {
                 if (typeof newPref.evaluationInterval === "number") modStorage.inspector.evaluationInterval = newPref.evaluationInterval;
                 if (typeof newPref.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = newPref.silentTelemetry;
                 if (typeof newPref.showProfileButton === "boolean") modStorage.inspector.showProfileButton = newPref.showProfileButton;
+                if (typeof newPref.allowForcedInjection === "boolean") modStorage.inspector.allowForcedInjection = newPref.allowForcedInjection;
                 saveStorage();
                 syncStorage();
                 restartPeriodicComplianceTimer();
@@ -1819,6 +1915,36 @@ export class InspectorSubscreen extends BaseSubscreen {
         });
 
         autoLoadSection.appendChild(autoRow);
+
+        // Forced Addon Injection by Others Toggle
+        const forcedInjectRow = document.createElement("div");
+        forcedInjectRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding-top: 14px; margin-top: 14px; border-top: 1px solid rgba(80, 100, 140, 0.3);";
+        forcedInjectRow.innerHTML = `
+            <div>
+                <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">💉 Allow Remote Forced Addon Injection by Others</div>
+                <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">
+                    Permits authorized dominants (governed by the <b>Force Compliance & Injection</b> permission) to remotely inject missing mandatory addons on ${subjectName}, even when auto-injection is set to Prompt or Alert.
+                </div>
+            </div>
+        `;
+        const forcedInjectBtn = document.createElement("button");
+        forcedInjectBtn.disabled = !canEditPreferences;
+        forcedInjectBtn.textContent = currentAllowForcedInjection ? "✓ Enabled" : "✕ Disabled";
+        forcedInjectBtn.style.cssText = `
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: ${canEditPreferences ? "pointer" : "not-allowed"};
+            background: ${currentAllowForcedInjection ? "rgba(76, 175, 80, 0.25)" : "rgba(100, 116, 139, 0.2)"};
+            border: 1px solid ${currentAllowForcedInjection ? "#4caf50" : "#78909c"};
+            color: ${currentAllowForcedInjection ? "#81c784" : "#90a4ae"};
+            transition: all 0.15s ease;
+        `;
+        forcedInjectBtn.addEventListener("click", () => updatePref({ allowForcedInjection: !currentAllowForcedInjection }));
+        forcedInjectRow.appendChild(forcedInjectBtn);
+        autoLoadSection.appendChild(forcedInjectRow);
+
         container.appendChild(autoLoadSection);
 
         // SECTION 3: Periodic Compliance Polling & Telemetry

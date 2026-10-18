@@ -1,6 +1,6 @@
 {
   "name": "quality-of-club",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Quality of Club (QoC) - Quality of life improvements for Bondage Club",
   "main": "src/index.ts",
   "scripts": {

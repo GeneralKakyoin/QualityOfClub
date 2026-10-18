@@ -104,6 +104,7 @@ export interface QoCSettings {
         evaluationInterval: number; // seconds: 0 = manual/room sync only, 15, 30, 60
         silentTelemetry: boolean; // broadcast manifest to dominants in room
         showProfileButton: boolean; // show shield button on info sheet
+        allowForcedInjection: boolean; // allow authorized dominants to force inject missing addons
         customCatalog: CuratedModInfo[];
         rules: ModRule[];
     };
@@ -129,6 +130,7 @@ const DEFAULT_SETTINGS: QoCSettings = {
         evaluationInterval: 30,
         silentTelemetry: true,
         showProfileButton: true,
+        allowForcedInjection: false,
         customCatalog: [],
         rules: []
     },
@@ -193,7 +195,8 @@ export function loadStorage(): void {
                 autoLoadMode: loadedData.inspector?.autoLoadMode || "Prompt",
                 evaluationInterval: typeof loadedData.inspector?.evaluationInterval === "number" ? loadedData.inspector.evaluationInterval : 30,
                 silentTelemetry: typeof loadedData.inspector?.silentTelemetry === "boolean" ? loadedData.inspector.silentTelemetry : true,
-                showProfileButton: typeof loadedData.inspector?.showProfileButton === "boolean" ? loadedData.inspector.showProfileButton : true
+                showProfileButton: typeof loadedData.inspector?.showProfileButton === "boolean" ? loadedData.inspector.showProfileButton : true,
+                allowForcedInjection: typeof loadedData.inspector?.allowForcedInjection === "boolean" ? loadedData.inspector.allowForcedInjection : false
             },
             managedRules: loadedData.managedRules || {}
         };

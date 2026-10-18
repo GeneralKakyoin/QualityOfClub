@@ -4270,7 +4270,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.15";
+  var version2 = "1.0.16";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4329,6 +4329,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
       evaluationInterval: 30,
       silentTelemetry: true,
       showProfileButton: true,
+      allowForcedInjection: false,
       customCatalog: [],
       rules: []
     },
@@ -4385,7 +4386,8 @@ One of mods you are using is using an old version of SDK. It will work for now b
           autoLoadMode: loadedData.inspector?.autoLoadMode || "Prompt",
           evaluationInterval: typeof loadedData.inspector?.evaluationInterval === "number" ? loadedData.inspector.evaluationInterval : 30,
           silentTelemetry: typeof loadedData.inspector?.silentTelemetry === "boolean" ? loadedData.inspector.silentTelemetry : true,
-          showProfileButton: typeof loadedData.inspector?.showProfileButton === "boolean" ? loadedData.inspector.showProfileButton : true
+          showProfileButton: typeof loadedData.inspector?.showProfileButton === "boolean" ? loadedData.inspector.showProfileButton : true,
+          allowForcedInjection: typeof loadedData.inspector?.allowForcedInjection === "boolean" ? loadedData.inspector.allowForcedInjection : false
         },
         managedRules: loadedData.managedRules || {}
       };
@@ -8772,6 +8774,234 @@ One of mods you are using is using an old version of SDK. It will work for now b
       }, intervalSec * 1e3);
     }
   }
+  function buildInspectResponseData(senderId) {
+    const permCheck = canSenderInspect(senderId);
+    if (!permCheck.allowed) {
+      return {
+        allowed: false,
+        reason: permCheck.reason
+      };
+    }
+    return {
+      allowed: true,
+      canViewAddons: permCheck.canViewAddons,
+      canViewRules: permCheck.canViewRules,
+      mods: permCheck.canViewAddons ? getLoadedMods2() : [],
+      rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
+      autoLoadMode: modStorage.inspector.autoLoadMode,
+      preferences: {
+        violationAction: modStorage.inspector.violationAction || "toast",
+        autoLoadMode: modStorage.inspector.autoLoadMode || "Prompt",
+        evaluationInterval: typeof modStorage.inspector.evaluationInterval === "number" ? modStorage.inspector.evaluationInterval : 30,
+        silentTelemetry: typeof modStorage.inspector.silentTelemetry === "boolean" ? modStorage.inspector.silentTelemetry : true,
+        showProfileButton: typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true,
+        allowForcedInjection: typeof modStorage.inspector.allowForcedInjection === "boolean" ? modStorage.inspector.allowForcedInjection : false
+      },
+      customCatalog: modStorage.inspector.customCatalog || [],
+      authority: modStorage.authority,
+      callerAccessLevel: getCharacterAccessLevel(senderId),
+      callerPermissions: getCallerPermissions(senderId),
+      version: version2
+    };
+  }
+  function handleSetRulesRequest(senderId, senderName, newRules) {
+    const authCheck = canSenderEnforceRules(senderId, newRules);
+    if (!authCheck.allowed) {
+      return {
+        success: false,
+        reason: authCheck.reason
+      };
+    }
+    modStorage.inspector.rules = newRules;
+    syncStorage();
+    evaluateCompliance();
+    toastsManager.info({
+      title: `${MOD_NAME} Rules Updated`,
+      message: `Addon rules updated by ${senderName}.`,
+      duration: 5e3
+    });
+    return { success: true };
+  }
+  async function handleTriggerComplianceRequest(senderId, senderName) {
+    if (!checkPermissionAccess("rules_force_compliance", senderId)) {
+      return {
+        success: false,
+        reason: "Permission Denied: You do not have authority to force compliance evaluations on this player."
+      };
+    }
+    toastsManager.info({
+      title: `${MOD_NAME} Compliance Triggered`,
+      message: `${senderName} requested an immediate compliance check.`,
+      duration: 4e3
+    });
+    const report = await evaluateCompliance();
+    return {
+      success: true,
+      report: {
+        isCompliant: report.isCompliant,
+        missingCount: report.missingRequired.length,
+        forbiddenCount: report.detectedForbidden.length
+      }
+    };
+  }
+  function handleAuthorityUpdateRequest(req, senderId, senderName) {
+    let resData;
+    if (!req || typeof req.action !== "string") {
+      resData = { success: false, reason: "Invalid request format." };
+    } else if (req.action === "add_role") {
+      const res = addRoleMember(req.role, req.memberNumber, senderId);
+      resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+    } else if (req.action === "remove_role") {
+      const res = removeRoleMember(req.role, req.memberNumber, senderId);
+      resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+    } else if (req.action === "set_min_role") {
+      const res = setPermissionMinRole(req.perm, req.minRole, senderId);
+      resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+    } else if (req.action === "set_self_access") {
+      const res = setPermissionSelfAccess(req.perm, req.selfAllowed, senderId);
+      resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+    } else if (req.action === "set_autoload_mode") {
+      if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+        resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
+      } else {
+        modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
+        saveStorage();
+        syncStorage();
+        resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
+      }
+    } else if (req.action === "update_preferences") {
+      if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+        resData = { success: false, reason: "Permission Denied: You do not have authority to edit preferences." };
+      } else if (req.preferences) {
+        if (req.preferences.violationAction) modStorage.inspector.violationAction = req.preferences.violationAction;
+        if (req.preferences.autoLoadMode) modStorage.inspector.autoLoadMode = req.preferences.autoLoadMode;
+        if (typeof req.preferences.evaluationInterval === "number") modStorage.inspector.evaluationInterval = req.preferences.evaluationInterval;
+        if (typeof req.preferences.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = req.preferences.silentTelemetry;
+        if (typeof req.preferences.showProfileButton === "boolean") modStorage.inspector.showProfileButton = req.preferences.showProfileButton;
+        if (typeof req.preferences.allowForcedInjection === "boolean") modStorage.inspector.allowForcedInjection = req.preferences.allowForcedInjection;
+        saveStorage();
+        syncStorage();
+        restartPeriodicComplianceTimer();
+        resData = {
+          success: true,
+          preferences: {
+            violationAction: modStorage.inspector.violationAction,
+            autoLoadMode: modStorage.inspector.autoLoadMode,
+            evaluationInterval: modStorage.inspector.evaluationInterval,
+            silentTelemetry: modStorage.inspector.silentTelemetry,
+            showProfileButton: modStorage.inspector.showProfileButton,
+            allowForcedInjection: modStorage.inspector.allowForcedInjection
+          }
+        };
+      } else {
+        resData = { success: false, reason: "No preferences provided." };
+      }
+    } else if (req.action === "add_custom_mod") {
+      if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+        resData = { success: false, reason: "Permission Denied: You do not have authority to add custom addons." };
+      } else if (req.customMod && req.customMod.id) {
+        modStorage.inspector.customCatalog = modStorage.inspector.customCatalog || [];
+        modStorage.inspector.customCatalog = modStorage.inspector.customCatalog.filter((c) => c.id.toLowerCase() !== req.customMod.id.toLowerCase());
+        modStorage.inspector.customCatalog.push(req.customMod);
+        saveStorage();
+        syncStorage();
+        resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
+      } else {
+        resData = { success: false, reason: "Invalid custom addon data." };
+      }
+    } else if (req.action === "remove_custom_mod") {
+      if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+        resData = { success: false, reason: "Permission Denied: You do not have authority to remove custom addons." };
+      } else if (req.customModId) {
+        modStorage.inspector.customCatalog = (modStorage.inspector.customCatalog || []).filter((c) => c.id.toLowerCase() !== req.customModId.toLowerCase());
+        saveStorage();
+        syncStorage();
+        resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
+      } else {
+        resData = { success: false, reason: "Invalid custom addon ID." };
+      }
+    } else {
+      resData = { success: false, reason: "Unknown action." };
+    }
+    if (resData.success) {
+      toastsManager.info({
+        title: `${MOD_NAME} Authority Updated`,
+        message: `Authority updated by ${senderName}.`,
+        duration: 4e3
+      });
+    }
+    return resData;
+  }
+  async function handleForceInjectRequest(senderId, senderName, targetModId) {
+    if (!modStorage.inspector.enabled) {
+      return { success: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
+    }
+    if (!checkPermissionAccess("rules_force_compliance", senderId)) {
+      return { success: false, reason: "Permission Denied: You do not have authority to force addon injection on this player." };
+    }
+    if (!modStorage.inspector.allowForcedInjection) {
+      return { success: false, reason: "Permission Denied: Forced addon injection is disabled in this player's preferences." };
+    }
+    const currentRules = modStorage.inspector.rules || [];
+    const missingMandatory = currentRules.filter((r) => (r.type === "required" || r.type === "mandatory") && !isModLoaded(r.modId));
+    if (missingMandatory.length === 0 && (!targetModId || targetModId === "all")) {
+      return {
+        success: true,
+        reason: "All mandatory addons are already loaded.",
+        injectedCount: 0,
+        report: {
+          isCompliant: true,
+          missingCount: 0,
+          forbiddenCount: 0
+        }
+      };
+    }
+    let toInject = [];
+    if (targetModId && targetModId !== "all") {
+      const matching = missingMandatory.find((r) => r.modId.toLowerCase() === targetModId.toLowerCase());
+      if (!matching) {
+        if (isModLoaded(targetModId)) {
+          return { success: true, reason: `${targetModId} is already loaded on this client.`, injectedCount: 0 };
+        }
+        const rule = currentRules.find((r) => r.modId.toLowerCase() === targetModId.toLowerCase() && (r.type === "required" || r.type === "mandatory"));
+        if (rule) {
+          toInject = [rule];
+        } else {
+          return { success: false, reason: `Addon '${targetModId}' is not an active mandatory requirement.` };
+        }
+      } else {
+        toInject = [matching];
+      }
+    } else {
+      toInject = missingMandatory;
+    }
+    let injectedCount = 0;
+    const injectedNames = [];
+    for (const rule of toInject) {
+      const success = await loadCuratedMod(rule.modId);
+      if (success) {
+        injectedCount++;
+        injectedNames.push(rule.modName || rule.modId);
+      }
+    }
+    if (injectedNames.length > 0) {
+      toastsManager.info({
+        title: `${MOD_NAME} Forced Addon Injection`,
+        message: `Mandatory addon${injectedNames.length > 1 ? "s" : ""} (${injectedNames.join(", ")}) ${injectedNames.length > 1 ? "were" : "was"} injected by ${senderName}.`,
+        duration: 6e3
+      });
+    }
+    const report = await evaluateCompliance();
+    return {
+      success: true,
+      injectedCount,
+      report: {
+        isCompliant: report.isCompliant,
+        missingCount: report.missingRequired.length,
+        forbiddenCount: report.detectedForbidden.length
+      }
+    };
+  }
   function initNetworkSync() {
     restartPeriodicComplianceTimer();
     hookFunction("ChatRoomMessage", HookPriority.ADD_BEHAVIOR, async (args, next) => {
@@ -8789,30 +9019,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
         const senderChar = typeof Character !== "undefined" && typeof Character.find === "function" ? Character.find((c) => c.MemberNumber === senderId) : null;
         const senderName = senderChar?.Name || `Member #${senderId}`;
         if (dictData.message === "qoc_inspect") {
-          const permCheck = canSenderInspect(senderId);
-          const responseData = permCheck.allowed ? {
-            allowed: true,
-            canViewAddons: permCheck.canViewAddons,
-            canViewRules: permCheck.canViewRules,
-            mods: permCheck.canViewAddons ? getLoadedMods2() : [],
-            rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
-            autoLoadMode: modStorage.inspector.autoLoadMode,
-            preferences: {
-              violationAction: modStorage.inspector.violationAction || "toast",
-              autoLoadMode: modStorage.inspector.autoLoadMode || "Prompt",
-              evaluationInterval: typeof modStorage.inspector.evaluationInterval === "number" ? modStorage.inspector.evaluationInterval : 30,
-              silentTelemetry: typeof modStorage.inspector.silentTelemetry === "boolean" ? modStorage.inspector.silentTelemetry : true,
-              showProfileButton: typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true
-            },
-            customCatalog: modStorage.inspector.customCatalog || [],
-            authority: modStorage.authority,
-            callerAccessLevel: getCharacterAccessLevel(senderId),
-            callerPermissions: getCallerPermissions(senderId),
-            version: version2
-          } : {
-            allowed: false,
-            reason: permCheck.reason
-          };
+          const responseData = buildInspectResponseData(senderId);
           messagesManager.sendPacket("requestResponse", {
             requestId: dictData.requestId,
             message: dictData.message,
@@ -8822,24 +9029,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
         }
         if (dictData.message === "qoc_setRules") {
           const newRules = Array.isArray(dictData.data?.rules) ? dictData.data.rules : [];
-          const authCheck = canSenderEnforceRules(senderId, newRules);
-          let responseData;
-          if (!authCheck.allowed) {
-            responseData = {
-              success: false,
-              reason: authCheck.reason
-            };
-          } else {
-            modStorage.inspector.rules = newRules;
-            syncStorage();
-            evaluateCompliance();
-            toastsManager.info({
-              title: `${MOD_NAME} Rules Updated`,
-              message: `Addon rules updated by ${senderName}.`,
-              duration: 5e3
-            });
-            responseData = { success: true };
-          }
+          const responseData = handleSetRulesRequest(senderId, senderName, newRules);
           messagesManager.sendPacket("requestResponse", {
             requestId: dictData.requestId,
             message: dictData.message,
@@ -8848,120 +9038,26 @@ One of mods you are using is using an old version of SDK. It will work for now b
           return;
         }
         if (dictData.message === "qoc_triggerCompliance") {
-          if (!checkPermissionAccess("rules_force_compliance", senderId)) {
-            messagesManager.sendPacket("requestResponse", {
-              requestId: dictData.requestId,
-              message: dictData.message,
-              data: { success: false, reason: "Permission Denied: You do not have authority to force compliance evaluations on this player." }
-            }, senderId);
-            return;
-          }
-          toastsManager.info({
-            title: `${MOD_NAME} Compliance Triggered`,
-            message: `${senderName} requested an immediate compliance check.`,
-            duration: 4e3
-          });
-          evaluateCompliance().then((report) => {
-            messagesManager.sendPacket("requestResponse", {
-              requestId: dictData.requestId,
-              message: dictData.message,
-              data: {
-                success: true,
-                report: {
-                  isCompliant: report.isCompliant,
-                  missingCount: report.missingRequired.length,
-                  forbiddenCount: report.detectedForbidden.length
-                }
-              }
-            }, senderId);
-          });
+          const responseData = await handleTriggerComplianceRequest(senderId, senderName);
+          messagesManager.sendPacket("requestResponse", {
+            requestId: dictData.requestId,
+            message: dictData.message,
+            data: responseData
+          }, senderId);
           return;
         }
         if (dictData.message === "qoc_updateAuthority") {
-          const req = dictData.data;
-          let resData;
-          if (!req || typeof req.action !== "string") {
-            resData = { success: false, reason: "Invalid request format." };
-          } else if (req.action === "add_role") {
-            const res = addRoleMember(req.role, req.memberNumber, senderId);
-            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-          } else if (req.action === "remove_role") {
-            const res = removeRoleMember(req.role, req.memberNumber, senderId);
-            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-          } else if (req.action === "set_min_role") {
-            const res = setPermissionMinRole(req.perm, req.minRole, senderId);
-            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-          } else if (req.action === "set_self_access") {
-            const res = setPermissionSelfAccess(req.perm, req.selfAllowed, senderId);
-            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-          } else if (req.action === "set_autoload_mode") {
-            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-              resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
-            } else {
-              modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
-              saveStorage();
-              syncStorage();
-              resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
-            }
-          } else if (req.action === "update_preferences") {
-            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-              resData = { success: false, reason: "Permission Denied: You do not have authority to edit preferences." };
-            } else if (req.preferences) {
-              if (req.preferences.violationAction) modStorage.inspector.violationAction = req.preferences.violationAction;
-              if (req.preferences.autoLoadMode) modStorage.inspector.autoLoadMode = req.preferences.autoLoadMode;
-              if (typeof req.preferences.evaluationInterval === "number") modStorage.inspector.evaluationInterval = req.preferences.evaluationInterval;
-              if (typeof req.preferences.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = req.preferences.silentTelemetry;
-              if (typeof req.preferences.showProfileButton === "boolean") modStorage.inspector.showProfileButton = req.preferences.showProfileButton;
-              saveStorage();
-              syncStorage();
-              restartPeriodicComplianceTimer();
-              resData = {
-                success: true,
-                preferences: {
-                  violationAction: modStorage.inspector.violationAction,
-                  autoLoadMode: modStorage.inspector.autoLoadMode,
-                  evaluationInterval: modStorage.inspector.evaluationInterval,
-                  silentTelemetry: modStorage.inspector.silentTelemetry,
-                  showProfileButton: modStorage.inspector.showProfileButton
-                }
-              };
-            } else {
-              resData = { success: false, reason: "No preferences provided." };
-            }
-          } else if (req.action === "add_custom_mod") {
-            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-              resData = { success: false, reason: "Permission Denied: You do not have authority to add custom addons." };
-            } else if (req.customMod && req.customMod.id) {
-              modStorage.inspector.customCatalog = modStorage.inspector.customCatalog || [];
-              modStorage.inspector.customCatalog = modStorage.inspector.customCatalog.filter((c) => c.id.toLowerCase() !== req.customMod.id.toLowerCase());
-              modStorage.inspector.customCatalog.push(req.customMod);
-              saveStorage();
-              syncStorage();
-              resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
-            } else {
-              resData = { success: false, reason: "Invalid custom addon data." };
-            }
-          } else if (req.action === "remove_custom_mod") {
-            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-              resData = { success: false, reason: "Permission Denied: You do not have authority to remove custom addons." };
-            } else if (req.customModId) {
-              modStorage.inspector.customCatalog = (modStorage.inspector.customCatalog || []).filter((c) => c.id.toLowerCase() !== req.customModId.toLowerCase());
-              saveStorage();
-              syncStorage();
-              resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
-            } else {
-              resData = { success: false, reason: "Invalid custom addon ID." };
-            }
-          } else {
-            resData = { success: false, reason: "Unknown action." };
-          }
-          if (resData.success) {
-            toastsManager.info({
-              title: `${MOD_NAME} Authority Updated`,
-              message: `Authority updated by ${senderName}.`,
-              duration: 4e3
-            });
-          }
+          const resData = handleAuthorityUpdateRequest(dictData.data, senderId, senderName);
+          messagesManager.sendPacket("requestResponse", {
+            requestId: dictData.requestId,
+            message: dictData.message,
+            data: resData
+          }, senderId);
+          return;
+        }
+        if (dictData.message === "qoc_forceInject") {
+          const targetModId = typeof dictData.data?.modId === "string" ? dictData.data.modId : void 0;
+          const resData = await handleForceInjectRequest(senderId, senderName, targetModId);
           messagesManager.sendPacket("requestResponse", {
             requestId: dictData.requestId,
             message: dictData.message,
@@ -9004,22 +9100,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
         const senderChar = typeof Character !== "undefined" && typeof Character.find === "function" ? Character.find((c) => c.MemberNumber === senderId) : null;
         const senderName = senderChar?.Name || `Member #${senderId}`;
         if (data.message === "qoc_inspect") {
-          const permCheck = canSenderInspect(senderId);
-          const responseData = permCheck.allowed ? {
-            allowed: true,
-            canViewAddons: permCheck.canViewAddons,
-            canViewRules: permCheck.canViewRules,
-            mods: permCheck.canViewAddons ? getLoadedMods2() : [],
-            rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
-            autoLoadMode: modStorage.inspector.autoLoadMode,
-            authority: modStorage.authority,
-            callerAccessLevel: getCharacterAccessLevel(senderId),
-            callerPermissions: getCallerPermissions(senderId),
-            version: version2
-          } : {
-            allowed: false,
-            reason: permCheck.reason
-          };
+          const responseData = buildInspectResponseData(senderId);
           messagesManager.sendBeep({
             type: `${MOD_KEY}_requestResponse`,
             requestId: data.requestId,
@@ -9030,16 +9111,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
         }
         if (data.message === "qoc_setRules") {
           const newRules = Array.isArray(data.data?.rules) ? data.data.rules : [];
-          const authCheck = canSenderEnforceRules(senderId, newRules);
-          let responseData;
-          if (!authCheck.allowed) {
-            responseData = { success: false, reason: authCheck.reason };
-          } else {
-            modStorage.inspector.rules = newRules;
-            syncStorage();
-            evaluateCompliance();
-            responseData = { success: true };
-          }
+          const responseData = handleSetRulesRequest(senderId, senderName, newRules);
           messagesManager.sendBeep({
             type: `${MOD_KEY}_requestResponse`,
             requestId: data.requestId,
@@ -9049,73 +9121,28 @@ One of mods you are using is using an old version of SDK. It will work for now b
           return;
         }
         if (data.message === "qoc_triggerCompliance") {
-          if (!checkPermissionAccess("rules_force_compliance", senderId)) {
-            messagesManager.sendBeep({
-              type: `${MOD_KEY}_requestResponse`,
-              requestId: data.requestId,
-              message: data.message,
-              data: { success: false, reason: "Permission Denied: You do not have authority to force compliance evaluations on this player." }
-            }, senderId);
-            return;
-          }
-          toastsManager.info({
-            title: `${MOD_NAME} Compliance Triggered`,
-            message: `${senderName} requested an immediate compliance check.`,
-            duration: 4e3
-          });
-          evaluateCompliance().then((report) => {
-            messagesManager.sendBeep({
-              type: `${MOD_KEY}_requestResponse`,
-              requestId: data.requestId,
-              message: data.message,
-              data: {
-                success: true,
-                report: {
-                  isCompliant: report.isCompliant,
-                  missingCount: report.missingRequired.length,
-                  forbiddenCount: report.detectedForbidden.length
-                }
-              }
-            }, senderId);
-          });
+          const responseData = await handleTriggerComplianceRequest(senderId, senderName);
+          messagesManager.sendBeep({
+            type: `${MOD_KEY}_requestResponse`,
+            requestId: data.requestId,
+            message: data.message,
+            data: responseData
+          }, senderId);
           return;
         }
         if (data.message === "qoc_updateAuthority") {
-          const req = data.data;
-          let resData;
-          if (!req || typeof req.action !== "string") {
-            resData = { success: false, reason: "Invalid request format." };
-          } else if (req.action === "add_role") {
-            const res = addRoleMember(req.role, req.memberNumber, senderId);
-            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-          } else if (req.action === "remove_role") {
-            const res = removeRoleMember(req.role, req.memberNumber, senderId);
-            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-          } else if (req.action === "set_min_role") {
-            const res = setPermissionMinRole(req.perm, req.minRole, senderId);
-            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-          } else if (req.action === "set_self_access") {
-            const res = setPermissionSelfAccess(req.perm, req.selfAllowed, senderId);
-            resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-          } else if (req.action === "set_autoload_mode") {
-            if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-              resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
-            } else {
-              modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
-              saveStorage();
-              syncStorage();
-              resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
-            }
-          } else {
-            resData = { success: false, reason: "Unknown action." };
-          }
-          if (resData.success) {
-            toastsManager.info({
-              title: `${MOD_NAME} Authority Updated`,
-              message: `Authority updated by ${senderName}.`,
-              duration: 4e3
-            });
-          }
+          const resData = handleAuthorityUpdateRequest(data.data, senderId, senderName);
+          messagesManager.sendBeep({
+            type: `${MOD_KEY}_requestResponse`,
+            requestId: data.requestId,
+            message: data.message,
+            data: resData
+          }, senderId);
+          return;
+        }
+        if (data.message === "qoc_forceInject") {
+          const targetModId = typeof data.data?.modId === "string" ? data.data.modId : void 0;
+          const resData = await handleForceInjectRequest(senderId, senderName, targetModId);
           messagesManager.sendBeep({
             type: `${MOD_KEY}_requestResponse`,
             requestId: data.requestId,
@@ -9277,6 +9304,45 @@ One of mods you are using is using an old version of SDK. It will work for now b
         return {
           success: false,
           error: res.data.reason || "Target player rejected compliance trigger."
+        };
+      }
+      return {
+        success: true,
+        data: res.data
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err?.message || "Failed to communicate with target player."
+      };
+    }
+  }
+  async function requestForceInject(targetMemberNumber, modId) {
+    try {
+      let res = await messagesManager.sendRequest({
+        message: "qoc_forceInject",
+        data: { modId },
+        target: targetMemberNumber,
+        type: "packet"
+      });
+      if (res.isError || !res.data) {
+        res = await messagesManager.sendRequest({
+          message: "qoc_forceInject",
+          data: { modId },
+          target: targetMemberNumber,
+          type: "beep"
+        });
+      }
+      if (res.isError || !res.data) {
+        return {
+          success: false,
+          error: "Target player did not respond to forced injection request."
+        };
+      }
+      if (!res.data.success) {
+        return {
+          success: false,
+          error: res.data.reason || "Target player rejected forced injection."
         };
       }
       return {
@@ -9660,6 +9726,34 @@ One of mods you are using is using an old version of SDK. It will work for now b
             forceBtn.textContent = "\u26A1 Force Compliance Evaluation Now";
           });
           toolbar.appendChild(forceBtn);
+          if (!this.isSelf && compliance.missing.length > 0) {
+            const forceInjectAllBtn = document.createElement("button");
+            forceInjectAllBtn.textContent = `\u{1F489} Force Inject All Missing Addons (${compliance.missing.length})`;
+            forceInjectAllBtn.style.cssText = "padding: 9px 18px; border-radius: 5px; background: rgba(76, 175, 80, 0.3); border: 1px solid #4caf50; color: #a5d6a7; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;";
+            forceInjectAllBtn.addEventListener("click", async () => {
+              if (!this.target || typeof this.target.MemberNumber !== "number") return;
+              forceInjectAllBtn.disabled = true;
+              forceInjectAllBtn.textContent = "\u23F3 Injecting Addons...";
+              const res = await requestForceInject(this.target.MemberNumber, "all");
+              if (res.success) {
+                toastsManager.success({
+                  title: `${MOD_NAME} Injection Complete`,
+                  message: `Injected missing addons on ${subjectName}.`,
+                  duration: 5e3
+                });
+                await this.loadTargetData();
+              } else {
+                toastsManager.error({
+                  title: `${MOD_NAME} Injection Failed`,
+                  message: res.error || "Failed to inject addons on target.",
+                  duration: 5e3
+                });
+                forceInjectAllBtn.disabled = false;
+                forceInjectAllBtn.textContent = `\u{1F489} Force Inject All Missing Addons (${compliance.missing.length})`;
+              }
+            });
+            toolbar.appendChild(forceInjectAllBtn);
+          }
         }
         if (canRemoveRules && rules.length > 0) {
           const clearAllBtn = document.createElement("button");
@@ -9721,6 +9815,65 @@ One of mods you are using is using an old version of SDK. It will work for now b
           badge.style.cssText = `background: ${isMet ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)"}; color: ${isMet ? "#81c784" : "#e57373"}; border: 1px solid ${isMet ? "#4caf50" : "#f44336"}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold;`;
           badge.textContent = isMet ? "MET" : "VIOLATION";
           rightDiv.appendChild(badge);
+          if (isMandatory && !isMet) {
+            if (!this.isSelf && canForceCompliance) {
+              const forceInjectBtn = document.createElement("button");
+              forceInjectBtn.textContent = "\u{1F489} Force Inject";
+              forceInjectBtn.title = `Remotely force injection of ${detail.rule.modName} on ${subjectName}`;
+              forceInjectBtn.style.cssText = "padding: 4px 10px; border-radius: 4px; background: rgba(76, 175, 80, 0.25); border: 1px solid #4caf50; color: #a5d6a7; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.15s;";
+              forceInjectBtn.addEventListener("click", async () => {
+                if (!this.target || typeof this.target.MemberNumber !== "number") return;
+                forceInjectBtn.disabled = true;
+                forceInjectBtn.textContent = "\u23F3 Injecting...";
+                const res = await requestForceInject(this.target.MemberNumber, detail.rule.modId);
+                if (res.success) {
+                  toastsManager.success({
+                    title: `${MOD_NAME} Addon Injected`,
+                    message: `${detail.rule.modName} injected on ${subjectName}!`,
+                    duration: 4e3
+                  });
+                  await this.loadTargetData();
+                } else {
+                  toastsManager.error({
+                    title: `${MOD_NAME} Injection Failed`,
+                    message: res.error || "Target client rejected addon injection.",
+                    duration: 4e3
+                  });
+                  forceInjectBtn.disabled = false;
+                  forceInjectBtn.textContent = "\u{1F489} Force Inject";
+                }
+              });
+              rightDiv.appendChild(forceInjectBtn);
+            } else if (this.isSelf) {
+              const injectSelfBtn = document.createElement("button");
+              injectSelfBtn.textContent = "\u{1F489} Inject Now";
+              injectSelfBtn.title = `Inject ${detail.rule.modName} into your session now`;
+              injectSelfBtn.style.cssText = "padding: 4px 10px; border-radius: 4px; background: rgba(76, 175, 80, 0.25); border: 1px solid #4caf50; color: #a5d6a7; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.15s;";
+              injectSelfBtn.addEventListener("click", async () => {
+                injectSelfBtn.disabled = true;
+                injectSelfBtn.textContent = "\u23F3 Injecting...";
+                const ok = await loadCuratedMod(detail.rule.modId);
+                if (ok) {
+                  toastsManager.success({
+                    title: `${MOD_NAME} Addon Injected`,
+                    message: `${detail.rule.modName} has been injected and activated!`,
+                    duration: 3500
+                  });
+                  await evaluateCompliance();
+                  this.renderAddonsTab();
+                } else {
+                  toastsManager.error({
+                    title: `${MOD_NAME} Injection Failed`,
+                    message: `Could not load ${detail.rule.modName}. Check URL or network console.`,
+                    duration: 4e3
+                  });
+                  injectSelfBtn.disabled = false;
+                  injectSelfBtn.textContent = "\u{1F489} Inject Now";
+                }
+              });
+              rightDiv.appendChild(injectSelfBtn);
+            }
+          }
           if (canRemoveRules) {
             const removeBtn = document.createElement("button");
             removeBtn.textContent = "\u{1F5D1}\uFE0F Remove";
@@ -10638,6 +10791,7 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       const currentInterval = this.isSelf ? typeof modStorage.inspector.evaluationInterval === "number" ? modStorage.inspector.evaluationInterval : 30 : this.targetData?.preferences?.evaluationInterval ?? 30;
       const currentTelemetry = this.isSelf ? typeof modStorage.inspector.silentTelemetry === "boolean" ? modStorage.inspector.silentTelemetry : true : this.targetData?.preferences?.silentTelemetry ?? true;
       const currentProfileBtn = this.isSelf ? typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true : this.targetData?.preferences?.showProfileButton ?? true;
+      const currentAllowForcedInjection = this.isSelf ? typeof modStorage.inspector.allowForcedInjection === "boolean" ? modStorage.inspector.allowForcedInjection : false : this.targetData?.preferences?.allowForcedInjection ?? false;
       const customCatalog = this.isSelf ? modStorage.inspector.customCatalog || [] : this.targetData?.customCatalog || [];
       const updatePref = async (newPref) => {
         if (!canEditPreferences) return;
@@ -10647,6 +10801,7 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
           if (typeof newPref.evaluationInterval === "number") modStorage.inspector.evaluationInterval = newPref.evaluationInterval;
           if (typeof newPref.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = newPref.silentTelemetry;
           if (typeof newPref.showProfileButton === "boolean") modStorage.inspector.showProfileButton = newPref.showProfileButton;
+          if (typeof newPref.allowForcedInjection === "boolean") modStorage.inspector.allowForcedInjection = newPref.allowForcedInjection;
           saveStorage();
           syncStorage();
           restartPeriodicComplianceTimer();
@@ -10813,6 +10968,33 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
         autoRow.appendChild(btn);
       });
       autoLoadSection.appendChild(autoRow);
+      const forcedInjectRow = document.createElement("div");
+      forcedInjectRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding-top: 14px; margin-top: 14px; border-top: 1px solid rgba(80, 100, 140, 0.3);";
+      forcedInjectRow.innerHTML = `
+            <div>
+                <div style="font-size: 14px; font-weight: bold; color: #e0e6ed;">\u{1F489} Allow Remote Forced Addon Injection by Others</div>
+                <div style="font-size: 12px; color: #90a4ae; margin-top: 2px;">
+                    Permits authorized dominants (governed by the <b>Force Compliance & Injection</b> permission) to remotely inject missing mandatory addons on ${subjectName}, even when auto-injection is set to Prompt or Alert.
+                </div>
+            </div>
+        `;
+      const forcedInjectBtn = document.createElement("button");
+      forcedInjectBtn.disabled = !canEditPreferences;
+      forcedInjectBtn.textContent = currentAllowForcedInjection ? "\u2713 Enabled" : "\u2715 Disabled";
+      forcedInjectBtn.style.cssText = `
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: ${canEditPreferences ? "pointer" : "not-allowed"};
+            background: ${currentAllowForcedInjection ? "rgba(76, 175, 80, 0.25)" : "rgba(100, 116, 139, 0.2)"};
+            border: 1px solid ${currentAllowForcedInjection ? "#4caf50" : "#78909c"};
+            color: ${currentAllowForcedInjection ? "#81c784" : "#90a4ae"};
+            transition: all 0.15s ease;
+        `;
+      forcedInjectBtn.addEventListener("click", () => updatePref({ allowForcedInjection: !currentAllowForcedInjection }));
+      forcedInjectRow.appendChild(forcedInjectBtn);
+      autoLoadSection.appendChild(forcedInjectRow);
       container.appendChild(autoLoadSection);
       const periodicSection = document.createElement("div");
       periodicSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";

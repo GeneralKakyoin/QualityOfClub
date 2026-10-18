@@ -2,7 +2,7 @@ import { messagesManager } from "zois-core/messaging";
 import { toastsManager } from "zois-core/toasts";
 import { hookFunction, HookPriority } from "zois-core/mod-sdk";
 import { modStorage, syncStorage, saveStorage, ModRule, QoCPermission, AuthorityData, AccessLevel, AutoLoadMode, ViolationAction, CuratedModInfo } from "./storage";
-import { DetectedMod, getLoadedMods } from "./modDetection";
+import { DetectedMod, getLoadedMods, isModLoaded, loadCuratedMod, getCuratedMod } from "./modDetection";
 import { evaluateCompliance, checkComplianceAgainstRules } from "./compliance";
 import { checkPermissionAccess, getCharacterAccessLevel, addRoleMember, removeRoleMember, setPermissionMinRole, setPermissionSelfAccess } from "./authority";
 import { version } from "../../package.json";
@@ -22,6 +22,7 @@ export interface InspectResponseData {
         evaluationInterval: number;
         silentTelemetry: boolean;
         showProfileButton: boolean;
+        allowForcedInjection: boolean;
     };
     customCatalog?: CuratedModInfo[];
     authority?: AuthorityData;
@@ -45,6 +46,17 @@ export interface TriggerComplianceResponseData {
     };
 }
 
+export interface ForceInjectResponseData {
+    success: boolean;
+    reason?: string;
+    injectedCount?: number;
+    report?: {
+        isCompliant: boolean;
+        missingCount: number;
+        forbiddenCount: number;
+    };
+}
+
 export interface AuthorityUpdateRequest {
     action: "add_role" | "remove_role" | "set_min_role" | "set_self_access" | "set_autoload_mode" | "update_preferences" | "add_custom_mod" | "remove_custom_mod";
     role?: "owner" | "mistress";
@@ -59,6 +71,7 @@ export interface AuthorityUpdateRequest {
         evaluationInterval?: number;
         silentTelemetry?: boolean;
         showProfileButton?: boolean;
+        allowForcedInjection?: boolean;
     };
     customMod?: CuratedModInfo;
     customModId?: string;
@@ -75,6 +88,7 @@ export interface AuthorityUpdateResponseData {
         evaluationInterval: number;
         silentTelemetry: boolean;
         showProfileButton: boolean;
+        allowForcedInjection: boolean;
     };
     customCatalog?: CuratedModInfo[];
 }
@@ -220,6 +234,272 @@ export function restartPeriodicComplianceTimer(): void {
 }
 
 /**
+ * Builds the inspect response payload according to sender's inspection permissions.
+ */
+function buildInspectResponseData(senderId: number): InspectResponseData {
+    const permCheck = canSenderInspect(senderId);
+    if (!permCheck.allowed) {
+        return {
+            allowed: false,
+            reason: permCheck.reason
+        };
+    }
+    return {
+        allowed: true,
+        canViewAddons: permCheck.canViewAddons,
+        canViewRules: permCheck.canViewRules,
+        mods: permCheck.canViewAddons ? getLoadedMods() : [],
+        rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
+        autoLoadMode: modStorage.inspector.autoLoadMode,
+        preferences: {
+            violationAction: modStorage.inspector.violationAction || "toast",
+            autoLoadMode: modStorage.inspector.autoLoadMode || "Prompt",
+            evaluationInterval: typeof modStorage.inspector.evaluationInterval === "number" ? modStorage.inspector.evaluationInterval : 30,
+            silentTelemetry: typeof modStorage.inspector.silentTelemetry === "boolean" ? modStorage.inspector.silentTelemetry : true,
+            showProfileButton: typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true,
+            allowForcedInjection: typeof modStorage.inspector.allowForcedInjection === "boolean" ? modStorage.inspector.allowForcedInjection : false
+        },
+        customCatalog: modStorage.inspector.customCatalog || [],
+        authority: modStorage.authority,
+        callerAccessLevel: getCharacterAccessLevel(senderId),
+        callerPermissions: getCallerPermissions(senderId),
+        version
+    };
+}
+
+/**
+ * Handles incoming rule update requests.
+ */
+function handleSetRulesRequest(senderId: number, senderName: string, newRules: ModRule[]): SetRulesResponseData {
+    const authCheck = canSenderEnforceRules(senderId, newRules);
+    if (!authCheck.allowed) {
+        return {
+            success: false,
+            reason: authCheck.reason
+        };
+    }
+
+    modStorage.inspector.rules = newRules;
+    syncStorage();
+    evaluateCompliance();
+
+    toastsManager.info({
+        title: `${MOD_NAME} Rules Updated`,
+        message: `Addon rules updated by ${senderName}.`,
+        duration: 5000
+    });
+
+    return { success: true };
+}
+
+/**
+ * Handles incoming trigger compliance evaluation requests.
+ */
+async function handleTriggerComplianceRequest(senderId: number, senderName: string): Promise<TriggerComplianceResponseData> {
+    if (!checkPermissionAccess("rules_force_compliance", senderId)) {
+        return {
+            success: false,
+            reason: "Permission Denied: You do not have authority to force compliance evaluations on this player."
+        };
+    }
+
+    toastsManager.info({
+        title: `${MOD_NAME} Compliance Triggered`,
+        message: `${senderName} requested an immediate compliance check.`,
+        duration: 4000
+    });
+
+    const report = await evaluateCompliance();
+    return {
+        success: true,
+        report: {
+            isCompliant: report.isCompliant,
+            missingCount: report.missingRequired.length,
+            forbiddenCount: report.detectedForbidden.length
+        }
+    };
+}
+
+/**
+ * Handles incoming authority and preference updates.
+ */
+function handleAuthorityUpdateRequest(req: AuthorityUpdateRequest, senderId: number, senderName: string): AuthorityUpdateResponseData {
+    let resData: AuthorityUpdateResponseData;
+
+    if (!req || typeof req.action !== "string") {
+        resData = { success: false, reason: "Invalid request format." };
+    } else if (req.action === "add_role") {
+        const res = addRoleMember(req.role!, req.memberNumber!, senderId);
+        resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+    } else if (req.action === "remove_role") {
+        const res = removeRoleMember(req.role!, req.memberNumber!, senderId);
+        resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+    } else if (req.action === "set_min_role") {
+        const res = setPermissionMinRole(req.perm!, req.minRole!, senderId);
+        resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+    } else if (req.action === "set_self_access") {
+        const res = setPermissionSelfAccess(req.perm!, req.selfAllowed!, senderId);
+        resData = { success: res.success, reason: res.message, authority: modStorage.authority };
+    } else if (req.action === "set_autoload_mode") {
+        if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+            resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
+        } else {
+            modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
+            saveStorage();
+            syncStorage();
+            resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
+        }
+    } else if (req.action === "update_preferences") {
+        if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+            resData = { success: false, reason: "Permission Denied: You do not have authority to edit preferences." };
+        } else if (req.preferences) {
+            if (req.preferences.violationAction) modStorage.inspector.violationAction = req.preferences.violationAction;
+            if (req.preferences.autoLoadMode) modStorage.inspector.autoLoadMode = req.preferences.autoLoadMode;
+            if (typeof req.preferences.evaluationInterval === "number") modStorage.inspector.evaluationInterval = req.preferences.evaluationInterval;
+            if (typeof req.preferences.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = req.preferences.silentTelemetry;
+            if (typeof req.preferences.showProfileButton === "boolean") modStorage.inspector.showProfileButton = req.preferences.showProfileButton;
+            if (typeof req.preferences.allowForcedInjection === "boolean") modStorage.inspector.allowForcedInjection = req.preferences.allowForcedInjection;
+            saveStorage();
+            syncStorage();
+            restartPeriodicComplianceTimer();
+            resData = {
+                success: true,
+                preferences: {
+                    violationAction: modStorage.inspector.violationAction,
+                    autoLoadMode: modStorage.inspector.autoLoadMode,
+                    evaluationInterval: modStorage.inspector.evaluationInterval,
+                    silentTelemetry: modStorage.inspector.silentTelemetry,
+                    showProfileButton: modStorage.inspector.showProfileButton,
+                    allowForcedInjection: modStorage.inspector.allowForcedInjection
+                }
+            };
+        } else {
+            resData = { success: false, reason: "No preferences provided." };
+        }
+    } else if (req.action === "add_custom_mod") {
+        if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+            resData = { success: false, reason: "Permission Denied: You do not have authority to add custom addons." };
+        } else if (req.customMod && req.customMod.id) {
+            modStorage.inspector.customCatalog = modStorage.inspector.customCatalog || [];
+            modStorage.inspector.customCatalog = modStorage.inspector.customCatalog.filter(c => c.id.toLowerCase() !== req.customMod!.id.toLowerCase());
+            modStorage.inspector.customCatalog.push(req.customMod);
+            saveStorage();
+            syncStorage();
+            resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
+        } else {
+            resData = { success: false, reason: "Invalid custom addon data." };
+        }
+    } else if (req.action === "remove_custom_mod") {
+        if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
+            resData = { success: false, reason: "Permission Denied: You do not have authority to remove custom addons." };
+        } else if (req.customModId) {
+            modStorage.inspector.customCatalog = (modStorage.inspector.customCatalog || []).filter(c => c.id.toLowerCase() !== req.customModId!.toLowerCase());
+            saveStorage();
+            syncStorage();
+            resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
+        } else {
+            resData = { success: false, reason: "Invalid custom addon ID." };
+        }
+    } else {
+        resData = { success: false, reason: "Unknown action." };
+    }
+
+    if (resData.success) {
+        toastsManager.info({
+            title: `${MOD_NAME} Authority Updated`,
+            message: `Authority updated by ${senderName}.`,
+            duration: 4000
+        });
+    }
+
+    return resData;
+}
+
+/**
+ * Handles incoming forced addon injection requests from an authorized dominant.
+ */
+async function handleForceInjectRequest(senderId: number, senderName: string, targetModId?: string): Promise<ForceInjectResponseData> {
+    if (!modStorage.inspector.enabled) {
+        return { success: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
+    }
+
+    if (!checkPermissionAccess("rules_force_compliance", senderId)) {
+        return { success: false, reason: "Permission Denied: You do not have authority to force addon injection on this player." };
+    }
+
+    if (!modStorage.inspector.allowForcedInjection) {
+        return { success: false, reason: "Permission Denied: Forced addon injection is disabled in this player's preferences." };
+    }
+
+    const currentRules = modStorage.inspector.rules || [];
+    const missingMandatory = currentRules.filter(r => (r.type === "required" || (r.type as string) === "mandatory") && !isModLoaded(r.modId));
+
+    if (missingMandatory.length === 0 && (!targetModId || targetModId === "all")) {
+        return {
+            success: true,
+            reason: "All mandatory addons are already loaded.",
+            injectedCount: 0,
+            report: {
+                isCompliant: true,
+                missingCount: 0,
+                forbiddenCount: 0
+            }
+        };
+    }
+
+    let toInject: ModRule[] = [];
+    if (targetModId && targetModId !== "all") {
+        const matching = missingMandatory.find(r => r.modId.toLowerCase() === targetModId.toLowerCase());
+        if (!matching) {
+            if (isModLoaded(targetModId)) {
+                return { success: true, reason: `${targetModId} is already loaded on this client.`, injectedCount: 0 };
+            }
+            const rule = currentRules.find(r => r.modId.toLowerCase() === targetModId.toLowerCase() && (r.type === "required" || (r.type as string) === "mandatory"));
+            if (rule) {
+                toInject = [rule];
+            } else {
+                return { success: false, reason: `Addon '${targetModId}' is not an active mandatory requirement.` };
+            }
+        } else {
+            toInject = [matching];
+        }
+    } else {
+        toInject = missingMandatory;
+    }
+
+    let injectedCount = 0;
+    const injectedNames: string[] = [];
+
+    for (const rule of toInject) {
+        const success = await loadCuratedMod(rule.modId);
+        if (success) {
+            injectedCount++;
+            injectedNames.push(rule.modName || rule.modId);
+        }
+    }
+
+    if (injectedNames.length > 0) {
+        toastsManager.info({
+            title: `${MOD_NAME} Forced Addon Injection`,
+            message: `Mandatory addon${injectedNames.length > 1 ? "s" : ""} (${injectedNames.join(", ")}) ${injectedNames.length > 1 ? "were" : "was"} injected by ${senderName}.`,
+            duration: 6000
+        });
+    }
+
+    const report = await evaluateCompliance();
+
+    return {
+        success: true,
+        injectedCount,
+        report: {
+            isCompliant: report.isCompliant,
+            missingCount: report.missingRequired.length,
+            forbiddenCount: report.detectedForbidden.length
+        }
+    };
+}
+
+/**
  * Initializes network message handlers and room sync listeners.
  */
 export function initNetworkSync(): void {
@@ -248,31 +528,7 @@ export function initNetworkSync(): void {
 
             // Incoming Inspection Query
             if (dictData.message === "qoc_inspect") {
-                const permCheck = canSenderInspect(senderId);
-                const responseData: InspectResponseData = permCheck.allowed ? {
-                    allowed: true,
-                    canViewAddons: permCheck.canViewAddons,
-                    canViewRules: permCheck.canViewRules,
-                    mods: permCheck.canViewAddons ? getLoadedMods() : [],
-                    rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
-                    autoLoadMode: modStorage.inspector.autoLoadMode,
-                    preferences: {
-                        violationAction: modStorage.inspector.violationAction || "toast",
-                        autoLoadMode: modStorage.inspector.autoLoadMode || "Prompt",
-                        evaluationInterval: typeof modStorage.inspector.evaluationInterval === "number" ? modStorage.inspector.evaluationInterval : 30,
-                        silentTelemetry: typeof modStorage.inspector.silentTelemetry === "boolean" ? modStorage.inspector.silentTelemetry : true,
-                        showProfileButton: typeof modStorage.inspector.showProfileButton === "boolean" ? modStorage.inspector.showProfileButton : true
-                    },
-                    customCatalog: modStorage.inspector.customCatalog || [],
-                    authority: modStorage.authority,
-                    callerAccessLevel: getCharacterAccessLevel(senderId),
-                    callerPermissions: getCallerPermissions(senderId),
-                    version
-                } : {
-                    allowed: false,
-                    reason: permCheck.reason
-                };
-
+                const responseData = buildInspectResponseData(senderId);
                 messagesManager.sendPacket("requestResponse", {
                     requestId: dictData.requestId,
                     message: dictData.message,
@@ -284,28 +540,7 @@ export function initNetworkSync(): void {
             // Incoming Rule Update
             if (dictData.message === "qoc_setRules") {
                 const newRules = Array.isArray(dictData.data?.rules) ? (dictData.data.rules as ModRule[]) : [];
-                const authCheck = canSenderEnforceRules(senderId, newRules);
-                let responseData: SetRulesResponseData;
-
-                if (!authCheck.allowed) {
-                    responseData = {
-                        success: false,
-                        reason: authCheck.reason
-                    };
-                } else {
-                    modStorage.inspector.rules = newRules;
-                    syncStorage();
-                    evaluateCompliance();
-
-                    toastsManager.info({
-                        title: `${MOD_NAME} Rules Updated`,
-                        message: `Addon rules updated by ${senderName}.`,
-                        duration: 5000
-                    });
-
-                    responseData = { success: true };
-                }
-
+                const responseData = handleSetRulesRequest(senderId, senderName, newRules);
                 messagesManager.sendPacket("requestResponse", {
                     requestId: dictData.requestId,
                     message: dictData.message,
@@ -316,127 +551,30 @@ export function initNetworkSync(): void {
 
             // Incoming Trigger Compliance Check
             if (dictData.message === "qoc_triggerCompliance") {
-                if (!checkPermissionAccess("rules_force_compliance", senderId)) {
-                    messagesManager.sendPacket("requestResponse", {
-                        requestId: dictData.requestId,
-                        message: dictData.message,
-                        data: { success: false, reason: "Permission Denied: You do not have authority to force compliance evaluations on this player." }
-                    }, senderId);
-                    return;
-                }
-
-                toastsManager.info({
-                    title: `${MOD_NAME} Compliance Triggered`,
-                    message: `${senderName} requested an immediate compliance check.`,
-                    duration: 4000
-                });
-
-                evaluateCompliance().then(report => {
-                    messagesManager.sendPacket("requestResponse", {
-                        requestId: dictData.requestId,
-                        message: dictData.message,
-                        data: {
-                            success: true,
-                            report: {
-                                isCompliant: report.isCompliant,
-                                missingCount: report.missingRequired.length,
-                                forbiddenCount: report.detectedForbidden.length
-                            }
-                        }
-                    }, senderId);
-                });
+                const responseData = await handleTriggerComplianceRequest(senderId, senderName);
+                messagesManager.sendPacket("requestResponse", {
+                    requestId: dictData.requestId,
+                    message: dictData.message,
+                    data: responseData
+                }, senderId);
                 return;
             }
 
             // Incoming Authority & Permissions Update
             if (dictData.message === "qoc_updateAuthority") {
-                const req = dictData.data as AuthorityUpdateRequest;
-                let resData: AuthorityUpdateResponseData;
+                const resData = handleAuthorityUpdateRequest(dictData.data as AuthorityUpdateRequest, senderId, senderName);
+                messagesManager.sendPacket("requestResponse", {
+                    requestId: dictData.requestId,
+                    message: dictData.message,
+                    data: resData
+                }, senderId);
+                return;
+            }
 
-                if (!req || typeof req.action !== "string") {
-                    resData = { success: false, reason: "Invalid request format." };
-                } else if (req.action === "add_role") {
-                    const res = addRoleMember(req.role!, req.memberNumber!, senderId);
-                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-                } else if (req.action === "remove_role") {
-                    const res = removeRoleMember(req.role!, req.memberNumber!, senderId);
-                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-                } else if (req.action === "set_min_role") {
-                    const res = setPermissionMinRole(req.perm!, req.minRole!, senderId);
-                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-                } else if (req.action === "set_self_access") {
-                    const res = setPermissionSelfAccess(req.perm!, req.selfAllowed!, senderId);
-                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-                } else if (req.action === "set_autoload_mode") {
-                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-                        resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
-                    } else {
-                        modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
-                        saveStorage();
-                        syncStorage();
-                        resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
-                    }
-                } else if (req.action === "update_preferences") {
-                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-                        resData = { success: false, reason: "Permission Denied: You do not have authority to edit preferences." };
-                    } else if (req.preferences) {
-                        if (req.preferences.violationAction) modStorage.inspector.violationAction = req.preferences.violationAction;
-                        if (req.preferences.autoLoadMode) modStorage.inspector.autoLoadMode = req.preferences.autoLoadMode;
-                        if (typeof req.preferences.evaluationInterval === "number") modStorage.inspector.evaluationInterval = req.preferences.evaluationInterval;
-                        if (typeof req.preferences.silentTelemetry === "boolean") modStorage.inspector.silentTelemetry = req.preferences.silentTelemetry;
-                        if (typeof req.preferences.showProfileButton === "boolean") modStorage.inspector.showProfileButton = req.preferences.showProfileButton;
-                        saveStorage();
-                        syncStorage();
-                        restartPeriodicComplianceTimer();
-                        resData = {
-                            success: true,
-                            preferences: {
-                                violationAction: modStorage.inspector.violationAction,
-                                autoLoadMode: modStorage.inspector.autoLoadMode,
-                                evaluationInterval: modStorage.inspector.evaluationInterval,
-                                silentTelemetry: modStorage.inspector.silentTelemetry,
-                                showProfileButton: modStorage.inspector.showProfileButton
-                            }
-                        };
-                    } else {
-                        resData = { success: false, reason: "No preferences provided." };
-                    }
-                } else if (req.action === "add_custom_mod") {
-                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-                        resData = { success: false, reason: "Permission Denied: You do not have authority to add custom addons." };
-                    } else if (req.customMod && req.customMod.id) {
-                        modStorage.inspector.customCatalog = modStorage.inspector.customCatalog || [];
-                        modStorage.inspector.customCatalog = modStorage.inspector.customCatalog.filter(c => c.id.toLowerCase() !== req.customMod!.id.toLowerCase());
-                        modStorage.inspector.customCatalog.push(req.customMod);
-                        saveStorage();
-                        syncStorage();
-                        resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
-                    } else {
-                        resData = { success: false, reason: "Invalid custom addon data." };
-                    }
-                } else if (req.action === "remove_custom_mod") {
-                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-                        resData = { success: false, reason: "Permission Denied: You do not have authority to remove custom addons." };
-                    } else if (req.customModId) {
-                        modStorage.inspector.customCatalog = (modStorage.inspector.customCatalog || []).filter(c => c.id.toLowerCase() !== req.customModId!.toLowerCase());
-                        saveStorage();
-                        syncStorage();
-                        resData = { success: true, customCatalog: modStorage.inspector.customCatalog };
-                    } else {
-                        resData = { success: false, reason: "Invalid custom addon ID." };
-                    }
-                } else {
-                    resData = { success: false, reason: "Unknown action." };
-                }
-
-                if (resData.success) {
-                    toastsManager.info({
-                        title: `${MOD_NAME} Authority Updated`,
-                        message: `Authority updated by ${senderName}.`,
-                        duration: 4000
-                    });
-                }
-
+            // Incoming Forced Addon Injection
+            if (dictData.message === "qoc_forceInject") {
+                const targetModId = typeof dictData.data?.modId === "string" ? dictData.data.modId : undefined;
+                const resData = await handleForceInjectRequest(senderId, senderName, targetModId);
                 messagesManager.sendPacket("requestResponse", {
                     requestId: dictData.requestId,
                     message: dictData.message,
@@ -491,23 +629,7 @@ export function initNetworkSync(): void {
             const senderName = senderChar?.Name || `Member #${senderId}`;
 
             if (data.message === "qoc_inspect") {
-                const permCheck = canSenderInspect(senderId);
-                const responseData: InspectResponseData = permCheck.allowed ? {
-                    allowed: true,
-                    canViewAddons: permCheck.canViewAddons,
-                    canViewRules: permCheck.canViewRules,
-                    mods: permCheck.canViewAddons ? getLoadedMods() : [],
-                    rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
-                    autoLoadMode: modStorage.inspector.autoLoadMode,
-                    authority: modStorage.authority,
-                    callerAccessLevel: getCharacterAccessLevel(senderId),
-                    callerPermissions: getCallerPermissions(senderId),
-                    version
-                } : {
-                    allowed: false,
-                    reason: permCheck.reason
-                };
-
+                const responseData = buildInspectResponseData(senderId);
                 messagesManager.sendBeep({
                     type: `${MOD_KEY}_requestResponse`,
                     requestId: data.requestId,
@@ -519,17 +641,7 @@ export function initNetworkSync(): void {
 
             if (data.message === "qoc_setRules") {
                 const newRules = Array.isArray(data.data?.rules) ? (data.data.rules as ModRule[]) : [];
-                const authCheck = canSenderEnforceRules(senderId, newRules);
-                let responseData: SetRulesResponseData;
-                if (!authCheck.allowed) {
-                    responseData = { success: false, reason: authCheck.reason };
-                } else {
-                    modStorage.inspector.rules = newRules;
-                    syncStorage();
-                    evaluateCompliance();
-                    responseData = { success: true };
-                }
-
+                const responseData = handleSetRulesRequest(senderId, senderName, newRules);
                 messagesManager.sendBeep({
                     type: `${MOD_KEY}_requestResponse`,
                     requestId: data.requestId,
@@ -540,79 +652,30 @@ export function initNetworkSync(): void {
             }
 
             if (data.message === "qoc_triggerCompliance") {
-                if (!checkPermissionAccess("rules_force_compliance", senderId)) {
-                    messagesManager.sendBeep({
-                        type: `${MOD_KEY}_requestResponse`,
-                        requestId: data.requestId,
-                        message: data.message,
-                        data: { success: false, reason: "Permission Denied: You do not have authority to force compliance evaluations on this player." }
-                    }, senderId);
-                    return;
-                }
-
-                toastsManager.info({
-                    title: `${MOD_NAME} Compliance Triggered`,
-                    message: `${senderName} requested an immediate compliance check.`,
-                    duration: 4000
-                });
-
-                evaluateCompliance().then(report => {
-                    messagesManager.sendBeep({
-                        type: `${MOD_KEY}_requestResponse`,
-                        requestId: data.requestId,
-                        message: data.message,
-                        data: {
-                            success: true,
-                            report: {
-                                isCompliant: report.isCompliant,
-                                missingCount: report.missingRequired.length,
-                                forbiddenCount: report.detectedForbidden.length
-                            }
-                        }
-                    }, senderId);
-                });
+                const responseData = await handleTriggerComplianceRequest(senderId, senderName);
+                messagesManager.sendBeep({
+                    type: `${MOD_KEY}_requestResponse`,
+                    requestId: data.requestId,
+                    message: data.message,
+                    data: responseData
+                }, senderId);
                 return;
             }
 
             if (data.message === "qoc_updateAuthority") {
-                const req = data.data as AuthorityUpdateRequest;
-                let resData: AuthorityUpdateResponseData;
+                const resData = handleAuthorityUpdateRequest(data.data as AuthorityUpdateRequest, senderId, senderName);
+                messagesManager.sendBeep({
+                    type: `${MOD_KEY}_requestResponse`,
+                    requestId: data.requestId,
+                    message: data.message,
+                    data: resData
+                }, senderId);
+                return;
+            }
 
-                if (!req || typeof req.action !== "string") {
-                    resData = { success: false, reason: "Invalid request format." };
-                } else if (req.action === "add_role") {
-                    const res = addRoleMember(req.role!, req.memberNumber!, senderId);
-                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-                } else if (req.action === "remove_role") {
-                    const res = removeRoleMember(req.role!, req.memberNumber!, senderId);
-                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-                } else if (req.action === "set_min_role") {
-                    const res = setPermissionMinRole(req.perm!, req.minRole!, senderId);
-                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-                } else if (req.action === "set_self_access") {
-                    const res = setPermissionSelfAccess(req.perm!, req.selfAllowed!, senderId);
-                    resData = { success: res.success, reason: res.message, authority: modStorage.authority };
-                } else if (req.action === "set_autoload_mode") {
-                    if (!checkPermissionAccess("rules_edit_autoload_mode", senderId)) {
-                        resData = { success: false, reason: "Permission Denied: You do not have authority to edit auto-load mode." };
-                    } else {
-                        modStorage.inspector.autoLoadMode = req.autoLoadMode || "Prompt";
-                        saveStorage();
-                        syncStorage();
-                        resData = { success: true, autoLoadMode: modStorage.inspector.autoLoadMode };
-                    }
-                } else {
-                    resData = { success: false, reason: "Unknown action." };
-                }
-
-                if (resData.success) {
-                    toastsManager.info({
-                        title: `${MOD_NAME} Authority Updated`,
-                        message: `Authority updated by ${senderName}.`,
-                        duration: 4000
-                    });
-                }
-
+            if (data.message === "qoc_forceInject") {
+                const targetModId = typeof data.data?.modId === "string" ? data.data.modId : undefined;
+                const resData = await handleForceInjectRequest(senderId, senderName, targetModId);
                 messagesManager.sendBeep({
                     type: `${MOD_KEY}_requestResponse`,
                     requestId: data.requestId,
@@ -810,6 +873,56 @@ export async function requestTriggerCompliance(targetMemberNumber: number): Prom
             return {
                 success: false,
                 error: res.data.reason || "Target player rejected compliance trigger."
+            };
+        }
+
+        return {
+            success: true,
+            data: res.data
+        };
+    } catch (err: any) {
+        return {
+            success: false,
+            error: err?.message || "Failed to communicate with target player."
+        };
+    }
+}
+
+/**
+ * Sends a request to remotely force injection of missing mandatory addons on a target player.
+ */
+export async function requestForceInject(
+    targetMemberNumber: number,
+    modId?: string
+): Promise<{ success: boolean; data?: ForceInjectResponseData; error?: string }> {
+    try {
+        let res = await messagesManager.sendRequest<ForceInjectResponseData>({
+            message: "qoc_forceInject",
+            data: { modId },
+            target: targetMemberNumber,
+            type: "packet"
+        });
+
+        if (res.isError || !res.data) {
+            res = await messagesManager.sendRequest<ForceInjectResponseData>({
+                message: "qoc_forceInject",
+                data: { modId },
+                target: targetMemberNumber,
+                type: "beep"
+            });
+        }
+
+        if (res.isError || !res.data) {
+            return {
+                success: false,
+                error: "Target player did not respond to forced injection request."
+            };
+        }
+
+        if (!res.data.success) {
+            return {
+                success: false,
+                error: res.data.reason || "Target player rejected forced injection."
             };
         }
 
