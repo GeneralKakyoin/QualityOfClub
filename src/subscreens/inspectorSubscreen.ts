@@ -476,11 +476,11 @@ export class InspectorSubscreen extends BaseSubscreen {
                         const res = await requestForceInject(this.target.MemberNumber, "all");
                         if (res.success) {
                             toastsManager.success({
-                                title: `${MOD_NAME} Injection Complete`,
-                                message: `Injected missing addons on ${subjectName}.`,
+                                title: `${MOD_NAME} Injection Initiated`,
+                                message: res.data?.reason || `Forced injection initiated on ${subjectName}.`,
                                 duration: 5000
                             });
-                            await this.loadTargetData();
+                            setTimeout(() => this.loadTargetData(), 2500);
                         } else {
                             toastsManager.error({
                                 title: `${MOD_NAME} Injection Failed`,
@@ -579,16 +579,16 @@ export class InspectorSubscreen extends BaseSubscreen {
                             const res = await requestForceInject(this.target.MemberNumber, detail.rule.modId);
                             if (res.success) {
                                 toastsManager.success({
-                                    title: `${MOD_NAME} Addon Injected`,
-                                    message: `${detail.rule.modName} injected on ${subjectName}!`,
+                                    title: `${MOD_NAME} Injection Initiated`,
+                                    message: res.data?.reason || `${detail.rule.modName} injection initiated on ${subjectName}!`,
                                     duration: 4000
                                 });
-                                await this.loadTargetData();
+                                setTimeout(() => this.loadTargetData(), 2500);
                             } else {
                                 toastsManager.error({
                                     title: `${MOD_NAME} Injection Failed`,
                                     message: res.error || "Target client rejected addon injection.",
-                                    duration: 4000
+                                    duration: 5000
                                 });
                                 forceInjectBtn.disabled = false;
                                 forceInjectBtn.textContent = "💉 Force Inject";

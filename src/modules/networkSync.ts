@@ -420,84 +420,97 @@ function handleAuthorityUpdateRequest(req: AuthorityUpdateRequest, senderId: num
  * Handles incoming forced addon injection requests from an authorized dominant.
  */
 async function handleForceInjectRequest(senderId: number, senderName: string, targetModId?: string): Promise<ForceInjectResponseData> {
-    if (!modStorage.inspector.enabled) {
-        return { success: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
-    }
+    try {
+        if (!modStorage.inspector.enabled) {
+            return { success: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
+        }
 
-    if (!checkPermissionAccess("rules_force_injection", senderId)) {
-        return { success: false, reason: "Permission Denied: You do not meet the minimum role required to force addon injection on this player." };
-    }
+        if (!checkPermissionAccess("rules_force_injection", senderId)) {
+            return { success: false, reason: "Permission Denied: You do not meet the minimum role required to force addon injection on this player." };
+        }
 
-    if (!modStorage.inspector.allowForcedInjection) {
-        return { success: false, reason: "Permission Denied: Forced addon injection is disabled in this player's preferences." };
-    }
+        if (!modStorage.inspector.allowForcedInjection) {
+            return { success: false, reason: "Permission Denied: Forced addon injection is disabled in this player's preferences." };
+        }
 
-    const currentRules = modStorage.inspector.rules || [];
-    const missingMandatory = currentRules.filter(r => (r.type === "required" || (r.type as string) === "mandatory") && !isModLoaded(r.modId));
+        const currentRules = modStorage.inspector.rules || [];
+        const missingMandatory = currentRules.filter(r => (r.type === "required" || (r.type as string) === "mandatory") && !isModLoaded(r.modId));
 
-    if (missingMandatory.length === 0 && (!targetModId || targetModId === "all")) {
-        return {
-            success: true,
-            reason: "All mandatory addons are already loaded.",
-            injectedCount: 0,
-            report: {
-                isCompliant: true,
-                missingCount: 0,
-                forbiddenCount: 0
-            }
-        };
-    }
+        if (missingMandatory.length === 0 && (!targetModId || targetModId === "all")) {
+            return {
+                success: true,
+                reason: "All mandatory addons are already loaded.",
+                injectedCount: 0,
+                report: {
+                    isCompliant: true,
+                    missingCount: 0,
+                    forbiddenCount: 0
+                }
+            };
+        }
 
-    let toInject: ModRule[] = [];
-    if (targetModId && targetModId !== "all") {
-        const matching = missingMandatory.find(r => r.modId.toLowerCase() === targetModId.toLowerCase());
-        if (!matching) {
-            if (isModLoaded(targetModId)) {
-                return { success: true, reason: `${targetModId} is already loaded on this client.`, injectedCount: 0 };
-            }
-            const rule = currentRules.find(r => r.modId.toLowerCase() === targetModId.toLowerCase() && (r.type === "required" || (r.type as string) === "mandatory"));
-            if (rule) {
-                toInject = [rule];
+        let toInject: ModRule[] = [];
+        if (targetModId && targetModId !== "all") {
+            const matching = missingMandatory.find(r => r.modId.toLowerCase() === targetModId.toLowerCase());
+            if (!matching) {
+                if (isModLoaded(targetModId)) {
+                    return { success: true, reason: `${targetModId} is already loaded on this client.`, injectedCount: 0 };
+                }
+                const rule = currentRules.find(r => r.modId.toLowerCase() === targetModId.toLowerCase() && (r.type === "required" || (r.type as string) === "mandatory"));
+                if (rule) {
+                    toInject = [rule];
+                } else {
+                    return { success: false, reason: `Addon '${targetModId}' is not an active mandatory requirement.` };
+                }
             } else {
-                return { success: false, reason: `Addon '${targetModId}' is not an active mandatory requirement.` };
+                toInject = [matching];
             }
         } else {
-            toInject = [matching];
+            toInject = missingMandatory;
         }
-    } else {
-        toInject = missingMandatory;
+
+        // Run the script loading in the background so we acknowledge the request immediately without hitting the 6-second timeout
+        (async () => {
+            let injectedCount = 0;
+            const injectedNames: string[] = [];
+
+            for (const rule of toInject) {
+                try {
+                    const success = await loadCuratedMod(rule.modId);
+                    if (success) {
+                        injectedCount++;
+                        injectedNames.push(rule.modName || rule.modId);
+                    }
+                } catch (loadErr) {
+                    console.error(`[${MOD_NAME}] Failed to inject mod '${rule.modId}':`, loadErr);
+                }
+            }
+
+            if (injectedNames.length > 0) {
+                toastsManager.info({
+                    title: `${MOD_NAME} Forced Addon Injection`,
+                    message: `Mandatory addon${injectedNames.length > 1 ? "s" : ""} (${injectedNames.join(", ")}) ${injectedNames.length > 1 ? "were" : "was"} injected by ${senderName}.`,
+                    duration: 6000
+                });
+            }
+
+            await evaluateCompliance();
+            if (typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
+                sendSilentRoomTelemetry();
+            }
+        })().catch(console.error);
+
+        return {
+            success: true,
+            reason: `Forced injection initiated for ${toInject.map(r => r.modName || r.modId).join(", ")}.`,
+            injectedCount: toInject.length
+        };
+    } catch (err: any) {
+        return {
+            success: false,
+            reason: err?.message || "Internal error executing forced injection."
+        };
     }
-
-    let injectedCount = 0;
-    const injectedNames: string[] = [];
-
-    for (const rule of toInject) {
-        const success = await loadCuratedMod(rule.modId);
-        if (success) {
-            injectedCount++;
-            injectedNames.push(rule.modName || rule.modId);
-        }
-    }
-
-    if (injectedNames.length > 0) {
-        toastsManager.info({
-            title: `${MOD_NAME} Forced Addon Injection`,
-            message: `Mandatory addon${injectedNames.length > 1 ? "s" : ""} (${injectedNames.join(", ")}) ${injectedNames.length > 1 ? "were" : "was"} injected by ${senderName}.`,
-            duration: 6000
-        });
-    }
-
-    const report = await evaluateCompliance();
-
-    return {
-        success: true,
-        injectedCount,
-        report: {
-            isCompliant: report.isCompliant,
-            missingCount: report.missingRequired.length,
-            forbiddenCount: report.detectedForbidden.length
-        }
-    };
 }
 
 /**
