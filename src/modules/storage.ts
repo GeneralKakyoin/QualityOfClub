@@ -75,6 +75,9 @@ export interface CuratedModInfo {
     detectKeys: string[];
     repositoryMatch?: string;
     isCustom?: boolean;
+    author?: string;
+    tags?: string[];
+    scriptType?: "script" | "module" | "eval";
 }
 
 export interface ModRule {

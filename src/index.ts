@@ -12,6 +12,7 @@ import { initChatResizer, applyChatDimensions } from "./modules/chatResizer";
 import { initNetworkSync } from "./modules/networkSync";
 import { initProfileButton } from "./modules/profileButton";
 import { evaluateCompliance } from "./modules/compliance";
+import { initFusamManifest } from "./modules/modDetection";
 
 let hasInitialized = false;
 
@@ -25,6 +26,7 @@ export function initializeQoC(): void {
         initChatResizer();
         initNetworkSync();
         initProfileButton();
+        initFusamManifest().catch(console.warn);
         evaluateCompliance();
 
         console.log(`%c[${MOD_NAME}] v${version} loaded successfully!`, "color: #3a7bd5; font-weight: bold; font-size: 13px;");

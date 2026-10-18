@@ -1,6 +1,7 @@
 import { modStorage, CuratedModInfo } from "./storage";
 import { getLoadedMods as getSdkLoadedMods } from "zois-core/mod-sdk";
-export { CuratedModInfo };
+import { getFusamManifestCatalog, initFusamManifest } from "./fusamManifest";
+export { CuratedModInfo, initFusamManifest };
 
 export interface DetectedMod {
     id: string;
@@ -62,10 +63,14 @@ export const CURATED_MOD_CATALOG: Record<string, CuratedModInfo> = {
 };
 
 /**
- * Returns all catalog mods including default curated mods and user-defined custom mods.
+ * Returns all catalog mods including dynamic FUSAM manifest addons,
+ * default curated overrides, and user-defined custom mods.
  */
 export function getAllCatalogMods(): Record<string, CuratedModInfo> {
-    const combined: Record<string, CuratedModInfo> = { ...CURATED_MOD_CATALOG };
+    const combined: Record<string, CuratedModInfo> = {
+        ...getFusamManifestCatalog(),
+        ...CURATED_MOD_CATALOG
+    };
     if (modStorage?.inspector?.customCatalog && Array.isArray(modStorage.inspector.customCatalog)) {
         for (const item of modStorage.inspector.customCatalog) {
             if (item && item.id) {
@@ -319,8 +324,11 @@ export function loadCuratedMod(catalogId: string): Promise<boolean> {
 
     return new Promise((resolve) => {
         try {
-            console.log(`[QoC] Injecting verified mod script for ${mod.name}: ${mod.scriptUrl}`);
+            console.log(`[QoC] Injecting verified mod script for ${mod.name}: ${mod.scriptUrl} (type: ${mod.scriptType || "script"})`);
             const script = document.createElement("script");
+            if (mod.scriptType === "module") {
+                script.type = "module";
+            }
             const scriptUrl = mod.scriptUrl.includes("?") ? `${mod.scriptUrl}&_=${Date.now()}` : `${mod.scriptUrl}?_=${Date.now()}`;
             script.src = scriptUrl;
             script.crossOrigin = "anonymous";

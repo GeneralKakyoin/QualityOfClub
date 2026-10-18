@@ -49,6 +49,9 @@ export class InspectorSubscreen extends BaseSubscreen {
     // Filter text for permissions tab
     private permissionFilter: string = "";
 
+    // Search filter for Enforce Rules catalog
+    private catalogSearchText: string = "";
+
     // Root UI container & content area
     private rootElement: HTMLDivElement | null = null;
     private contentArea: HTMLDivElement | null = null;
@@ -702,109 +705,173 @@ export class InspectorSubscreen extends BaseSubscreen {
             this.contentArea.appendChild(activeList);
         }
 
-        // Curated & Custom Addon Catalog
+        // Community & Curated Addon Catalog
         const catalogHeader = document.createElement("div");
-        catalogHeader.style.cssText = "font-size: 15px; font-weight: bold; color: #64b5f6; margin-bottom: 8px;";
-        catalogHeader.textContent = "Curated & Custom Addon Catalog:";
+        catalogHeader.style.cssText = "display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;";
+
+        const allCatalogMods = Object.values(getAllCatalogMods());
+        catalogHeader.innerHTML = `
+            <div style="font-size: 15px; font-weight: bold; color: #64b5f6;">
+                Community & Curated Addon Catalog (${allCatalogMods.length}):
+            </div>
+        `;
+
+        const searchInput = document.createElement("input");
+        searchInput.type = "text";
+        searchInput.placeholder = "🔍 Search addons (name, ID, author, tags)...";
+        searchInput.value = this.catalogSearchText;
+        searchInput.style.cssText = `
+            padding: 8px 14px;
+            background: rgba(20, 26, 38, 0.9);
+            border: 1px solid rgba(80, 100, 140, 0.5);
+            color: white;
+            font-size: 13px;
+            border-radius: 6px;
+            width: 340px;
+            outline: none;
+        `;
+
+        catalogHeader.appendChild(searchInput);
         this.contentArea.appendChild(catalogHeader);
 
-        const curatedList = Object.values(getAllCatalogMods());
-        for (const item of curatedList) {
-            const row = document.createElement("div");
-            row.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;";
+        const catalogContainer = document.createElement("div");
+        catalogContainer.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
+        this.contentArea.appendChild(catalogContainer);
 
-            const left = document.createElement("div");
-            left.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 15px; font-weight: bold; color: #64b5f6;">${item.name}</span>
-                    ${item.isCustom ? '<span style="background: rgba(255, 152, 0, 0.2); border: 1px solid #ff9800; color: #ffb74d; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 3px;">CUSTOM</span>' : ''}
-                </div>
-                <div style="font-size: 12px; color: #8fa0b5; margin-top: 2px;">${item.description}</div>
-            `;
+        const renderCatalogItems = () => {
+            catalogContainer.innerHTML = "";
+            const query = this.catalogSearchText.toLowerCase().trim();
+            const filteredList = allCatalogMods.filter(item => {
+                if (!query) return true;
+                if (item.name.toLowerCase().includes(query)) return true;
+                if (item.id.toLowerCase().includes(query)) return true;
+                if (item.description && item.description.toLowerCase().includes(query)) return true;
+                if (item.author && item.author.toLowerCase().includes(query)) return true;
+                if (Array.isArray(item.tags) && item.tags.some(t => t.toLowerCase().includes(query))) return true;
+                if (Array.isArray(item.detectKeys) && item.detectKeys.some(k => k.toLowerCase().includes(query))) return true;
+                return false;
+            });
 
-            const existingRule = this.targetRulesCopy.find(r => r.modId.toLowerCase() === item.id.toLowerCase());
-            const currentState = existingRule ? (existingRule.type === "required" ? "required" : existingRule.type) : "none";
+            if (filteredList.length === 0) {
+                const emptyNotice = document.createElement("div");
+                emptyNotice.style.cssText = "padding: 20px; text-align: center; color: #90a4ae; background: rgba(30, 36, 48, 0.5); border-radius: 6px;";
+                emptyNotice.textContent = `No addons match "${this.catalogSearchText}".`;
+                catalogContainer.appendChild(emptyNotice);
+                return;
+            }
 
-            const btnGroup = document.createElement("div");
-            btnGroup.style.cssText = "display: flex; gap: 8px;";
+            for (const item of filteredList) {
+                const row = document.createElement("div");
+                row.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 6px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;";
 
-            const createChoiceBtn = (state: "none" | "required" | "forbidden", label: string, color: string, enabled: boolean) => {
-                const b = document.createElement("button");
-                b.textContent = label;
-                b.disabled = !enabled;
-                const isSelected = currentState === state;
-                b.style.cssText = `
-                    padding: 7px 16px;
-                    border-radius: 4px;
-                    font-size: 13px;
-                    font-weight: ${isSelected ? "bold" : "normal"};
-                    cursor: ${enabled ? "pointer" : "not-allowed"};
-                    background: ${isSelected ? color : "rgba(60, 70, 90, 0.4)"};
-                    border: 1px solid ${isSelected ? color : "rgba(100, 120, 150, 0.4)"};
-                    color: ${isSelected ? "white" : "#b0bec5"};
-                    opacity: ${enabled ? "1" : "0.5"};
-                    transition: all 0.15s ease;
+                const tagPills = (Array.isArray(item.tags) && item.tags.length > 0)
+                    ? item.tags.map(t => `<span style="background: rgba(41, 121, 255, 0.15); border: 1px solid rgba(66, 165, 245, 0.3); color: #90caf9; font-size: 10px; padding: 1px 5px; border-radius: 3px;">${t}</span>`).join(" ")
+                    : "";
+                const authorNote = item.author ? `<span style="color: #78909c; font-size: 11px;">by ${item.author}</span>` : "";
+
+                const left = document.createElement("div");
+                left.style.cssText = "max-width: 65%;";
+                left.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span style="font-size: 15px; font-weight: bold; color: #64b5f6;">${item.name}</span>
+                        ${authorNote}
+                        ${item.isCustom ? '<span style="background: rgba(255, 152, 0, 0.2); border: 1px solid #ff9800; color: #ffb74d; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 3px;">CUSTOM</span>' : ''}
+                        ${tagPills}
+                    </div>
+                    <div style="font-size: 12px; color: #8fa0b5; margin-top: 3px; line-height: 1.4;">${item.description}</div>
                 `;
-                b.addEventListener("click", async () => {
-                    if (!enabled) return;
-                    this.targetRulesCopy = this.targetRulesCopy.filter(r => r.modId.toLowerCase() !== item.id.toLowerCase());
-                    if (state !== "none") {
-                        this.targetRulesCopy.push({
-                            modId: item.id,
-                            modName: item.name,
-                            type: state,
-                            enforcedBy: typeof Player !== "undefined" ? (Player.MemberNumber || 0) : 0,
-                            enforcedByName: typeof Player !== "undefined" ? Player.Name : undefined,
-                            enforcedAt: Date.now()
-                        });
-                    }
 
-                    if (this.isSelf) {
-                        modStorage.inspector.rules = structuredClone(this.targetRulesCopy);
-                        saveStorage();
-                        syncStorage();
-                        evaluateCompliance();
-                        toastsManager.info({
-                            title: `${MOD_NAME} Rules`,
-                            message: `Rule for ${item.name} set to ${state === "none" ? "Neutral (Removed)" : state.toUpperCase()}.`,
-                            duration: 2500
-                        });
-                        this.renderRulesTab();
-                    } else {
-                        if (this.targetData) {
-                            this.targetData.rules = structuredClone(this.targetRulesCopy);
+                const existingRule = this.targetRulesCopy.find(r => r.modId.toLowerCase() === item.id.toLowerCase());
+                const currentState = existingRule ? (existingRule.type === "required" ? "required" : existingRule.type) : "none";
+
+                const btnGroup = document.createElement("div");
+                btnGroup.style.cssText = "display: flex; gap: 8px;";
+
+                const createChoiceBtn = (state: "none" | "required" | "forbidden", label: string, color: string, enabled: boolean) => {
+                    const b = document.createElement("button");
+                    b.textContent = label;
+                    b.disabled = !enabled;
+                    const isSelected = currentState === state;
+                    b.style.cssText = `
+                        padding: 7px 16px;
+                        border-radius: 4px;
+                        font-size: 13px;
+                        font-weight: ${isSelected ? "bold" : "normal"};
+                        cursor: ${enabled ? "pointer" : "not-allowed"};
+                        background: ${isSelected ? color : "rgba(60, 70, 90, 0.4)"};
+                        border: 1px solid ${isSelected ? color : "rgba(100, 120, 150, 0.4)"};
+                        color: ${isSelected ? "white" : "#b0bec5"};
+                        opacity: ${enabled ? "1" : "0.5"};
+                        transition: all 0.15s ease;
+                    `;
+                    b.addEventListener("click", async () => {
+                        if (!enabled) return;
+                        this.targetRulesCopy = this.targetRulesCopy.filter(r => r.modId.toLowerCase() !== item.id.toLowerCase());
+                        if (state !== "none") {
+                            this.targetRulesCopy.push({
+                                modId: item.id,
+                                modName: item.name,
+                                type: state,
+                                enforcedBy: typeof Player !== "undefined" ? (Player.MemberNumber || 0) : 0,
+                                enforcedByName: typeof Player !== "undefined" ? Player.Name : undefined,
+                                enforcedAt: Date.now()
+                            });
                         }
-                        this.renderRulesTab();
 
-                        if (this.target && typeof this.target.MemberNumber === "number") {
-                            const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
-                            if (res.success) {
-                                toastsManager.info({
-                                    title: `${MOD_NAME} Rules`,
-                                    message: `Rule for ${item.name} synced to ${subjectName}.`,
-                                    duration: 2500
-                                });
-                            } else {
-                                toastsManager.error({
-                                    title: `${MOD_NAME} Sync Failed`,
-                                    message: res.error || "Failed to sync rule to target.",
-                                    duration: 4000
-                                });
+                        if (this.isSelf) {
+                            modStorage.inspector.rules = structuredClone(this.targetRulesCopy);
+                            saveStorage();
+                            syncStorage();
+                            evaluateCompliance();
+                            toastsManager.info({
+                                title: `${MOD_NAME} Rules`,
+                                message: `Rule for ${item.name} set to ${state === "none" ? "Neutral (Removed)" : state.toUpperCase()}.`,
+                                duration: 2500
+                            });
+                            this.renderRulesTab();
+                        } else {
+                            if (this.targetData) {
+                                this.targetData.rules = structuredClone(this.targetRulesCopy);
+                            }
+                            this.renderRulesTab();
+
+                            if (this.target && typeof this.target.MemberNumber === "number") {
+                                const res = await requestSetRules(this.target.MemberNumber, this.targetRulesCopy);
+                                if (res.success) {
+                                    toastsManager.info({
+                                        title: `${MOD_NAME} Rules`,
+                                        message: `Rule for ${item.name} synced to ${subjectName}.`,
+                                        duration: 2500
+                                    });
+                                } else {
+                                    toastsManager.error({
+                                        title: `${MOD_NAME} Sync Failed`,
+                                        message: res.error || "Failed to sync rule to target.",
+                                        duration: 4000
+                                    });
+                                }
                             }
                         }
-                    }
-                });
-                return b;
-            };
+                    });
+                    return b;
+                };
 
-            btnGroup.appendChild(createChoiceBtn("none", "🔓 Neutral", "#78909c", canRemove));
-            btnGroup.appendChild(createChoiceBtn("required", "🔒 Mandatory", "#2e7d32", canMandatory));
-            btnGroup.appendChild(createChoiceBtn("forbidden", "🚫 Forbidden", "#c62828", canForbidden));
+                btnGroup.appendChild(createChoiceBtn("none", "🔓 Neutral", "#78909c", canRemove));
+                btnGroup.appendChild(createChoiceBtn("required", "🔒 Mandatory", "#2e7d32", canMandatory));
+                btnGroup.appendChild(createChoiceBtn("forbidden", "🚫 Forbidden", "#c62828", canForbidden));
 
-            row.appendChild(left);
-            row.appendChild(btnGroup);
-            this.contentArea.appendChild(row);
-        }
+                row.appendChild(left);
+                row.appendChild(btnGroup);
+                catalogContainer.appendChild(row);
+            }
+        };
+
+        searchInput.addEventListener("input", (e) => {
+            this.catalogSearchText = (e.target as HTMLInputElement).value;
+            renderCatalogItems();
+        });
+
+        renderCatalogItems();
 
         // Re-sync All button (only for remote targets)
         if (!this.isSelf) {
