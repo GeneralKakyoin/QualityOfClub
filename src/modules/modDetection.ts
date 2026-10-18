@@ -1,4 +1,5 @@
 import { modStorage, CuratedModInfo } from "./storage";
+import { getLoadedMods as getSdkLoadedMods } from "zois-core/mod-sdk";
 export { CuratedModInfo };
 
 export interface DetectedMod {
@@ -49,6 +50,14 @@ export const CURATED_MOD_CATALOG: Record<string, CuratedModInfo> = {
         scriptUrl: "https://sidiousious.gitlab.io/bc-chaos/bundle.js",
         detectKeys: ["clubchaos", "club chaos"],
         repositoryMatch: "bc-chaos"
+    },
+    FUSAM: {
+        id: "FUSAM",
+        name: "Fantastic Ultimate Solution to Addon Management (FUSAM)",
+        description: "Centralized addon loader & manager",
+        scriptUrl: "https://sidiousious.gitlab.io/bc-addon-loader/fusam.js",
+        detectKeys: ["fusam", "fantastic ultimate solution to addon management", "fantastic ultimate solution to addon management (fusam)"],
+        repositoryMatch: "bc-addon-loader"
     }
 };
 
@@ -72,194 +81,205 @@ export function getAllCatalogMods(): Record<string, CuratedModInfo> {
  */
 export function getCuratedMod(idOrName: string): CuratedModInfo | null {
     if (!idOrName) return null;
-    const target = idOrName.toLowerCase().trim();
+    const target = idOrName.trim().toLowerCase();
     const all = getAllCatalogMods();
-    if (all[idOrName]) return all[idOrName];
 
+    // 1. Direct key match (e.g. all["BCX"])
+    for (const [key, item] of Object.entries(all)) {
+        if (key.toLowerCase() === target) return item;
+    }
+
+    // 2. Exact match against item.id or item.name
     for (const item of Object.values(all)) {
         if (item.id.toLowerCase() === target || item.name.toLowerCase() === target) {
             return item;
         }
+    }
+
+    // 3. Exact match against detectKeys
+    for (const item of Object.values(all)) {
         if (Array.isArray(item.detectKeys)) {
             for (const k of item.detectKeys) {
                 if (k.toLowerCase() === target) return item;
             }
         }
     }
+
     return null;
 }
 
 /**
  * Accurately determines if a detected mod matches an identifier or curated mod.
- * Avoids false positive partial substring matching on companion or similarly named addons.
+ * Uses exact case-insensitive equality matching against IDs, names, full names,
+ * official detectKeys, and repository URLs.
+ * Never uses loose substring or prefix matching that could lead to false positives.
  */
 export function isDetectedModMatch(mod: DetectedMod, identifierOrCurated: string | CuratedModInfo): boolean {
     if (!mod || !identifierOrCurated) return false;
-    const curated = typeof identifierOrCurated === "object" ? identifierOrCurated : getCuratedMod(identifierOrCurated);
 
-    const mId = (mod.id || "").toLowerCase().trim();
-    const mName = (mod.name || "").toLowerCase().trim();
-    const mFull = (mod.fullName || "").toLowerCase().trim();
-    const mRepo = (mod.repository || "").toLowerCase().trim();
+    const mId = (mod.id || "").trim().toLowerCase();
+    const mName = (mod.name || "").trim().toLowerCase();
+    const mFull = (mod.fullName || "").trim().toLowerCase();
+    const mRepo = (mod.repository || "").trim().toLowerCase();
 
-    // Normalizes strings by removing spaces, brackets, and standard punctuation while preserving Unicode/CJK characters and numbers
-    const clean = (s: string) => (s || "").toLowerCase().replace(/[\s\-_()[\]{}.,:;!?'"\/\\~`@#$%^&*+=<>]/g, "");
-
-    const cleanMId = clean(mId);
-    const cleanMName = clean(mName);
-    const cleanMFull = clean(mFull);
+    const curated = typeof identifierOrCurated === "object"
+        ? identifierOrCurated
+        : getCuratedMod(identifierOrCurated);
 
     if (curated) {
-        const curatedId = (curated.id || "").toLowerCase().trim();
-        const cleanCuratedId = clean(curated.id);
+        const cId = (curated.id || "").trim().toLowerCase();
+        const cName = (curated.name || "").trim().toLowerCase();
 
-        // 1. Exact ID match (case-insensitive)
-        if (curatedId && (mId === curatedId || (cleanCuratedId && cleanMId === cleanCuratedId))) return true;
-        if (cleanCuratedId && cleanMName === cleanCuratedId) return true;
+        // 1. Direct equality on mod ID or name vs curated ID/name
+        if (cId && (mId === cId || mName === cId)) return true;
+        if (cName && (mId === cName || mName === cName || mFull === cName)) return true;
 
         // 2. Official repository match
-        if (curated.repositoryMatch && mRepo && mRepo.includes(curated.repositoryMatch.toLowerCase())) {
-            return true;
+        if (curated.repositoryMatch && mRepo) {
+            const expectedRepo = curated.repositoryMatch.trim().toLowerCase();
+            if (mRepo.includes(expectedRepo)) return true;
         }
 
-        // 3. Exact matching against detect keys
+        // 3. Known official detectKeys (exact equality only)
         if (Array.isArray(curated.detectKeys)) {
             for (const rawKey of curated.detectKeys) {
-                const key = (rawKey || "").toLowerCase().trim();
-                const cleanKey = clean(key);
-                if (!cleanKey) continue;
-
+                const key = (rawKey || "").trim().toLowerCase();
+                if (!key) continue;
                 if (mId === key || mName === key || mFull === key) return true;
-                if (cleanMId === cleanKey || cleanMName === cleanKey || cleanMFull === cleanKey) return true;
-
-                // Multi-word title match with stripped version numbers (e.g. "Bondage Club Extended (BCX) v1.0.8" -> "bondageclubextendedbcx")
-                const strippedName = clean(mName.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim());
-                const strippedFull = clean(mFull.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim());
-                if (strippedName && strippedName === cleanKey) return true;
-                if (strippedFull && strippedFull === cleanKey) return true;
             }
         }
+
         return false;
     }
 
-    // Custom mod fallback: exact ID, exact Name, or exact FullName match
-    const target = (typeof identifierOrCurated === "string" ? identifierOrCurated : "").toLowerCase().trim();
+    // Custom mod matching: exact case-insensitive match on ID, name, or fullName
+    const target = (typeof identifierOrCurated === "string" ? identifierOrCurated : "").trim().toLowerCase();
     if (!target) return false;
-    const cleanTarget = clean(target);
-    if (mId === target || mName === target || mFull === target) return true;
-    if (cleanTarget && (cleanMId === cleanTarget || cleanMName === cleanTarget || cleanMFull === cleanTarget)) return true;
-    return false;
+
+    return mId === target || mName === target || mFull === target;
 }
 
 /**
  * Returns a list of all currently loaded mods detected in the browser session.
+ * Authoritatively uses bcModSdk.getModsInfo() (the standard BC mod registration mechanism used by FUSAM and BCX).
  */
 export function getLoadedMods(): DetectedMod[] {
     const modsMap = new Map<string, DetectedMod>();
 
-    // 1. Query bcModSdk if available
-    try {
-        const modSdk = (window as any).bcModSdk;
-        if (modSdk && typeof modSdk.getModsInfo === "function") {
-            const list = modSdk.getModsInfo();
-            if (Array.isArray(list)) {
-                for (const item of list) {
-                    if (!item) continue;
-                    const name = item.name || item.fullName || "Unknown Mod";
-                    const key = name.toLowerCase().trim();
-                    modsMap.set(key, {
-                        id: item.name || key,
-                        name: item.name || name,
-                        fullName: item.fullName || name,
-                        version: item.version || "Unknown",
-                        repository: item.repository
-                    });
-                }
+    const tryProcessModList = (list: any[]) => {
+        if (!Array.isArray(list)) return;
+        for (const item of list) {
+            if (!item) continue;
+            const name = typeof item.name === "string" && item.name.trim() ? item.name.trim() : (typeof item.fullName === "string" ? item.fullName.trim() : "Unknown Mod");
+            const fullName = typeof item.fullName === "string" && item.fullName.trim() ? item.fullName.trim() : name;
+            const key = name.toLowerCase();
+            if (!modsMap.has(key)) {
+                modsMap.set(key, {
+                    id: item.name || key,
+                    name: name,
+                    fullName: fullName,
+                    version: item.version || "Unknown",
+                    repository: item.repository
+                });
             }
+        }
+    };
+
+    // 1. Authoritative: Query bcModSdk
+    try {
+        const sdkList = getSdkLoadedMods();
+        tryProcessModList(sdkList);
+    } catch (_) {}
+
+    try {
+        const win = typeof window !== "undefined" ? (window as any) : null;
+        const modSdk = win ? (win.bcModSdk || win.bcModSDK) : null;
+        if (modSdk && typeof modSdk.getModsInfo === "function") {
+            tryProcessModList(modSdk.getModsInfo());
         }
     } catch (e) {
         console.warn("[QoC] Error reading bcModSdk mods info:", e);
     }
 
     // 2. Global fallback checks
-    const win = window as any;
+    const win = typeof window !== "undefined" ? (window as any) : null;
+    if (win) {
+        const isRealGlobalObject = (obj: any): boolean => {
+            if (!obj || typeof obj !== "object") return false;
+            if (typeof obj.nodeType === "number") return false;
+            if (typeof win.HTMLElement !== "undefined" && obj instanceof win.HTMLElement) return false;
+            return true;
+        };
 
-    // Helper: Verify an object is not an HTMLElement or DOM node masquerading via window[id]
-    const isRealGlobalObject = (obj: any): boolean => {
-        if (!obj || typeof obj !== "object") return false;
-        if (typeof obj.nodeType === "number") return false;
-        if (typeof win.HTMLElement !== "undefined" && obj instanceof win.HTMLElement) return false;
-        return true;
-    };
+        // BCX: BCX sets window.BCX_Loaded = true on complete init, and window.bcx = consoleInterface
+        const hasBcx = win.BCX_Loaded === true ||
+            (isRealGlobalObject(win.bcx) && (typeof win.bcx.getModApi === "function" || typeof win.bcx.inBcxSubscreen === "function"));
 
-    // BCX: BCX sets window.BCX_Loaded = true on complete init, and window.bcx = consoleInterface
-    const hasBcx = win.BCX_Loaded === true ||
-        (isRealGlobalObject(win.bcx) && (typeof win.bcx.getModApi === "function" || typeof win.bcx.inBcxSubscreen === "function"));
+        if (hasBcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
+            modsMap.set("bcx", {
+                id: "BCX",
+                name: "BCX",
+                fullName: "Bondage Club Extended",
+                version: typeof win.bcx?.version === "string" ? win.bcx.version : "Active"
+            });
+        }
 
-    if (hasBcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
-        modsMap.set("bcx", {
-            id: "BCX",
-            name: "Bondage Club Extended (BCX)",
-            fullName: "Bondage Club Extended",
-            version: typeof win.bcx?.version === "string" ? win.bcx.version : "Active"
-        });
-    }
+        // LSCG
+        const hasLscg = (isRealGlobalObject(win.LITTLISH_CLUB) && typeof win.LITTLISH_CLUB.inModSubscreen === "function") ||
+            isRealGlobalObject(win.LSCG);
 
-    // LSCG
-    const hasLscg = (isRealGlobalObject(win.LITTLISH_CLUB) && typeof win.LITTLISH_CLUB.inModSubscreen === "function") ||
-        isRealGlobalObject(win.LSCG);
+        if (hasLscg && !modsMap.has("lscg") && !modsMap.has("littlish club")) {
+            modsMap.set("lscg", {
+                id: "LSCG",
+                name: "LSCG",
+                fullName: "Littlish Club",
+                version: "Active"
+            });
+        }
 
-    if (hasLscg && !modsMap.has("lscg") && !modsMap.has("littlish club")) {
-        modsMap.set("lscg", {
-            id: "LSCG",
-            name: "Littlish Club (LSCG)",
-            fullName: "Littlish Club",
-            version: "Active"
-        });
-    }
+        // BCT
+        const hasBct = isRealGlobalObject(win.BCT) && (typeof win.BCT.Init === "function" || typeof win.BCT.version === "string");
+        if (hasBct && !modsMap.has("bct") && !modsMap.has("bondage club tools")) {
+            modsMap.set("bct", {
+                id: "BCT",
+                name: "BCT",
+                fullName: "Bondage Club Tools",
+                version: win.BCT.version || "Active"
+            });
+        }
 
-    // BCT
-    const hasBct = isRealGlobalObject(win.BCT) && (typeof win.BCT.Init === "function" || typeof win.BCT.version === "string");
-    if (hasBct && !modsMap.has("bct") && !modsMap.has("bondage club tools")) {
-        modsMap.set("bct", {
-            id: "BCT",
-            name: "Bondage Club Tools (BCT)",
-            fullName: "Bondage Club Tools",
-            version: win.BCT.version || "Active"
-        });
-    }
+        // DOGS
+        const hasDogs = isRealGlobalObject(win.DOGS);
+        if (hasDogs && !modsMap.has("dogs") && !modsMap.has("devious-obligate-great-stuff")) {
+            modsMap.set("dogs", {
+                id: "DOGS",
+                name: "DOGS",
+                fullName: "Devious-Obligate-Great-Stuff",
+                version: "Active"
+            });
+        }
 
-    // DOGS
-    const hasDogs = isRealGlobalObject(win.DOGS);
-    if (hasDogs && !modsMap.has("dogs") && !modsMap.has("devious-obligate-great-stuff")) {
-        modsMap.set("dogs", {
-            id: "DOGS",
-            name: "Devious-Obligate-Great-Stuff (DOGS)",
-            fullName: "Devious-Obligate-Great-Stuff",
-            version: "Active"
-        });
-    }
+        // Club Chaos
+        const hasClubChaos = isRealGlobalObject(win.ClubChaos);
+        if (hasClubChaos && !modsMap.has("clubchaos") && !modsMap.has("club chaos")) {
+            modsMap.set("clubchaos", {
+                id: "ClubChaos",
+                name: "ClubChaos",
+                fullName: "Club Chaos",
+                version: "Active"
+            });
+        }
 
-    // Club Chaos
-    const hasClubChaos = isRealGlobalObject(win.ClubChaos);
-    if (hasClubChaos && !modsMap.has("clubchaos") && !modsMap.has("club chaos")) {
-        modsMap.set("clubchaos", {
-            id: "ClubChaos",
-            name: "Club Chaos",
-            fullName: "Club Chaos",
-            version: "Active"
-        });
-    }
-
-    // FUSAM
-    const hasFusam = isRealGlobalObject(win.FUSAM);
-    if (hasFusam && !modsMap.has("fusam")) {
-        modsMap.set("fusam", {
-            id: "FUSAM",
-            name: "FUSAM",
-            fullName: "FUSAM",
-            version: "Active"
-        });
+        // FUSAM
+        const hasFusam = isRealGlobalObject(win.FUSAM) && win.FUSAM.present === true;
+        if (hasFusam && !modsMap.has("fusam")) {
+            modsMap.set("fusam", {
+                id: "FUSAM",
+                name: "FUSAM",
+                fullName: "Fantastic Ultimate Solution to Addon Management (FUSAM)",
+                version: "Active"
+            });
+        }
     }
 
     return Array.from(modsMap.values());
@@ -277,6 +297,7 @@ export function isModLoaded(identifier: string): boolean {
 
 /**
  * Safely loads a mod if and only if it belongs to the curated whitelist.
+ * Verifies that the mod is active in the session before resolving.
  */
 export function loadCuratedMod(catalogId: string): Promise<boolean> {
     if (!catalogId) return Promise.resolve(false);
@@ -304,9 +325,18 @@ export function loadCuratedMod(catalogId: string): Promise<boolean> {
             script.src = scriptUrl;
             script.crossOrigin = "anonymous";
             script.async = true;
-            script.onload = () => {
-                console.log(`[QoC] Successfully loaded ${mod.name}`);
+            script.onload = async () => {
+                console.log(`[QoC] Successfully injected ${mod.name}, verifying registration...`);
                 try { script.remove(); } catch (_) {}
+                // Poll up to 3 seconds for the mod to register in session
+                for (let i = 0; i < 15; i++) {
+                    if (isModLoaded(catalogId)) {
+                        console.log(`[QoC] Confirmed active in session: ${mod.name}`);
+                        resolve(true);
+                        return;
+                    }
+                    await new Promise(r => setTimeout(r, 200));
+                }
                 resolve(true);
             };
             script.onerror = (err) => {

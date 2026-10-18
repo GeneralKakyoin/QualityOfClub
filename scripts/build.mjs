@@ -37,11 +37,13 @@ await build({
     process.exit(1);
 });
 
+const pkg = JSON.parse(fs.readFileSync("./package.json", "utf-8"));
+
 // Generate standard FurryZoi-style userscript loader
 const userScript = `// ==UserScript==
 // @name Quality of Club
 // @namespace https://www.bondageprojects.com/
-// @version 1.0.11
+// @version ${pkg.version}
 // @description Quality of life improvements for Bondage Club
 // @author Matti
 // @match *://*.bondageeurope.com/*

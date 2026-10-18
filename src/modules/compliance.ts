@@ -195,16 +195,20 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
                             duration: 4000
                         });
                         const success = await loadCuratedMod(curated.id);
-                        if (success) {
+                        if (success && (isModLoaded(rule.modId) || isModLoaded(rule.modName))) {
                             toastsManager.success({
                                 title: `${MOD_NAME} Injected`,
                                 message: `Successfully loaded ${curated.name}!`,
                                 duration: 4000
                             });
-                            if (isModLoaded(rule.modId) || isModLoaded(rule.modName)) {
-                                const idx = missingRequired.indexOf(rule);
-                                if (idx !== -1) missingRequired.splice(idx, 1);
-                            }
+                            const idx = missingRequired.indexOf(rule);
+                            if (idx !== -1) missingRequired.splice(idx, 1);
+                        } else if (success) {
+                            toastsManager.warn({
+                                title: `${MOD_NAME} Injection Notice`,
+                                message: `Injected ${curated.name}, but it has not initialized yet.`,
+                                duration: 4500
+                            });
                         }
                     } else if (modStorage.inspector.autoLoadMode === "Prompt") {
                         if (!promptedMods.has(curated.id)) {

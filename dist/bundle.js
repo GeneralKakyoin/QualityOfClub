@@ -1365,6 +1365,9 @@ One of mods you are using is using an old version of SDK. It will work for now b
       };
     }
   }
+  function getLoadedMods() {
+    return import_bondage_club_mod_sdk.default.getModsInfo();
+  }
 
   // node_modules/.pnpm/zois-core@2.2.1/node_modules/zois-core/dist/shard-modules/shardModule.js
   var ShardModule = class {
@@ -4267,7 +4270,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.13";
+  var version2 = "1.0.14";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -5040,6 +5043,14 @@ One of mods you are using is using an old version of SDK. It will work for now b
       scriptUrl: "https://sidiousious.gitlab.io/bc-chaos/bundle.js",
       detectKeys: ["clubchaos", "club chaos"],
       repositoryMatch: "bc-chaos"
+    },
+    FUSAM: {
+      id: "FUSAM",
+      name: "Fantastic Ultimate Solution to Addon Management (FUSAM)",
+      description: "Centralized addon loader & manager",
+      scriptUrl: "https://sidiousious.gitlab.io/bc-addon-loader/fusam.js",
+      detectKeys: ["fusam", "fantastic ultimate solution to addon management", "fantastic ultimate solution to addon management (fusam)"],
+      repositoryMatch: "bc-addon-loader"
     }
   };
   function getAllCatalogMods() {
@@ -5055,13 +5066,17 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
   function getCuratedMod(idOrName) {
     if (!idOrName) return null;
-    const target = idOrName.toLowerCase().trim();
+    const target = idOrName.trim().toLowerCase();
     const all = getAllCatalogMods();
-    if (all[idOrName]) return all[idOrName];
+    for (const [key, item] of Object.entries(all)) {
+      if (key.toLowerCase() === target) return item;
+    }
     for (const item of Object.values(all)) {
       if (item.id.toLowerCase() === target || item.name.toLowerCase() === target) {
         return item;
       }
+    }
+    for (const item of Object.values(all)) {
       if (Array.isArray(item.detectKeys)) {
         for (const k of item.detectKeys) {
           if (k.toLowerCase() === target) return item;
@@ -5072,135 +5087,135 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
   function isDetectedModMatch(mod, identifierOrCurated) {
     if (!mod || !identifierOrCurated) return false;
+    const mId = (mod.id || "").trim().toLowerCase();
+    const mName = (mod.name || "").trim().toLowerCase();
+    const mFull = (mod.fullName || "").trim().toLowerCase();
+    const mRepo = (mod.repository || "").trim().toLowerCase();
     const curated = typeof identifierOrCurated === "object" ? identifierOrCurated : getCuratedMod(identifierOrCurated);
-    const mId = (mod.id || "").toLowerCase().trim();
-    const mName = (mod.name || "").toLowerCase().trim();
-    const mFull = (mod.fullName || "").toLowerCase().trim();
-    const mRepo = (mod.repository || "").toLowerCase().trim();
-    const clean = (s) => (s || "").toLowerCase().replace(/[\s\-_()[\]{}.,:;!?'"\/\\~`@#$%^&*+=<>]/g, "");
-    const cleanMId = clean(mId);
-    const cleanMName = clean(mName);
-    const cleanMFull = clean(mFull);
     if (curated) {
-      const curatedId = (curated.id || "").toLowerCase().trim();
-      const cleanCuratedId = clean(curated.id);
-      if (curatedId && (mId === curatedId || cleanCuratedId && cleanMId === cleanCuratedId)) return true;
-      if (cleanCuratedId && cleanMName === cleanCuratedId) return true;
-      if (curated.repositoryMatch && mRepo && mRepo.includes(curated.repositoryMatch.toLowerCase())) {
-        return true;
+      const cId = (curated.id || "").trim().toLowerCase();
+      const cName = (curated.name || "").trim().toLowerCase();
+      if (cId && (mId === cId || mName === cId)) return true;
+      if (cName && (mId === cName || mName === cName || mFull === cName)) return true;
+      if (curated.repositoryMatch && mRepo) {
+        const expectedRepo = curated.repositoryMatch.trim().toLowerCase();
+        if (mRepo.includes(expectedRepo)) return true;
       }
       if (Array.isArray(curated.detectKeys)) {
         for (const rawKey of curated.detectKeys) {
-          const key = (rawKey || "").toLowerCase().trim();
-          const cleanKey = clean(key);
-          if (!cleanKey) continue;
+          const key = (rawKey || "").trim().toLowerCase();
+          if (!key) continue;
           if (mId === key || mName === key || mFull === key) return true;
-          if (cleanMId === cleanKey || cleanMName === cleanKey || cleanMFull === cleanKey) return true;
-          const strippedName = clean(mName.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim());
-          const strippedFull = clean(mFull.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim());
-          if (strippedName && strippedName === cleanKey) return true;
-          if (strippedFull && strippedFull === cleanKey) return true;
         }
       }
       return false;
     }
-    const target = (typeof identifierOrCurated === "string" ? identifierOrCurated : "").toLowerCase().trim();
+    const target = (typeof identifierOrCurated === "string" ? identifierOrCurated : "").trim().toLowerCase();
     if (!target) return false;
-    const cleanTarget = clean(target);
-    if (mId === target || mName === target || mFull === target) return true;
-    if (cleanTarget && (cleanMId === cleanTarget || cleanMName === cleanTarget || cleanMFull === cleanTarget)) return true;
-    return false;
+    return mId === target || mName === target || mFull === target;
   }
-  function getLoadedMods() {
+  function getLoadedMods2() {
     const modsMap = /* @__PURE__ */ new Map();
-    try {
-      const modSdk2 = window.bcModSdk;
-      if (modSdk2 && typeof modSdk2.getModsInfo === "function") {
-        const list = modSdk2.getModsInfo();
-        if (Array.isArray(list)) {
-          for (const item of list) {
-            if (!item) continue;
-            const name = item.name || item.fullName || "Unknown Mod";
-            const key = name.toLowerCase().trim();
-            modsMap.set(key, {
-              id: item.name || key,
-              name: item.name || name,
-              fullName: item.fullName || name,
-              version: item.version || "Unknown",
-              repository: item.repository
-            });
-          }
+    const tryProcessModList = (list) => {
+      if (!Array.isArray(list)) return;
+      for (const item of list) {
+        if (!item) continue;
+        const name = typeof item.name === "string" && item.name.trim() ? item.name.trim() : typeof item.fullName === "string" ? item.fullName.trim() : "Unknown Mod";
+        const fullName = typeof item.fullName === "string" && item.fullName.trim() ? item.fullName.trim() : name;
+        const key = name.toLowerCase();
+        if (!modsMap.has(key)) {
+          modsMap.set(key, {
+            id: item.name || key,
+            name,
+            fullName,
+            version: item.version || "Unknown",
+            repository: item.repository
+          });
         }
+      }
+    };
+    try {
+      const sdkList = getLoadedMods();
+      tryProcessModList(sdkList);
+    } catch (_) {
+    }
+    try {
+      const win2 = typeof window !== "undefined" ? window : null;
+      const modSdk2 = win2 ? win2.bcModSdk || win2.bcModSDK : null;
+      if (modSdk2 && typeof modSdk2.getModsInfo === "function") {
+        tryProcessModList(modSdk2.getModsInfo());
       }
     } catch (e) {
       console.warn("[QoC] Error reading bcModSdk mods info:", e);
     }
-    const win = window;
-    const isRealGlobalObject = (obj) => {
-      if (!obj || typeof obj !== "object") return false;
-      if (typeof obj.nodeType === "number") return false;
-      if (typeof win.HTMLElement !== "undefined" && obj instanceof win.HTMLElement) return false;
-      return true;
-    };
-    const hasBcx = win.BCX_Loaded === true || isRealGlobalObject(win.bcx) && (typeof win.bcx.getModApi === "function" || typeof win.bcx.inBcxSubscreen === "function");
-    if (hasBcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
-      modsMap.set("bcx", {
-        id: "BCX",
-        name: "Bondage Club Extended (BCX)",
-        fullName: "Bondage Club Extended",
-        version: typeof win.bcx?.version === "string" ? win.bcx.version : "Active"
-      });
-    }
-    const hasLscg = isRealGlobalObject(win.LITTLISH_CLUB) && typeof win.LITTLISH_CLUB.inModSubscreen === "function" || isRealGlobalObject(win.LSCG);
-    if (hasLscg && !modsMap.has("lscg") && !modsMap.has("littlish club")) {
-      modsMap.set("lscg", {
-        id: "LSCG",
-        name: "Littlish Club (LSCG)",
-        fullName: "Littlish Club",
-        version: "Active"
-      });
-    }
-    const hasBct = isRealGlobalObject(win.BCT) && (typeof win.BCT.Init === "function" || typeof win.BCT.version === "string");
-    if (hasBct && !modsMap.has("bct") && !modsMap.has("bondage club tools")) {
-      modsMap.set("bct", {
-        id: "BCT",
-        name: "Bondage Club Tools (BCT)",
-        fullName: "Bondage Club Tools",
-        version: win.BCT.version || "Active"
-      });
-    }
-    const hasDogs = isRealGlobalObject(win.DOGS);
-    if (hasDogs && !modsMap.has("dogs") && !modsMap.has("devious-obligate-great-stuff")) {
-      modsMap.set("dogs", {
-        id: "DOGS",
-        name: "Devious-Obligate-Great-Stuff (DOGS)",
-        fullName: "Devious-Obligate-Great-Stuff",
-        version: "Active"
-      });
-    }
-    const hasClubChaos = isRealGlobalObject(win.ClubChaos);
-    if (hasClubChaos && !modsMap.has("clubchaos") && !modsMap.has("club chaos")) {
-      modsMap.set("clubchaos", {
-        id: "ClubChaos",
-        name: "Club Chaos",
-        fullName: "Club Chaos",
-        version: "Active"
-      });
-    }
-    const hasFusam = isRealGlobalObject(win.FUSAM);
-    if (hasFusam && !modsMap.has("fusam")) {
-      modsMap.set("fusam", {
-        id: "FUSAM",
-        name: "FUSAM",
-        fullName: "FUSAM",
-        version: "Active"
-      });
+    const win = typeof window !== "undefined" ? window : null;
+    if (win) {
+      const isRealGlobalObject = (obj) => {
+        if (!obj || typeof obj !== "object") return false;
+        if (typeof obj.nodeType === "number") return false;
+        if (typeof win.HTMLElement !== "undefined" && obj instanceof win.HTMLElement) return false;
+        return true;
+      };
+      const hasBcx = win.BCX_Loaded === true || isRealGlobalObject(win.bcx) && (typeof win.bcx.getModApi === "function" || typeof win.bcx.inBcxSubscreen === "function");
+      if (hasBcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
+        modsMap.set("bcx", {
+          id: "BCX",
+          name: "BCX",
+          fullName: "Bondage Club Extended",
+          version: typeof win.bcx?.version === "string" ? win.bcx.version : "Active"
+        });
+      }
+      const hasLscg = isRealGlobalObject(win.LITTLISH_CLUB) && typeof win.LITTLISH_CLUB.inModSubscreen === "function" || isRealGlobalObject(win.LSCG);
+      if (hasLscg && !modsMap.has("lscg") && !modsMap.has("littlish club")) {
+        modsMap.set("lscg", {
+          id: "LSCG",
+          name: "LSCG",
+          fullName: "Littlish Club",
+          version: "Active"
+        });
+      }
+      const hasBct = isRealGlobalObject(win.BCT) && (typeof win.BCT.Init === "function" || typeof win.BCT.version === "string");
+      if (hasBct && !modsMap.has("bct") && !modsMap.has("bondage club tools")) {
+        modsMap.set("bct", {
+          id: "BCT",
+          name: "BCT",
+          fullName: "Bondage Club Tools",
+          version: win.BCT.version || "Active"
+        });
+      }
+      const hasDogs = isRealGlobalObject(win.DOGS);
+      if (hasDogs && !modsMap.has("dogs") && !modsMap.has("devious-obligate-great-stuff")) {
+        modsMap.set("dogs", {
+          id: "DOGS",
+          name: "DOGS",
+          fullName: "Devious-Obligate-Great-Stuff",
+          version: "Active"
+        });
+      }
+      const hasClubChaos = isRealGlobalObject(win.ClubChaos);
+      if (hasClubChaos && !modsMap.has("clubchaos") && !modsMap.has("club chaos")) {
+        modsMap.set("clubchaos", {
+          id: "ClubChaos",
+          name: "ClubChaos",
+          fullName: "Club Chaos",
+          version: "Active"
+        });
+      }
+      const hasFusam = isRealGlobalObject(win.FUSAM) && win.FUSAM.present === true;
+      if (hasFusam && !modsMap.has("fusam")) {
+        modsMap.set("fusam", {
+          id: "FUSAM",
+          name: "FUSAM",
+          fullName: "Fantastic Ultimate Solution to Addon Management (FUSAM)",
+          version: "Active"
+        });
+      }
     }
     return Array.from(modsMap.values());
   }
   function isModLoaded(identifier) {
     if (!identifier) return false;
-    const loaded = getLoadedMods();
+    const loaded = getLoadedMods2();
     return loaded.some((mod) => isDetectedModMatch(mod, identifier));
   }
   function loadCuratedMod(catalogId) {
@@ -5225,11 +5240,19 @@ One of mods you are using is using an old version of SDK. It will work for now b
         script.src = scriptUrl;
         script.crossOrigin = "anonymous";
         script.async = true;
-        script.onload = () => {
-          console.log(`[QoC] Successfully loaded ${mod.name}`);
+        script.onload = async () => {
+          console.log(`[QoC] Successfully injected ${mod.name}, verifying registration...`);
           try {
             script.remove();
           } catch (_) {
+          }
+          for (let i = 0; i < 15; i++) {
+            if (isModLoaded(catalogId)) {
+              console.log(`[QoC] Confirmed active in session: ${mod.name}`);
+              resolve(true);
+              return;
+            }
+            await new Promise((r) => setTimeout(r, 200));
           }
           resolve(true);
         };
@@ -5394,16 +5417,20 @@ One of mods you are using is using an old version of SDK. It will work for now b
                 duration: 4e3
               });
               const success = await loadCuratedMod(curated.id);
-              if (success) {
+              if (success && (isModLoaded(rule.modId) || isModLoaded(rule.modName))) {
                 toastsManager.success({
                   title: `${MOD_NAME} Injected`,
                   message: `Successfully loaded ${curated.name}!`,
                   duration: 4e3
                 });
-                if (isModLoaded(rule.modId) || isModLoaded(rule.modName)) {
-                  const idx = missingRequired.indexOf(rule);
-                  if (idx !== -1) missingRequired.splice(idx, 1);
-                }
+                const idx = missingRequired.indexOf(rule);
+                if (idx !== -1) missingRequired.splice(idx, 1);
+              } else if (success) {
+                toastsManager.warn({
+                  title: `${MOD_NAME} Injection Notice`,
+                  message: `Injected ${curated.name}, but it has not initialized yet.`,
+                  duration: 4500
+                });
               }
             } else if (modStorage.inspector.autoLoadMode === "Prompt") {
               if (!promptedMods.has(curated.id)) {
@@ -7652,7 +7679,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     if (!modStorage.inspector.silentTelemetry) return;
     if (typeof ChatRoomCharacter === "undefined" || !Array.isArray(ChatRoomCharacter)) return;
     if (typeof Player === "undefined") return;
-    const loadedMods = getLoadedMods();
+    const loadedMods = getLoadedMods2();
     const rules = modStorage.inspector.rules;
     const compliance = checkComplianceAgainstRules(loadedMods, rules);
     for (const char of ChatRoomCharacter) {
@@ -7709,7 +7736,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
             allowed: true,
             canViewAddons: permCheck.canViewAddons,
             canViewRules: permCheck.canViewRules,
-            mods: permCheck.canViewAddons ? getLoadedMods() : [],
+            mods: permCheck.canViewAddons ? getLoadedMods2() : [],
             rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
             autoLoadMode: modStorage.inspector.autoLoadMode,
             preferences: {
@@ -7924,7 +7951,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
             allowed: true,
             canViewAddons: permCheck.canViewAddons,
             canViewRules: permCheck.canViewRules,
-            mods: permCheck.canViewAddons ? getLoadedMods() : [],
+            mods: permCheck.canViewAddons ? getLoadedMods2() : [],
             rules: permCheck.canViewRules ? modStorage.inspector.rules : [],
             autoLoadMode: modStorage.inspector.autoLoadMode,
             authority: modStorage.authority,
@@ -8464,7 +8491,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
       const canViewRules = this.isSelf ? checkPermissionAccess("inspect_view_rules") : this.targetData?.canViewRules ?? true;
       const canRemoveRules = this.isSelf ? checkPermissionAccess("rules_remove_rules") : this.targetData?.callerPermissions?.rules_remove_rules ?? false;
       const canForceCompliance = this.isSelf ? checkPermissionAccess("rules_force_compliance") : this.targetData?.callerPermissions?.rules_force_compliance ?? false;
-      const mods = this.isSelf ? getLoadedMods() : this.targetData?.mods || [];
+      const mods = this.isSelf ? getLoadedMods2() : this.targetData?.mods || [];
       const rules = this.isSelf ? modStorage.inspector.rules : this.targetRulesCopy.length > 0 ? this.targetRulesCopy : this.targetData?.rules || [];
       const compliance = checkComplianceAgainstRules(mods, rules);
       if (this.isSelf && compliance.hasRules && compliance.missing.length > 0 && modStorage.inspector.autoLoadMode === "Silent") {
@@ -9982,7 +10009,7 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
         btn.style.fontWeight = "bold";
         btn.style.fontSize = "calc(3.5px * var(--size-unit, 4px))";
       });
-      const loadedMods = getLoadedMods();
+      const loadedMods = getLoadedMods2();
       const rules = modStorage.inspector.rules;
       const compliance = checkComplianceAgainstRules(loadedMods, rules);
       const permSetting = modStorage.authority?.permissions?.inspect_view_addons;
