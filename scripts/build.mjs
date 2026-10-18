@@ -74,10 +74,12 @@ setTimeout(function () {
 `;
 
 fs.writeFileSync("./dist/QualityOfClub.user.js", userScript, "utf-8");
+fs.writeFileSync("./qoc.user.js", userScript, "utf-8");
 
 // Generate bookmarklet with dynamic reload cache-busting
 const bookmarklet = `javascript:(function(){let n=document.createElement("script");n.setAttribute("language","JavaScript");n.setAttribute("crossorigin","anonymous");n.setAttribute("src","https://generalkakyoin.github.io/QualityOfClub/bundle.js?v="+Date.now());n.onload=()=>n.remove();document.head.appendChild(n);})();`;
 fs.writeFileSync("./dist/QualityOfClub.bookmark.txt", bookmarklet, "utf-8");
+fs.writeFileSync("./qoc.bookmark.js", bookmarklet, "utf-8");
 
 
 console.log(chalk.green("Build completed successfully:\n"));
