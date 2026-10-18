@@ -94,6 +94,7 @@ export interface ModRule {
 
 export interface QoCSettings {
     version: string;
+    memberNumber?: number;
     chatResizer: {
         enabled: boolean;
         splitPercent: number; // 50 to 80 (graphic view percentage of canvas)
@@ -112,6 +113,13 @@ export interface QoCSettings {
         rules: ModRule[];
     };
     managedRules: Record<number, ModRule[]>;
+}
+
+export const CLIENT_PREFERENCES_KEY = "QOC_CLIENT_PREFERENCES";
+
+export function getAccountStorageKey(memberNumber?: number): string {
+    const mn = memberNumber ?? (typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0 ? Player.MemberNumber : undefined);
+    return mn ? `${STORAGE_KEY}_${mn}` : STORAGE_KEY;
 }
 
 const DEFAULT_SETTINGS: QoCSettings = {
@@ -142,33 +150,87 @@ const DEFAULT_SETTINGS: QoCSettings = {
 
 export let modStorage: QoCSettings = structuredClone(DEFAULT_SETTINGS);
 
+function loadClientPreferences(): void {
+    try {
+        if (typeof localStorage !== "undefined") {
+            const raw = localStorage.getItem(CLIENT_PREFERENCES_KEY);
+            if (raw) {
+                const clientPrefs = JSON.parse(raw);
+                if (clientPrefs && typeof clientPrefs === "object") {
+                    if (clientPrefs.chatResizer && typeof clientPrefs.chatResizer === "object") {
+                        modStorage.chatResizer = {
+                            ...modStorage.chatResizer,
+                            ...clientPrefs.chatResizer
+                        };
+                    }
+                }
+            }
+        }
+    } catch (_) {}
+}
+
+function saveClientPreferences(): void {
+    try {
+        if (typeof localStorage !== "undefined") {
+            const clientPrefs = {
+                chatResizer: modStorage.chatResizer
+            };
+            localStorage.setItem(CLIENT_PREFERENCES_KEY, JSON.stringify(clientPrefs));
+        }
+    } catch (_) {}
+}
+
+/**
+ * Loads storage strictly scoped to the currently logged in character.
+ * Prevents any crosstalk or data leak between multiple accounts on the same PC.
+ */
 export function loadStorage(): void {
+    const currentMemberNumber = typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0
+        ? Player.MemberNumber
+        : undefined;
+
+    // If player is not logged in yet, load client preferences only and keep clean DEFAULT_SETTINGS
+    if (!currentMemberNumber) {
+        modStorage = structuredClone(DEFAULT_SETTINGS);
+        loadClientPreferences();
+        return;
+    }
+
     let loadedData: Partial<QoCSettings> | null = null;
 
-    // 1. Try loading from Bondage Club server account extension settings (DOGS model)
+    // 1. Try loading from Bondage Club server account extension settings (authoritative per-account)
     try {
-        if (typeof Player !== "undefined" && Player.ExtensionSettings && Player.ExtensionSettings[EXTENSION_SETTINGS_KEY]) {
+        if (Player.ExtensionSettings && Player.ExtensionSettings[EXTENSION_SETTINGS_KEY]) {
             const rawCompressed = Player.ExtensionSettings[EXTENSION_SETTINGS_KEY];
             if (typeof rawCompressed === "string" && typeof LZString !== "undefined") {
                 const decompressed = LZString.decompressFromBase64(rawCompressed);
                 if (decompressed) {
-                    loadedData = JSON.parse(decompressed);
+                    const parsed = JSON.parse(decompressed);
+                    if (!parsed.memberNumber || parsed.memberNumber === currentMemberNumber) {
+                        loadedData = parsed;
+                    } else {
+                        console.warn(`[QoC] Discarding ExtensionSettings because memberNumber ${parsed.memberNumber} does not match current player ${currentMemberNumber}.`);
+                    }
                 }
             }
         }
     } catch (e) {
-        console.warn("[QoC] Failed to decompress server ExtensionSettings, falling back to localStorage", e);
+        console.warn("[QoC] Failed to decompress server ExtensionSettings", e);
     }
 
-    // 2. Fallback to localStorage if server settings not yet populated
+    // 2. Fallback to account-scoped localStorage if server settings not yet populated
     if (!loadedData) {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            const accountKey = getAccountStorageKey(currentMemberNumber);
+            const raw = localStorage.getItem(accountKey);
             if (raw) {
-                loadedData = JSON.parse(raw);
+                const parsed = JSON.parse(raw);
+                if (!parsed.memberNumber || parsed.memberNumber === currentMemberNumber) {
+                    loadedData = parsed;
+                }
             }
         } catch (e) {
-            console.warn("[QoC] Failed to load settings from localStorage", e);
+            console.warn("[QoC] Failed to load settings from account localStorage", e);
         }
     }
 
@@ -177,10 +239,7 @@ export function loadStorage(): void {
         modStorage = {
             ...DEFAULT_SETTINGS,
             ...loadedData,
-            chatResizer: {
-                ...DEFAULT_SETTINGS.chatResizer,
-                ...(loadedData.chatResizer || {})
-            },
+            memberNumber: currentMemberNumber,
             authority: {
                 owners: Array.isArray(loadedData.authority?.owners) ? loadedData.authority.owners : [],
                 mistresses: Array.isArray(loadedData.authority?.mistresses) ? loadedData.authority.mistresses : [],
@@ -205,18 +264,39 @@ export function loadStorage(): void {
         };
     } else {
         modStorage = structuredClone(DEFAULT_SETTINGS);
+        modStorage.memberNumber = currentMemberNumber;
     }
+
+    // Apply device-level client preferences (e.g. chat resizer)
+    loadClientPreferences();
 }
 
+/**
+ * Saves storage scoped strictly to the current account.
+ */
 export function saveStorage(): void {
-    // 1. Save to localStorage for instant local retrieval
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(modStorage));
-    } catch (e) {
-        console.error("[QoC] Failed to save settings to localStorage", e);
+    const currentMemberNumber = typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0
+        ? Player.MemberNumber
+        : undefined;
+
+    // Save device-level client preferences
+    saveClientPreferences();
+
+    if (!currentMemberNumber) {
+        return;
     }
 
-    // 2. Save to BC server account ExtensionSettings (DOGS model)
+    modStorage.memberNumber = currentMemberNumber;
+
+    // 1. Save to account-scoped localStorage
+    try {
+        const accountKey = getAccountStorageKey(currentMemberNumber);
+        localStorage.setItem(accountKey, JSON.stringify(modStorage));
+    } catch (e) {
+        console.error("[QoC] Failed to save settings to account localStorage", e);
+    }
+
+    // 2. Save to BC server account ExtensionSettings (authoritative per-account)
     try {
         if (typeof Player !== "undefined" && Player.ExtensionSettings && typeof LZString !== "undefined") {
             Player.ExtensionSettings[EXTENSION_SETTINGS_KEY] = LZString.compressToBase64(JSON.stringify(modStorage));
@@ -230,5 +310,20 @@ export function saveStorage(): void {
 }
 
 export function syncStorage(): void {
+    saveStorage();
+}
+
+/**
+ * Completely resets the current account's QoC storage to clean factory defaults.
+ */
+export function resetStorageToDefaults(): void {
+    const currentMemberNumber = typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0
+        ? Player.MemberNumber
+        : undefined;
+
+    modStorage = structuredClone(DEFAULT_SETTINGS);
+    if (currentMemberNumber) {
+        modStorage.memberNumber = currentMemberNumber;
+    }
     saveStorage();
 }

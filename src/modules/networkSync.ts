@@ -1,7 +1,7 @@
 import { messagesManager } from "zois-core/messaging";
 import { toastsManager } from "zois-core/toasts";
 import { hookFunction, HookPriority } from "zois-core/mod-sdk";
-import { modStorage, syncStorage, saveStorage, ModRule, QoCPermission, AuthorityData, AccessLevel, AutoLoadMode, ViolationAction, CuratedModInfo } from "./storage";
+import { modStorage, syncStorage, saveStorage, loadStorage, ModRule, QoCPermission, AuthorityData, AccessLevel, AutoLoadMode, ViolationAction, CuratedModInfo } from "./storage";
 import { DetectedMod, getLoadedMods, isModLoaded, loadCuratedMod, getCuratedMod } from "./modDetection";
 import { evaluateCompliance, checkComplianceAgainstRules } from "./compliance";
 import { checkPermissionAccess, getCharacterAccessLevel, addRoleMember, removeRoleMember, setPermissionMinRole, setPermissionSelfAccess } from "./authority";
@@ -690,20 +690,16 @@ export function initNetworkSync(): void {
         return next(args);
     });
 
-    // 3. Periodic / room sync hook for compliance & telemetry
+    // 3. Room sync hook for compliance & telemetry (and account switch guard)
     hookFunction("ChatRoomSync", HookPriority.OBSERVE, (args, next) => {
+        if (typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0 && modStorage.memberNumber !== Player.MemberNumber) {
+            loadStorage();
+        }
         const ret = next(args);
         evaluateCompliance();
         sendSilentRoomTelemetry();
         return ret;
     });
-
-    // Periodic compliance check every 20 seconds while in a room
-    setInterval(() => {
-        if (typeof CurrentScreen !== "undefined" && CurrentScreen === "ChatRoom") {
-            evaluateCompliance();
-        }
-    }, 20000);
 }
 
 /**

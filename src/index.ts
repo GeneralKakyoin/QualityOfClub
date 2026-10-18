@@ -9,10 +9,11 @@ import { InspectorSubscreen } from "./subscreens/inspectorSubscreen";
 import { loadStorage } from "./modules/storage";
 import { loadSettingsMenu } from "./modules/settingsMenu";
 import { initChatResizer, applyChatDimensions } from "./modules/chatResizer";
-import { initNetworkSync } from "./modules/networkSync";
+import { initNetworkSync, restartPeriodicComplianceTimer } from "./modules/networkSync";
 import { initProfileButton } from "./modules/profileButton";
 import { evaluateCompliance } from "./modules/compliance";
 import { initFusamManifest } from "./modules/modDetection";
+import { hookFunction, HookPriority } from "zois-core/mod-sdk";
 
 let hasInitialized = false;
 
@@ -28,6 +29,32 @@ export function initializeQoC(): void {
         initProfileButton();
         initFusamManifest().catch(console.warn);
         evaluateCompliance();
+
+        // Hook login/logout to ensure account-scoped settings are refreshed immediately without crosstalk
+        hookFunction("LoginResponse", HookPriority.ADD_BEHAVIOR, (args, next) => {
+            const ret = next(args);
+            try {
+                if (typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0) {
+                    loadStorage();
+                    applyChatDimensions();
+                    evaluateCompliance();
+                    restartPeriodicComplianceTimer();
+                }
+            } catch (e) {
+                console.error(`[${MOD_NAME}] Error loading account data on LoginResponse:`, e);
+            }
+            return ret;
+        });
+
+        hookFunction("Relog", HookPriority.ADD_BEHAVIOR, (args, next) => {
+            const ret = next(args);
+            try {
+                loadStorage();
+            } catch (e) {
+                console.error(`[${MOD_NAME}] Error resetting data on Relog:`, e);
+            }
+            return ret;
+        });
 
         console.log(`%c[${MOD_NAME}] v${version} loaded successfully!`, "color: #3a7bd5; font-weight: bold; font-size: 13px;");
 

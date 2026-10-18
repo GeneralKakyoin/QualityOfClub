@@ -4,6 +4,7 @@ import {
     modStorage,
     saveStorage,
     syncStorage,
+    resetStorageToDefaults,
     ModRule,
     AutoLoadMode,
     ViolationAction,
@@ -2204,6 +2205,45 @@ export class InspectorSubscreen extends BaseSubscreen {
         }
 
         container.appendChild(catalogSection);
+
+        // SECTION 6: Reset Account Settings to Defaults
+        if (this.isSelf) {
+            const resetSection = document.createElement("div");
+            resetSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(239, 83, 80, 0.4); border-radius: 8px; padding: 20px;";
+            resetSection.innerHTML = `
+                <div style="font-size: 16px; font-weight: bold; color: #ef5350; margin-bottom: 6px;">
+                    🔄 Reset Account Settings to Default
+                </div>
+                <div style="font-size: 13px; color: #90a4ae; margin-bottom: 14px;">
+                    Completely wipes this account's saved Quality of Club rules, authority roles, and custom catalog back to factory defaults. Useful if settings were contaminated or if you want a fresh start.
+                </div>
+            `;
+            const resetBtn = document.createElement("button");
+            resetBtn.textContent = "⚠️ Reset All Settings to Factory Default";
+            resetBtn.style.cssText = "padding: 10px 20px; background: rgba(198, 40, 40, 0.25); border: 1px solid #ef5350; color: #ef9a9a; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.15s ease;";
+            resetBtn.addEventListener("mouseenter", () => {
+                resetBtn.style.background = "rgba(198, 40, 40, 0.45)";
+            });
+            resetBtn.addEventListener("mouseleave", () => {
+                resetBtn.style.background = "rgba(198, 40, 40, 0.25)";
+            });
+            resetBtn.addEventListener("click", () => {
+                if (confirm("Are you sure you want to completely reset all Quality of Club settings and rules for this account to factory defaults?")) {
+                    resetStorageToDefaults();
+                    restartPeriodicComplianceTimer();
+                    evaluateCompliance();
+                    toastsManager.success({
+                        title: `${MOD_NAME} Reset`,
+                        message: "All settings and rules have been reset to factory defaults.",
+                        duration: 4000
+                    });
+                    this.renderSettingsTab();
+                }
+            });
+            resetSection.appendChild(resetBtn);
+            container.appendChild(resetSection);
+        }
+
         this.contentArea.appendChild(container);
     }
 }
