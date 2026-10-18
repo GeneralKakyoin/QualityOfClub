@@ -105,6 +105,7 @@ function getCallerPermissions(senderId: number): Record<QoCPermission, boolean> 
         "rules_remove_rules",
         "rules_edit_autoload_mode",
         "rules_force_compliance",
+        "rules_force_injection",
         "menu_open_settings"
     ];
     const res: Record<string, boolean> = {};
@@ -423,8 +424,8 @@ async function handleForceInjectRequest(senderId: number, senderName: string, ta
         return { success: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
     }
 
-    if (!checkPermissionAccess("rules_force_compliance", senderId)) {
-        return { success: false, reason: "Permission Denied: You do not have authority to force addon injection on this player." };
+    if (!checkPermissionAccess("rules_force_injection", senderId)) {
+        return { success: false, reason: "Permission Denied: You do not meet the minimum role required to force addon injection on this player." };
     }
 
     if (!modStorage.inspector.allowForcedInjection) {

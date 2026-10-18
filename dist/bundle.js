@@ -4270,7 +4270,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.16";
+  var version2 = "1.0.17";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4308,6 +4308,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
     rules_remove_rules: { self: true, min: 2 /* owner */ },
     rules_edit_autoload_mode: { self: true, min: 2 /* owner */ },
     rules_force_compliance: { self: true, min: 2 /* owner */ },
+    rules_force_injection: { self: true, min: 2 /* owner */ },
     menu_open_settings: { self: true, min: 2 /* owner */ }
   };
   var DEFAULT_SETTINGS = {
@@ -5045,6 +5046,9 @@ One of mods you are using is using an old version of SDK. It will work for now b
       const stable = addon.versions.find((v) => v.distribution === "stable");
       scriptUrl = stable && stable.source ? stable.source : addon.versions[0].source || "";
     }
+    if (!scriptUrl) {
+      scriptUrl = addon.source || addon.url || "";
+    }
     let repositoryMatch = void 0;
     if (addon.repository && typeof addon.repository === "string") {
       const trimmed = addon.repository.trim();
@@ -5061,7 +5065,8 @@ One of mods you are using is using an old version of SDK. It will work for now b
       description,
       author: addon.author || "Community",
       scriptUrl,
-      scriptType: addon.type === "module" ? "module" : "script",
+      scriptType: addon.type === "eval" ? "eval" : addon.type === "module" ? "module" : "script",
+      noCacheBusting: addon.noCacheBusting === true,
       tags: Array.isArray(addon.tags) ? addon.tags : [],
       detectKeys: Array.from(detectKeySet),
       repositoryMatch
@@ -6142,34 +6147,47 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
     return null;
   }
+  function cleanStr(s) {
+    return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+  var sessionInjectedMods = /* @__PURE__ */ new Set();
   function isDetectedModMatch(mod, identifierOrCurated) {
     if (!mod || !identifierOrCurated) return false;
     const mId = (mod.id || "").trim().toLowerCase();
     const mName = (mod.name || "").trim().toLowerCase();
     const mFull = (mod.fullName || "").trim().toLowerCase();
     const mRepo = (mod.repository || "").trim().toLowerCase();
+    const mCleanId = cleanStr(mId);
+    const mCleanName = cleanStr(mName);
+    const mCleanFull = cleanStr(mFull);
+    const mCleanRepo = cleanStr(mRepo);
     const curated = typeof identifierOrCurated === "object" ? identifierOrCurated : getCuratedMod(identifierOrCurated);
     if (curated) {
       const cId = (curated.id || "").trim().toLowerCase();
       const cName = (curated.name || "").trim().toLowerCase();
-      if (cId && (mId === cId || mName === cId)) return true;
-      if (cName && (mId === cName || mName === cName || mFull === cName)) return true;
+      const cCleanId = cleanStr(cId);
+      const cCleanName = cleanStr(cName);
+      if (cId && (mId === cId || mName === cId || mCleanId === cCleanId || mCleanName === cCleanId)) return true;
+      if (cName && (mId === cName || mName === cName || mFull === cName || mCleanId === cCleanName || mCleanName === cCleanName || mCleanFull === cCleanName)) return true;
       if (curated.repositoryMatch && mRepo) {
-        const expectedRepo = curated.repositoryMatch.trim().toLowerCase();
-        if (mRepo.includes(expectedRepo)) return true;
+        const expectedRepo = cleanStr(curated.repositoryMatch);
+        if (expectedRepo && mCleanRepo.includes(expectedRepo)) return true;
       }
       if (Array.isArray(curated.detectKeys)) {
         for (const rawKey of curated.detectKeys) {
           const key = (rawKey || "").trim().toLowerCase();
           if (!key) continue;
+          const cleanKey = cleanStr(key);
           if (mId === key || mName === key || mFull === key) return true;
+          if (cleanKey && (mCleanId === cleanKey || mCleanName === cleanKey || mCleanFull === cleanKey)) return true;
         }
       }
       return false;
     }
     const target = (typeof identifierOrCurated === "string" ? identifierOrCurated : "").trim().toLowerCase();
     if (!target) return false;
-    return mId === target || mName === target || mFull === target;
+    const cleanTarget = cleanStr(target);
+    return mId === target || mName === target || mFull === target || !!cleanTarget && (mCleanId === cleanTarget || mCleanName === cleanTarget || mCleanFull === cleanTarget);
   }
   function getLoadedMods2() {
     const modsMap = /* @__PURE__ */ new Map();
@@ -6267,16 +6285,63 @@ One of mods you are using is using an old version of SDK. It will work for now b
           version: "Active"
         });
       }
+      if (hasFusam && win.FUSAM.addons && typeof win.FUSAM.addons === "object") {
+        for (const [fId, fVal] of Object.entries(win.FUSAM.addons)) {
+          if (!fId) continue;
+          const val = fVal;
+          if (val && (val.status === "loaded" || val.status === "loading" || val.distribution)) {
+            const k = fId.toLowerCase();
+            if (!modsMap.has(k)) {
+              const curated = getCuratedMod(fId);
+              modsMap.set(k, {
+                id: curated?.id || fId,
+                name: curated?.name || fId,
+                fullName: curated?.name || fId,
+                version: typeof val.distribution === "string" ? val.distribution : "Active"
+              });
+            }
+          }
+        }
+      }
+    }
+    for (const injectedId of sessionInjectedMods) {
+      const k = injectedId.toLowerCase();
+      if (!modsMap.has(k)) {
+        const curated = getCuratedMod(injectedId);
+        modsMap.set(k, {
+          id: curated?.id || injectedId,
+          name: curated?.name || injectedId,
+          fullName: curated?.name || injectedId,
+          version: "Injected"
+        });
+      }
     }
     return Array.from(modsMap.values());
   }
   function isModLoaded(identifier) {
     if (!identifier) return false;
+    const target = identifier.trim().toLowerCase();
+    const cleanTarget = cleanStr(target);
+    if (sessionInjectedMods.has(target) || cleanTarget && Array.from(sessionInjectedMods).some((m) => cleanStr(m) === cleanTarget)) {
+      return true;
+    }
+    if (typeof window !== "undefined" && window.FUSAM && typeof window.FUSAM.addons === "object") {
+      const fAddons = window.FUSAM.addons;
+      for (const [fId, fVal] of Object.entries(fAddons)) {
+        if (!fId) continue;
+        const val = fVal;
+        if (val && (val.status === "loaded" || val.status === "loading" || val.distribution)) {
+          if (fId.toLowerCase() === target || cleanStr(fId) === cleanTarget) {
+            return true;
+          }
+        }
+      }
+    }
     const loaded = getLoadedMods2();
     return loaded.some((mod) => isDetectedModMatch(mod, identifier));
   }
-  function loadCuratedMod(catalogId) {
-    if (!catalogId) return Promise.resolve(false);
+  async function loadCuratedMod(catalogId) {
+    if (!catalogId) return false;
     const target = catalogId.toLowerCase().trim();
     const all = getAllCatalogMods();
     const mod = all[catalogId] || Object.values(all).find(
@@ -6284,52 +6349,93 @@ One of mods you are using is using an old version of SDK. It will work for now b
     );
     if (!mod || !mod.scriptUrl) {
       console.warn(`[QoC] Cannot auto-load mod '${catalogId}'. No valid script URL found.`);
-      return Promise.resolve(false);
+      return false;
     }
     if (isModLoaded(catalogId)) {
-      return Promise.resolve(true);
+      return true;
     }
-    return new Promise((resolve) => {
+    const scriptUrl = mod.noCacheBusting ? mod.scriptUrl : mod.scriptUrl.includes("?") ? `${mod.scriptUrl}&_=${Date.now()}` : `${mod.scriptUrl}?_=${Date.now()}`;
+    console.log(`[QoC] Injecting verified mod script for ${mod.name}: ${scriptUrl} (type: ${mod.scriptType || "script"})`);
+    let executionSuccess = false;
+    const isGithubRaw = scriptUrl.includes("raw.githubusercontent.com");
+    if (mod.scriptType === "eval" || isGithubRaw) {
       try {
-        console.log(`[QoC] Injecting verified mod script for ${mod.name}: ${mod.scriptUrl} (type: ${mod.scriptType || "script"})`);
-        const script = document.createElement("script");
-        if (mod.scriptType === "module") {
-          script.type = "module";
-        }
-        const scriptUrl = mod.scriptUrl.includes("?") ? `${mod.scriptUrl}&_=${Date.now()}` : `${mod.scriptUrl}?_=${Date.now()}`;
-        script.src = scriptUrl;
-        script.crossOrigin = "anonymous";
-        script.async = true;
-        script.onload = async () => {
-          console.log(`[QoC] Successfully injected ${mod.name}, verifying registration...`);
-          try {
-            script.remove();
-          } catch (_) {
-          }
-          for (let i = 0; i < 15; i++) {
-            if (isModLoaded(catalogId)) {
-              console.log(`[QoC] Confirmed active in session: ${mod.name}`);
-              resolve(true);
-              return;
-            }
-            await new Promise((r) => setTimeout(r, 200));
-          }
-          resolve(true);
-        };
-        script.onerror = (err) => {
-          console.error(`[QoC] Failed to load ${mod.name}:`, err);
-          try {
-            script.remove();
-          } catch (_) {
-          }
-          resolve(false);
-        };
-        document.head.appendChild(script);
-      } catch (e) {
-        console.error(`[QoC] Error injecting script for ${mod.name}:`, e);
-        resolve(false);
+        const resp = await fetch(scriptUrl);
+        if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);
+        let code = await resp.text();
+        code = code.replace(/sourceMappingURL=.*?.map/u, "");
+        (1, eval)(code);
+        executionSuccess = true;
+        console.log(`[QoC] Successfully evaluated script for ${mod.name}`);
+      } catch (err) {
+        console.error(`[QoC] Error evaluating ${mod.name}:`, err);
       }
-    });
+    } else if (mod.scriptType === "module") {
+      try {
+        await new Function("u", "return import(u)")(scriptUrl);
+        executionSuccess = true;
+        console.log(`[QoC] Successfully imported module for ${mod.name}`);
+      } catch (err) {
+        console.warn(`[QoC] Dynamic import failed for ${mod.name}, falling back to <script type="module">:`, err);
+        try {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.type = "module";
+            script.src = scriptUrl;
+            script.onload = () => resolve();
+            script.onerror = (e) => reject(e);
+            document.head.appendChild(script);
+          });
+          executionSuccess = true;
+        } catch (scriptErr) {
+          console.error(`[QoC] Script module tag also failed for ${mod.name}:`, scriptErr);
+        }
+      }
+    } else {
+      try {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = scriptUrl;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = (e) => reject(e);
+          document.head.appendChild(script);
+        });
+        executionSuccess = true;
+        console.log(`[QoC] Successfully loaded script tag for ${mod.name}`);
+      } catch (scriptErr) {
+        console.warn(`[QoC] Standard script tag failed for ${mod.name}, falling back to fetch/eval:`, scriptErr);
+        try {
+          const resp = await fetch(scriptUrl);
+          if (resp.ok) {
+            let code = await resp.text();
+            code = code.replace(/sourceMappingURL=.*?.map/u, "");
+            (1, eval)(code);
+            executionSuccess = true;
+            console.log(`[QoC] Successfully loaded ${mod.name} via fetch/eval fallback`);
+          }
+        } catch (fetchErr) {
+          console.error(`[QoC] Both script tag and fetch/eval failed for ${mod.name}:`, fetchErr);
+        }
+      }
+    }
+    if (!executionSuccess) {
+      return false;
+    }
+    sessionInjectedMods.add(mod.id.toLowerCase());
+    sessionInjectedMods.add(catalogId.toLowerCase());
+    if (mod.name) sessionInjectedMods.add(mod.name.toLowerCase());
+    if (Array.isArray(mod.detectKeys)) {
+      for (const k of mod.detectKeys) sessionInjectedMods.add(k.toLowerCase());
+    }
+    for (let i = 0; i < 25; i++) {
+      if (isModLoaded(catalogId)) {
+        console.log(`[QoC] Confirmed active in session: ${mod.name}`);
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return true;
   }
 
   // src/modules/compliance.ts
@@ -8546,7 +8652,13 @@ One of mods you are using is using an old version of SDK. It will work for now b
     {
       key: "rules_force_compliance",
       name: "Allow forcing compliance evaluations",
-      description: "Permits commanding this character's game to immediately evaluate all rules, auto-inject missing mandatory addons, and alert on forbidden ones.",
+      description: "Permits commanding this character's game to immediately evaluate all active rules and alert on violations.",
+      category: "Rules"
+    },
+    {
+      key: "rules_force_injection",
+      name: "Allow forcing addon injection",
+      description: "Permits remotely commanding this character's game to force-inject missing mandatory addons, even if auto-injection is off.",
       category: "Rules"
     },
     // General
@@ -8683,6 +8795,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
       "rules_remove_rules",
       "rules_edit_autoload_mode",
       "rules_force_compliance",
+      "rules_force_injection",
       "menu_open_settings"
     ];
     const res = {};
@@ -8936,8 +9049,8 @@ One of mods you are using is using an old version of SDK. It will work for now b
     if (!modStorage.inspector.enabled) {
       return { success: false, reason: "Quality of Club Addon Inspector is disabled on this player." };
     }
-    if (!checkPermissionAccess("rules_force_compliance", senderId)) {
-      return { success: false, reason: "Permission Denied: You do not have authority to force addon injection on this player." };
+    if (!checkPermissionAccess("rules_force_injection", senderId)) {
+      return { success: false, reason: "Permission Denied: You do not meet the minimum role required to force addon injection on this player." };
     }
     if (!modStorage.inspector.allowForcedInjection) {
       return { success: false, reason: "Permission Denied: Forced addon injection is disabled in this player's preferences." };
@@ -9617,6 +9730,8 @@ One of mods you are using is using an old version of SDK. It will work for now b
       const canViewRules = this.isSelf ? checkPermissionAccess("inspect_view_rules") : this.targetData?.canViewRules ?? true;
       const canRemoveRules = this.isSelf ? checkPermissionAccess("rules_remove_rules") : this.targetData?.callerPermissions?.rules_remove_rules ?? false;
       const canForceCompliance = this.isSelf ? checkPermissionAccess("rules_force_compliance") : this.targetData?.callerPermissions?.rules_force_compliance ?? false;
+      const canForceInjection = this.isSelf ? true : this.targetData?.callerPermissions?.rules_force_injection ?? false;
+      const isForcedInjectionAllowed = this.isSelf ? true : this.targetData?.preferences?.allowForcedInjection ?? false;
       const mods = this.isSelf ? getLoadedMods2() : this.targetData?.mods || [];
       const rules = this.isSelf ? modStorage.inspector.rules : this.targetRulesCopy.length > 0 ? this.targetRulesCopy : this.targetData?.rules || [];
       const compliance = checkComplianceAgainstRules(mods, rules);
@@ -9726,7 +9841,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
             forceBtn.textContent = "\u26A1 Force Compliance Evaluation Now";
           });
           toolbar.appendChild(forceBtn);
-          if (!this.isSelf && compliance.missing.length > 0) {
+          if (!this.isSelf && canForceInjection && compliance.missing.length > 0) {
             const forceInjectAllBtn = document.createElement("button");
             forceInjectAllBtn.textContent = `\u{1F489} Force Inject All Missing Addons (${compliance.missing.length})`;
             forceInjectAllBtn.style.cssText = "padding: 9px 18px; border-radius: 5px; background: rgba(76, 175, 80, 0.3); border: 1px solid #4caf50; color: #a5d6a7; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;";
@@ -9816,7 +9931,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
           badge.textContent = isMet ? "MET" : "VIOLATION";
           rightDiv.appendChild(badge);
           if (isMandatory && !isMet) {
-            if (!this.isSelf && canForceCompliance) {
+            if (!this.isSelf && canForceInjection) {
               const forceInjectBtn = document.createElement("button");
               forceInjectBtn.textContent = "\u{1F489} Force Inject";
               forceInjectBtn.title = `Remotely force injection of ${detail.rule.modName} on ${subjectName}`;

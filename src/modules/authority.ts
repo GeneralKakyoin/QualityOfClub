@@ -70,7 +70,13 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     {
         key: "rules_force_compliance",
         name: "Allow forcing compliance evaluations",
-        description: "Permits commanding this character's game to immediately evaluate all rules, auto-inject missing mandatory addons, and alert on forbidden ones.",
+        description: "Permits commanding this character's game to immediately evaluate all active rules and alert on violations.",
+        category: "Rules"
+    },
+    {
+        key: "rules_force_injection",
+        name: "Allow forcing addon injection",
+        description: "Permits remotely commanding this character's game to force-inject missing mandatory addons, even if auto-injection is off.",
         category: "Rules"
     },
 

@@ -64,6 +64,9 @@ export function parseFusamAddonToCurated(addon: FUSAMManifestAddon): CuratedModI
         const stable = addon.versions.find(v => v.distribution === "stable");
         scriptUrl = (stable && stable.source) ? stable.source : (addon.versions[0].source || "");
     }
+    if (!scriptUrl) {
+        scriptUrl = (addon as any).source || (addon as any).url || "";
+    }
 
     let repositoryMatch: string | undefined = undefined;
     if (addon.repository && typeof addon.repository === "string") {
@@ -82,7 +85,8 @@ export function parseFusamAddonToCurated(addon: FUSAMManifestAddon): CuratedModI
         description,
         author: addon.author || "Community",
         scriptUrl,
-        scriptType: addon.type === "module" ? "module" : "script",
+        scriptType: addon.type === "eval" ? "eval" : addon.type === "module" ? "module" : "script",
+        noCacheBusting: (addon as any).noCacheBusting === true,
         tags: Array.isArray(addon.tags) ? addon.tags : [],
         detectKeys: Array.from(detectKeySet),
         repositoryMatch

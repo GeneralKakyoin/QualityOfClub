@@ -36,6 +36,7 @@ export type QoCPermission =
     | "rules_remove_rules"           // Remove or clear active rules
     | "rules_edit_autoload_mode"     // Change auto-load behavior (Silent vs Prompt)
     | "rules_force_compliance"       // Force immediate compliance check & reload
+    | "rules_force_injection"        // Force remote injection of missing mandatory addons
     | "menu_open_settings";          // Open and view QoC settings menu
 
 export interface PermissionSetting {
@@ -60,6 +61,7 @@ export const DEFAULT_PERMISSIONS: Record<QoCPermission, PermissionSetting> = {
     rules_remove_rules: { self: true, min: AccessLevel.owner },
     rules_edit_autoload_mode: { self: true, min: AccessLevel.owner },
     rules_force_compliance: { self: true, min: AccessLevel.owner },
+    rules_force_injection: { self: true, min: AccessLevel.owner },
     menu_open_settings: { self: true, min: AccessLevel.owner }
 };
 
@@ -78,6 +80,7 @@ export interface CuratedModInfo {
     author?: string;
     tags?: string[];
     scriptType?: "script" | "module" | "eval";
+    noCacheBusting?: boolean;
 }
 
 export interface ModRule {

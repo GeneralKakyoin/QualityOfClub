@@ -342,6 +342,8 @@ export class InspectorSubscreen extends BaseSubscreen {
         const canViewRules = this.isSelf ? checkPermissionAccess("inspect_view_rules") : (this.targetData?.canViewRules ?? true);
         const canRemoveRules = this.isSelf ? checkPermissionAccess("rules_remove_rules") : (this.targetData?.callerPermissions?.rules_remove_rules ?? false);
         const canForceCompliance = this.isSelf ? checkPermissionAccess("rules_force_compliance") : (this.targetData?.callerPermissions?.rules_force_compliance ?? false);
+        const canForceInjection = this.isSelf ? true : (this.targetData?.callerPermissions?.rules_force_injection ?? false);
+        const isForcedInjectionAllowed = this.isSelf ? true : (this.targetData?.preferences?.allowForcedInjection ?? false);
 
         const mods: DetectedMod[] = this.isSelf ? getLoadedMods() : (this.targetData?.mods || []);
         const rules: ModRule[] = this.isSelf
@@ -462,7 +464,7 @@ export class InspectorSubscreen extends BaseSubscreen {
                 });
                 toolbar.appendChild(forceBtn);
 
-                if (!this.isSelf && compliance.missing.length > 0) {
+                if (!this.isSelf && canForceInjection && compliance.missing.length > 0) {
                     const forceInjectAllBtn = document.createElement("button");
                     forceInjectAllBtn.textContent = `💉 Force Inject All Missing Addons (${compliance.missing.length})`;
                     forceInjectAllBtn.style.cssText = "padding: 9px 18px; border-radius: 5px; background: rgba(76, 175, 80, 0.3); border: 1px solid #4caf50; color: #a5d6a7; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;";
@@ -564,7 +566,7 @@ export class InspectorSubscreen extends BaseSubscreen {
                 rightDiv.appendChild(badge);
 
                 if (isMandatory && !isMet) {
-                    if (!this.isSelf && canForceCompliance) {
+                    if (!this.isSelf && canForceInjection) {
                         const forceInjectBtn = document.createElement("button");
                         forceInjectBtn.textContent = "💉 Force Inject";
                         forceInjectBtn.title = `Remotely force injection of ${detail.rule.modName} on ${subjectName}`;
