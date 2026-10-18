@@ -4270,7 +4270,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.17";
+  var version2 = "1.0.18";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4311,6 +4311,11 @@ One of mods you are using is using an old version of SDK. It will work for now b
     rules_force_injection: { self: true, min: 2 /* owner */ },
     menu_open_settings: { self: true, min: 2 /* owner */ }
   };
+  var CLIENT_PREFERENCES_KEY = "QOC_CLIENT_PREFERENCES";
+  function getAccountStorageKey(memberNumber) {
+    const mn = memberNumber ?? (typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0 ? Player.MemberNumber : void 0);
+    return mn ? `${STORAGE_KEY}_${mn}` : STORAGE_KEY;
+  }
   var DEFAULT_SETTINGS = {
     version: version2,
     chatResizer: {
@@ -4337,39 +4342,81 @@ One of mods you are using is using an old version of SDK. It will work for now b
     managedRules: {}
   };
   var modStorage = structuredClone(DEFAULT_SETTINGS);
+  function loadClientPreferences() {
+    try {
+      if (typeof localStorage !== "undefined") {
+        const raw = localStorage.getItem(CLIENT_PREFERENCES_KEY);
+        if (raw) {
+          const clientPrefs = JSON.parse(raw);
+          if (clientPrefs && typeof clientPrefs === "object") {
+            if (clientPrefs.chatResizer && typeof clientPrefs.chatResizer === "object") {
+              modStorage.chatResizer = {
+                ...modStorage.chatResizer,
+                ...clientPrefs.chatResizer
+              };
+            }
+          }
+        }
+      }
+    } catch (_) {
+    }
+  }
+  function saveClientPreferences() {
+    try {
+      if (typeof localStorage !== "undefined") {
+        const clientPrefs = {
+          chatResizer: modStorage.chatResizer
+        };
+        localStorage.setItem(CLIENT_PREFERENCES_KEY, JSON.stringify(clientPrefs));
+      }
+    } catch (_) {
+    }
+  }
   function loadStorage() {
+    const currentMemberNumber = typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0 ? Player.MemberNumber : void 0;
+    if (!currentMemberNumber) {
+      modStorage = structuredClone(DEFAULT_SETTINGS);
+      loadClientPreferences();
+      return;
+    }
     let loadedData = null;
     try {
-      if (typeof Player !== "undefined" && Player.ExtensionSettings && Player.ExtensionSettings[EXTENSION_SETTINGS_KEY]) {
+      if (Player.ExtensionSettings && Player.ExtensionSettings[EXTENSION_SETTINGS_KEY]) {
         const rawCompressed = Player.ExtensionSettings[EXTENSION_SETTINGS_KEY];
         if (typeof rawCompressed === "string" && typeof LZString !== "undefined") {
           const decompressed = LZString.decompressFromBase64(rawCompressed);
           if (decompressed) {
-            loadedData = JSON.parse(decompressed);
+            const parsed = JSON.parse(decompressed);
+            if (!parsed.memberNumber || parsed.memberNumber === currentMemberNumber) {
+              loadedData = parsed;
+            } else {
+              console.warn(`[QoC] Discarding ExtensionSettings because memberNumber ${parsed.memberNumber} does not match current player ${currentMemberNumber}.`);
+            }
           }
         }
       }
     } catch (e) {
-      console.warn("[QoC] Failed to decompress server ExtensionSettings, falling back to localStorage", e);
+      console.warn("[QoC] Failed to decompress server ExtensionSettings", e);
     }
     if (!loadedData) {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const accountKey = getAccountStorageKey(currentMemberNumber);
+        const raw = localStorage.getItem(accountKey);
         if (raw) {
-          loadedData = JSON.parse(raw);
+          const parsed = JSON.parse(raw);
+          if (!parsed.memberNumber || parsed.memberNumber === currentMemberNumber) {
+            loadedData = parsed;
+          }
         }
       } catch (e) {
-        console.warn("[QoC] Failed to load settings from localStorage", e);
+        console.warn("[QoC] Failed to load settings from account localStorage", e);
       }
     }
     if (loadedData) {
       modStorage = {
         ...DEFAULT_SETTINGS,
         ...loadedData,
-        chatResizer: {
-          ...DEFAULT_SETTINGS.chatResizer,
-          ...loadedData.chatResizer || {}
-        },
+        memberNumber: currentMemberNumber,
         authority: {
           owners: Array.isArray(loadedData.authority?.owners) ? loadedData.authority.owners : [],
           mistresses: Array.isArray(loadedData.authority?.mistresses) ? loadedData.authority.mistresses : [],
@@ -4394,13 +4441,22 @@ One of mods you are using is using an old version of SDK. It will work for now b
       };
     } else {
       modStorage = structuredClone(DEFAULT_SETTINGS);
+      modStorage.memberNumber = currentMemberNumber;
     }
+    loadClientPreferences();
   }
   function saveStorage() {
+    const currentMemberNumber = typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0 ? Player.MemberNumber : void 0;
+    saveClientPreferences();
+    if (!currentMemberNumber) {
+      return;
+    }
+    modStorage.memberNumber = currentMemberNumber;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(modStorage));
+      const accountKey = getAccountStorageKey(currentMemberNumber);
+      localStorage.setItem(accountKey, JSON.stringify(modStorage));
     } catch (e) {
-      console.error("[QoC] Failed to save settings to localStorage", e);
+      console.error("[QoC] Failed to save settings to account localStorage", e);
     }
     try {
       if (typeof Player !== "undefined" && Player.ExtensionSettings && typeof LZString !== "undefined") {
@@ -4414,6 +4470,14 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
   }
   function syncStorage() {
+    saveStorage();
+  }
+  function resetStorageToDefaults() {
+    const currentMemberNumber = typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0 ? Player.MemberNumber : void 0;
+    modStorage = structuredClone(DEFAULT_SETTINGS);
+    if (currentMemberNumber) {
+      modStorage.memberNumber = currentMemberNumber;
+    }
     saveStorage();
   }
 
@@ -9268,16 +9332,14 @@ One of mods you are using is using an old version of SDK. It will work for now b
       return next(args);
     });
     hookFunction("ChatRoomSync", HookPriority.OBSERVE, (args, next) => {
+      if (typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0 && modStorage.memberNumber !== Player.MemberNumber) {
+        loadStorage();
+      }
       const ret = next(args);
       evaluateCompliance();
       sendSilentRoomTelemetry();
       return ret;
     });
-    setInterval(() => {
-      if (typeof CurrentScreen !== "undefined" && CurrentScreen === "ChatRoom") {
-        evaluateCompliance();
-      }
-    }, 2e4);
   }
   async function requestInspect(targetMemberNumber) {
     try {
@@ -11336,6 +11398,42 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
         catalogSection.appendChild(formBox);
       }
       container.appendChild(catalogSection);
+      if (this.isSelf) {
+        const resetSection = document.createElement("div");
+        resetSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(239, 83, 80, 0.4); border-radius: 8px; padding: 20px;";
+        resetSection.innerHTML = `
+                <div style="font-size: 16px; font-weight: bold; color: #ef5350; margin-bottom: 6px;">
+                    \u{1F504} Reset Account Settings to Default
+                </div>
+                <div style="font-size: 13px; color: #90a4ae; margin-bottom: 14px;">
+                    Completely wipes this account's saved Quality of Club rules, authority roles, and custom catalog back to factory defaults. Useful if settings were contaminated or if you want a fresh start.
+                </div>
+            `;
+        const resetBtn = document.createElement("button");
+        resetBtn.textContent = "\u26A0\uFE0F Reset All Settings to Factory Default";
+        resetBtn.style.cssText = "padding: 10px 20px; background: rgba(198, 40, 40, 0.25); border: 1px solid #ef5350; color: #ef9a9a; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.15s ease;";
+        resetBtn.addEventListener("mouseenter", () => {
+          resetBtn.style.background = "rgba(198, 40, 40, 0.45)";
+        });
+        resetBtn.addEventListener("mouseleave", () => {
+          resetBtn.style.background = "rgba(198, 40, 40, 0.25)";
+        });
+        resetBtn.addEventListener("click", () => {
+          if (confirm("Are you sure you want to completely reset all Quality of Club settings and rules for this account to factory defaults?")) {
+            resetStorageToDefaults();
+            restartPeriodicComplianceTimer();
+            evaluateCompliance();
+            toastsManager.success({
+              title: `${MOD_NAME} Reset`,
+              message: "All settings and rules have been reset to factory defaults.",
+              duration: 4e3
+            });
+            this.renderSettingsTab();
+          }
+        });
+        resetSection.appendChild(resetBtn);
+        container.appendChild(resetSection);
+      }
       this.contentArea.appendChild(container);
     }
   };
@@ -11689,6 +11787,29 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       initProfileButton();
       initFusamManifest().catch(console.warn);
       evaluateCompliance();
+      hookFunction("LoginResponse", HookPriority.ADD_BEHAVIOR, (args, next) => {
+        const ret = next(args);
+        try {
+          if (typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0) {
+            loadStorage();
+            applyChatDimensions();
+            evaluateCompliance();
+            restartPeriodicComplianceTimer();
+          }
+        } catch (e) {
+          console.error(`[${MOD_NAME}] Error loading account data on LoginResponse:`, e);
+        }
+        return ret;
+      });
+      hookFunction("Relog", HookPriority.ADD_BEHAVIOR, (args, next) => {
+        const ret = next(args);
+        try {
+          loadStorage();
+        } catch (e) {
+          console.error(`[${MOD_NAME}] Error resetting data on Relog:`, e);
+        }
+        return ret;
+      });
       console.log(`%c[${MOD_NAME}] v${version2} loaded successfully!`, "color: #3a7bd5; font-weight: bold; font-size: 13px;");
       try {
         toastsManager.success({
