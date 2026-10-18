@@ -345,6 +345,15 @@ export class InspectorSubscreen extends BaseSubscreen {
             : (this.targetRulesCopy.length > 0 ? this.targetRulesCopy : (this.targetData?.rules || []));
         const compliance = checkComplianceAgainstRules(mods, rules);
 
+        // Auto-evaluate compliance for self in background if there are unsatisfied missing rules and Silent auto-load is on
+        if (this.isSelf && compliance.hasRules && compliance.missing.length > 0 && modStorage.inspector.autoLoadMode === "Silent") {
+            evaluateCompliance().then(rep => {
+                if (rep.isCompliant && this.activeTab === "addons") {
+                    this.renderAddonsTab();
+                }
+            });
+        }
+
         // 1. Status Banner (if canViewRules)
         if (canViewRules) {
             const banner = document.createElement("div");

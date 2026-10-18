@@ -15,7 +15,7 @@ export const CURATED_MOD_CATALOG: Record<string, CuratedModInfo> = {
         name: "Bondage Club Extended (BCX)",
         description: "Rules, curses, statistics, extended room tools",
         scriptUrl: "https://jomshir98.github.io/bondage-club-extended/bcx.js",
-        detectKeys: ["bcx", "bondage club extended", "bondage-club-extended"],
+        detectKeys: ["bcx", "bondage club extended", "bondage-club-extended", "bondage club extended (bcx)"],
         repositoryMatch: "jomshir98/bondage-club-extended"
     },
     LSCG: {
@@ -102,12 +102,20 @@ export function isDetectedModMatch(mod: DetectedMod, identifierOrCurated: string
     const mFull = (mod.fullName || "").toLowerCase().trim();
     const mRepo = (mod.repository || "").toLowerCase().trim();
 
-    const clean = (s: string) => s.replace(/[^a-z0-9]/g, "");
+    // Normalizes strings by removing spaces, brackets, and standard punctuation while preserving Unicode/CJK characters and numbers
+    const clean = (s: string) => (s || "").toLowerCase().replace(/[\s\-_()[\]{}.,:;!?'"\/\\~`@#$%^&*+=<>]/g, "");
+
+    const cleanMId = clean(mId);
+    const cleanMName = clean(mName);
+    const cleanMFull = clean(mFull);
 
     if (curated) {
+        const curatedId = (curated.id || "").toLowerCase().trim();
+        const cleanCuratedId = clean(curated.id);
+
         // 1. Exact ID match (case-insensitive)
-        if (mId === curated.id.toLowerCase() || clean(mId) === clean(curated.id)) return true;
-        if (clean(mName) === clean(curated.id)) return true;
+        if (curatedId && (mId === curatedId || (cleanCuratedId && cleanMId === cleanCuratedId))) return true;
+        if (cleanCuratedId && cleanMName === cleanCuratedId) return true;
 
         // 2. Official repository match
         if (curated.repositoryMatch && mRepo && mRepo.includes(curated.repositoryMatch.toLowerCase())) {
@@ -115,20 +123,20 @@ export function isDetectedModMatch(mod: DetectedMod, identifierOrCurated: string
         }
 
         // 3. Exact matching against detect keys
-        const cleanCuratedId = clean(curated.id);
-        for (const rawKey of curated.detectKeys) {
-            const key = rawKey.toLowerCase().trim();
-            const cleanKey = clean(key);
+        if (Array.isArray(curated.detectKeys)) {
+            for (const rawKey of curated.detectKeys) {
+                const key = (rawKey || "").toLowerCase().trim();
+                const cleanKey = clean(key);
+                if (!cleanKey) continue;
 
-            if (mId === key || mName === key || mFull === key) return true;
-            if (clean(mId) === cleanKey || clean(mName) === cleanKey || clean(mFull) === cleanKey) return true;
+                if (mId === key || mName === key || mFull === key) return true;
+                if (cleanMId === cleanKey || cleanMName === cleanKey || cleanMFull === cleanKey) return true;
 
-            // Multi-word title match with stripped version/parentheses (e.g. "Bondage Club Extended (BCX)" -> "Bondage Club Extended")
-            if (key.includes(" ") || key.includes("-")) {
-                const strippedName = mName.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim();
-                const strippedFull = mFull.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim();
-                if (clean(strippedName) === cleanKey || clean(strippedFull) === cleanKey) return true;
-                if (clean(strippedName).startsWith(cleanKey) && clean(strippedName).includes(cleanCuratedId)) return true;
+                // Multi-word title match with stripped version numbers (e.g. "Bondage Club Extended (BCX) v1.0.8" -> "bondageclubextendedbcx")
+                const strippedName = clean(mName.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim());
+                const strippedFull = clean(mFull.replace(/\bv?\d+(\.\d+)*\b/gi, "").trim());
+                if (strippedName && strippedName === cleanKey) return true;
+                if (strippedFull && strippedFull === cleanKey) return true;
             }
         }
         return false;
@@ -137,7 +145,10 @@ export function isDetectedModMatch(mod: DetectedMod, identifierOrCurated: string
     // Custom mod fallback: exact ID, exact Name, or exact FullName match
     const target = (typeof identifierOrCurated === "string" ? identifierOrCurated : "").toLowerCase().trim();
     if (!target) return false;
-    return mId === target || mName === target || mFull === target || clean(mId) === clean(target) || clean(mName) === clean(target);
+    const cleanTarget = clean(target);
+    if (mId === target || mName === target || mFull === target) return true;
+    if (cleanTarget && (cleanMId === cleanTarget || cleanMName === cleanTarget || cleanMFull === cleanTarget)) return true;
+    return false;
 }
 
 /**
@@ -181,10 +192,9 @@ export function getLoadedMods(): DetectedMod[] {
         return true;
     };
 
-    // BCX: BCX sets window.BCX_Loaded (never window.bcx!)
+    // BCX: BCX sets window.BCX_Loaded = true on complete init, and window.bcx = consoleInterface
     const hasBcx = win.BCX_Loaded === true ||
-        (typeof win.BCX_Loaded !== "undefined" && win.BCX_Loaded !== false) ||
-        (isRealGlobalObject(win.bcx) && typeof win.bcx.getApi === "function");
+        (isRealGlobalObject(win.bcx) && (typeof win.bcx.getModApi === "function" || typeof win.bcx.inBcxSubscreen === "function"));
 
     if (hasBcx && !modsMap.has("bcx") && !modsMap.has("bondage club extended")) {
         modsMap.set("bcx", {
@@ -290,14 +300,18 @@ export function loadCuratedMod(catalogId: string): Promise<boolean> {
         try {
             console.log(`[QoC] Injecting verified mod script for ${mod.name}: ${mod.scriptUrl}`);
             const script = document.createElement("script");
-            script.src = mod.scriptUrl;
+            const scriptUrl = mod.scriptUrl.includes("?") ? `${mod.scriptUrl}&_=${Date.now()}` : `${mod.scriptUrl}?_=${Date.now()}`;
+            script.src = scriptUrl;
+            script.crossOrigin = "anonymous";
             script.async = true;
             script.onload = () => {
                 console.log(`[QoC] Successfully loaded ${mod.name}`);
+                try { script.remove(); } catch (_) {}
                 resolve(true);
             };
             script.onerror = (err) => {
                 console.error(`[QoC] Failed to load ${mod.name}:`, err);
+                try { script.remove(); } catch (_) {}
                 resolve(false);
             };
             document.head.appendChild(script);

@@ -209,8 +209,8 @@ export function restartPeriodicComplianceTimer(): void {
     const intervalSec = modStorage.inspector.evaluationInterval;
     if (intervalSec && intervalSec > 0) {
         periodicComplianceTimer = setInterval(() => {
+            evaluateCompliance();
             if (typeof ServerPlayerIsInChatRoom === "function" && ServerPlayerIsInChatRoom()) {
-                evaluateCompliance();
                 if (modStorage.inspector.silentTelemetry) {
                     sendSilentRoomTelemetry();
                 }

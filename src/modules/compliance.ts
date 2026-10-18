@@ -201,6 +201,10 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
                                 message: `Successfully loaded ${curated.name}!`,
                                 duration: 4000
                             });
+                            if (isModLoaded(rule.modId) || isModLoaded(rule.modName)) {
+                                const idx = missingRequired.indexOf(rule);
+                                if (idx !== -1) missingRequired.splice(idx, 1);
+                            }
                         }
                     } else if (modStorage.inspector.autoLoadMode === "Prompt") {
                         if (!promptedMods.has(curated.id)) {
@@ -212,15 +216,18 @@ export async function evaluateCompliance(): Promise<ComplianceReport> {
                                 }).then(async (ok) => {
                                     if (ok) {
                                         await loadCuratedMod(curated.id);
+                                        evaluateCompliance();
                                     }
                                 }).catch(async () => {
                                     if (typeof window !== "undefined" && window.confirm(promptMsg)) {
                                         await loadCuratedMod(curated.id);
+                                        evaluateCompliance();
                                     }
                                 });
                             } catch {
                                 if (typeof window !== "undefined" && window.confirm(promptMsg)) {
                                     await loadCuratedMod(curated.id);
+                                    evaluateCompliance();
                                 }
                             }
                         }
