@@ -8,7 +8,6 @@ import { MainSubscreen } from "./subscreens/mainSubscreen";
 import { InspectorSubscreen } from "./subscreens/inspectorSubscreen";
 import { loadStorage } from "./modules/storage";
 import { loadSettingsMenu } from "./modules/settingsMenu";
-import { initChatResizer, applyChatDimensions } from "./modules/chatResizer";
 import { initNetworkSync, restartPeriodicComplianceTimer } from "./modules/networkSync";
 import { initProfileButton } from "./modules/profileButton";
 import { evaluateCompliance } from "./modules/compliance";
@@ -22,9 +21,11 @@ export function initializeQoC(): void {
     hasInitialized = true;
 
     try {
+        // Clean up any residual divider from chat resizer
+        document.getElementById("qoc-chat-divider")?.remove();
+
         loadStorage();
         loadSettingsMenu();
-        initChatResizer();
         initNetworkSync();
         initProfileButton();
         initFusamManifest().catch(console.warn);
@@ -36,7 +37,6 @@ export function initializeQoC(): void {
             try {
                 if (typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0) {
                     loadStorage();
-                    applyChatDimensions();
                     evaluateCompliance();
                     restartPeriodicComplianceTimer();
                 }
@@ -65,16 +65,11 @@ export function initializeQoC(): void {
                 duration: 4000
             });
         } catch (_) {}
-
-        if (typeof CurrentScreen !== "undefined" && CurrentScreen === "ChatRoom") {
-            applyChatDimensions();
-        }
     } catch (err) {
         console.error(`[${MOD_NAME}] Initialization error:`, err);
     }
 }
 
-import { ChatResizerSubscreen } from "./subscreens/chatResizerSubscreen";
 import { AuthoritySubscreen } from "./subscreens/authoritySubscreen";
 
 // Bootstrap with zois-core
@@ -86,7 +81,6 @@ bootstrap({
     repository: MOD_REPOSITORY,
     subscreens: {
         MainSubscreen,
-        ChatResizerSubscreen,
         AuthoritySubscreen,
         InspectorSubscreen
     },

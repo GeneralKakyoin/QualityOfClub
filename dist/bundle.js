@@ -4270,7 +4270,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   }
 
   // package.json
-  var version2 = "1.0.20";
+  var version2 = "1.0.21";
 
   // src/constants.ts
   var MOD_NAME = "Quality of Club";
@@ -4278,11 +4278,7 @@ One of mods you are using is using an old version of SDK. It will work for now b
   var MOD_KEY = "QoC";
   var MOD_REPOSITORY = "https://github.com/GeneralKakyoin/QualityOfClub";
   var STORAGE_KEY = "QOC_SETTINGS";
-  var CANVAS_WIDTH = 2e3;
-  var CANVAS_HEIGHT = 1e3;
   var DEFAULT_SPLIT_PERCENT = 50;
-  var MIN_SPLIT_PERCENT = 50;
-  var MAX_SPLIT_PERCENT = 80;
   var PROFILE_BUTTON_POSITION = [1700, 790, 90, 90];
   var EXTENSION_SETTINGS_KEY = "QOC";
 
@@ -4480,594 +4476,6 @@ One of mods you are using is using an old version of SDK. It will work for now b
     }
     saveStorage();
   }
-
-  // src/modules/chatResizer.ts
-  var dividerElement = null;
-  var isDragging = false;
-  function getGraphicWidth() {
-    if (!modStorage.chatResizer.enabled) return 1e3;
-    const pct = Math.max(MIN_SPLIT_PERCENT, Math.min(MAX_SPLIT_PERCENT, modStorage.chatResizer.splitPercent));
-    return Math.round(pct / 100 * CANVAS_WIDTH);
-  }
-  function setSplitPercent(percent) {
-    const clamped = Math.max(MIN_SPLIT_PERCENT, Math.min(MAX_SPLIT_PERCENT, Math.round(percent)));
-    modStorage.chatResizer.splitPercent = clamped;
-    saveStorage();
-    applyChatDimensions();
-  }
-  function applyChatDimensions() {
-    const graphicWidth = getGraphicWidth();
-    if (typeof ChatRoomDivRect !== "undefined" && Array.isArray(ChatRoomDivRect)) {
-      ChatRoomDivRect[0] = graphicWidth + 5;
-      ChatRoomDivRect[1] = 2;
-      ChatRoomDivRect[2] = CANVAS_WIDTH - graphicWidth - 12;
-      ChatRoomDivRect[3] = 998;
-    }
-    if (typeof CurrentScreen !== "undefined" && CurrentScreen === "ChatRoom") {
-      if (typeof ChatRoomResize === "function") {
-        try {
-          ChatRoomResize(false);
-        } catch (e) {
-          console.warn("[QoC] Error running ChatRoomResize", e);
-        }
-      }
-    }
-    updateDividerPosition();
-  }
-  function updateDividerPosition() {
-    if (!dividerElement) return;
-    if (typeof CurrentScreen === "undefined" || CurrentScreen !== "ChatRoom" || !modStorage.chatResizer.enabled || !modStorage.chatResizer.showDivider) {
-      dividerElement.style.display = "none";
-      return;
-    }
-    const canvas = typeof MainCanvas !== "undefined" ? MainCanvas.canvas : document.getElementById("MainCanvas");
-    if (!canvas) {
-      dividerElement.style.display = "none";
-      return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    const graphicWidth = getGraphicWidth();
-    const scaleX = rect.width / CANVAS_WIDTH;
-    const dividerX = rect.left + graphicWidth * scaleX;
-    dividerElement.style.display = "flex";
-    dividerElement.style.left = `${dividerX - 4}px`;
-    dividerElement.style.top = `${rect.top}px`;
-    dividerElement.style.height = `${rect.height}px`;
-  }
-  function createDividerElement() {
-    if (dividerElement && dividerElement.parentElement) return;
-    dividerElement = document.createElement("div");
-    dividerElement.id = "qoc-chat-divider";
-    dividerElement.title = "Drag to resize Chat & Graphic view. Double-click to reset (50/50).";
-    Object.assign(dividerElement.style, {
-      position: "fixed",
-      width: "10px",
-      zIndex: "9999",
-      cursor: "col-resize",
-      display: "none",
-      alignItems: "center",
-      justifyContent: "center",
-      userSelect: "none",
-      touchAction: "none"
-    });
-    const innerLine = document.createElement("div");
-    innerLine.id = "qoc-chat-divider-line";
-    Object.assign(innerLine.style, {
-      width: "3px",
-      height: "100%",
-      backgroundColor: "rgba(255, 255, 255, 0.25)",
-      boxShadow: "0 0 3px rgba(0, 0, 0, 0.7)",
-      transition: "background-color 0.15s ease, width 0.15s ease",
-      borderRadius: "2px",
-      pointerEvents: "none"
-    });
-    dividerElement.appendChild(innerLine);
-    dividerElement.addEventListener("mouseenter", () => {
-      if (!isDragging) {
-        innerLine.style.backgroundColor = "rgba(100, 180, 255, 0.85)";
-        innerLine.style.width = "4px";
-      }
-    });
-    dividerElement.addEventListener("mouseleave", () => {
-      if (!isDragging) {
-        innerLine.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
-        innerLine.style.width = "3px";
-      }
-    });
-    dividerElement.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      isDragging = true;
-      dividerElement?.setPointerCapture(e.pointerId);
-      innerLine.style.backgroundColor = "rgba(100, 220, 255, 1)";
-      innerLine.style.width = "5px";
-    });
-    dividerElement.addEventListener("pointermove", (e) => {
-      if (!isDragging) return;
-      const canvas = typeof MainCanvas !== "undefined" ? MainCanvas.canvas : document.getElementById("MainCanvas");
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const canvasX = (e.clientX - rect.left) / rect.width * CANVAS_WIDTH;
-      const pct = canvasX / CANVAS_WIDTH * 100;
-      setSplitPercent(pct);
-    });
-    const endDrag = (e) => {
-      if (!isDragging) return;
-      isDragging = false;
-      try {
-        dividerElement?.releasePointerCapture(e.pointerId);
-      } catch (_) {
-      }
-      innerLine.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
-      innerLine.style.width = "3px";
-      saveStorage();
-    };
-    dividerElement.addEventListener("pointerup", endDrag);
-    dividerElement.addEventListener("pointercancel", endDrag);
-    dividerElement.addEventListener("dblclick", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setSplitPercent(DEFAULT_SPLIT_PERCENT);
-    });
-    document.body.appendChild(dividerElement);
-  }
-  function initChatResizer() {
-    const styleEl = document.createElement("style");
-    styleEl.id = "qoc-resizer-styles";
-    styleEl.innerHTML = `
-        #chat-room-top-menu {
-            flex-wrap: wrap !important;
-            overflow-x: hidden !important;
-        }
-        .chat-room-top-menu-btn {
-            min-width: 2.2em !important;
-            padding: 2px 4px !important;
-        }
-        #chat-room-buttons {
-            gap: 2px !important;
-            padding: 2px !important;
-        }
-        #InputChat {
-            font-size: 0.95em;
-        }
-    `;
-    document.head.appendChild(styleEl);
-    createDividerElement();
-    hookFunction("ChatRoomResize", HookPriority.ADD_BEHAVIOR, (args, next) => {
-      if (modStorage.chatResizer.enabled) {
-        const w = getGraphicWidth();
-        if (typeof ChatRoomDivRect !== "undefined" && Array.isArray(ChatRoomDivRect)) {
-          ChatRoomDivRect[0] = w + 5;
-          ChatRoomDivRect[1] = 2;
-          ChatRoomDivRect[2] = CANVAS_WIDTH - w - 12;
-          ChatRoomDivRect[3] = 998;
-        }
-      }
-      const result = next(args);
-      updateDividerPosition();
-      return result;
-    });
-    hookFunction("ChatRoomClick", HookPriority.OVERRIDE_BEHAVIOR, (args, next) => {
-      const event = args[0];
-      if (Player.ArousalSettings != null && Player.ArousalSettings.OrgasmTimer != null && typeof Player.ArousalSettings.OrgasmTimer === "number" && !isNaN(Player.ArousalSettings.OrgasmTimer) && Player.ArousalSettings.OrgasmTimer > 0) {
-        return next(args);
-      }
-      const graphicWidth = getGraphicWidth();
-      if (MouseIn(0, 0, graphicWidth, CANVAS_HEIGHT)) {
-        if (typeof ChatRoomActiveView !== "undefined" && ChatRoomActiveView && ChatRoomActiveView.Click) {
-          return ChatRoomActiveView.Click(event);
-        }
-      }
-    });
-    hookFunction("ChatRoomCharacterViewLoopCharacters", HookPriority.OVERRIDE_BEHAVIOR, (args) => {
-      const callback = args[0];
-      const charCount = typeof ChatRoomCharacterDrawlist !== "undefined" ? ChatRoomCharacterDrawlist.length : 0;
-      if (charCount === 0) return;
-      const viewWidth = getGraphicWidth();
-      const viewHeight = typeof ChatRoomCharacterViewHeight !== "undefined" ? ChatRoomCharacterViewHeight : 1e3;
-      let targetZoom;
-      let Space;
-      let startX;
-      if (charCount === 1) {
-        targetZoom = 1;
-        Space = viewWidth / 2;
-        startX = (viewWidth - 500 * targetZoom) / 2;
-      } else {
-        Space = viewWidth / charCount;
-        targetZoom = Math.min(1, Math.max(0.35, Space / 380));
-        const totalVisualWidth = (charCount - 1) * Space + 500 * targetZoom;
-        if (totalVisualWidth > viewWidth) {
-          Space = (viewWidth - 500 * targetZoom) / (charCount - 1);
-          startX = 0;
-        } else {
-          startX = (viewWidth - totalVisualWidth) / 2;
-        }
-      }
-      let weight = typeof ChatRoomCharacterViewSlideWeight !== "undefined" ? ChatRoomCharacterViewSlideWeight : 9;
-      const frametimeAdjustment = typeof TimerRunInterval !== "undefined" ? TimerRunInterval / (1e3 / 30) : 1;
-      if (ChatRoomCharacterViewInitialize || !(Player.GraphicsSettings && Player.GraphicsSettings.SmoothZoom)) {
-        ChatRoomCharacterViewInitialize = false;
-        weight = 0;
-      }
-      const zoomFrameStep = (current) => (current * weight + targetZoom) / (weight + 1);
-      let zoom = typeof ChatRoomCharacterViewZoom !== "undefined" ? ChatRoomCharacterViewZoom : targetZoom;
-      for (let i = 0; i < frametimeAdjustment; i++) {
-        const nextZoom = zoomFrameStep(zoom);
-        if (weight === 0) {
-          zoom = nextZoom;
-          break;
-        }
-        const remainder = frametimeAdjustment - i;
-        if (remainder >= 1) {
-          zoom = nextZoom;
-        } else {
-          zoom += (nextZoom - zoom) * remainder;
-        }
-      }
-      ChatRoomCharacterViewZoom = zoom;
-      const Y = Math.max(0, viewHeight * (1 - zoom) / 2);
-      for (let C = 0; C < charCount; C++) {
-        const CharX = startX + C * Space;
-        const CharY = Y;
-        if (callback(C, CharX, CharY, Space, zoom)) break;
-      }
-    });
-    hookFunction("ChatRoomCharacterViewDraw", HookPriority.OVERRIDE_BEHAVIOR, () => {
-      const backgroundURL = DrawGetBackgroundURL(false);
-      const viewWidth = getGraphicWidth();
-      const viewHeight = typeof ChatRoomCharacterViewHeight !== "undefined" ? ChatRoomCharacterViewHeight : 1e3;
-      const opts = {
-        inverted: Player.GraphicsSettings?.InvertRoom && Player.IsInverted(),
-        blur: typeof Player.GetBlurLevel === "function" ? Player.GetBlurLevel() : 0,
-        darken: typeof DrawGetDarkFactor === "function" ? DrawGetDarkFactor() : 0,
-        tints: typeof Player.GetTints === "function" ? Player.GetTints() : [],
-        sizeMode: ChatRoomData?.Custom?.SizeMode
-      };
-      if (backgroundURL) {
-        const bgRect = RectMakeRect(0, 0, viewWidth, viewHeight);
-        DrawRoomBackground(backgroundURL, bgRect, opts);
-      }
-      ChatRoomCharacterViewLoopCharacters((charIdx, charX, charY, _space, roomZoom) => {
-        if (ChatRoomCharacterDrawlist && ChatRoomCharacterDrawlist[charIdx]) {
-          DrawCharacter(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-          DrawStatus(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-          if (ChatRoomCharacterDrawlist[charIdx].MemberNumber != null) {
-            ChatRoomCharacterViewDrawOverlay(ChatRoomCharacterDrawlist[charIdx], charX, charY, roomZoom);
-          }
-        }
-      });
-    });
-    hookFunction("ChatRoomLoad", HookPriority.ADD_BEHAVIOR, (args, next) => {
-      const result = next(args);
-      applyChatDimensions();
-      return result;
-    });
-    window.addEventListener("resize", () => {
-      updateDividerPosition();
-    });
-  }
-
-  // src/subscreens/chatResizerSubscreen.ts
-  var ChatResizerSubscreen = class extends BaseSubscreen {
-    rootElement = null;
-    sliderInput = null;
-    sliderValueLabel = null;
-    get name() {
-      return "";
-    }
-    onRun() {
-      DrawRect(0, 0, 2e3, 1e3, "#191f2b");
-    }
-    onLoad() {
-      this.createUI();
-    }
-    exit() {
-      this.cleanup();
-      setSubscreen(new MainSubscreen2());
-    }
-    onUnload() {
-      this.cleanup();
-    }
-    onExit() {
-      this.cleanup();
-    }
-    cleanup() {
-      if (this.rootElement) {
-        this.rootElement.remove();
-        this.rootElement = null;
-      }
-      this.sliderInput = null;
-      this.sliderValueLabel = null;
-    }
-    createUI() {
-      this.cleanup();
-      const backdrop = document.createElement("div");
-      backdrop.style.cssText = `
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #191f2b;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            color: #e0e6ed;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            box-sizing: border-box;
-            user-select: none;
-        `;
-      const container = document.createElement("div");
-      container.style.cssText = `
-            width: min(92vw, 1200px);
-            height: min(90vh, 850px);
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            box-sizing: border-box;
-        `;
-      const header = document.createElement("div");
-      header.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 12px;
-            border-bottom: 1px solid rgba(80, 100, 140, 0.35);
-        `;
-      const titleBox = document.createElement("div");
-      titleBox.innerHTML = `
-            <div style="font-size: 24px; font-weight: bold; color: #64b5f6; letter-spacing: 0.5px;">
-                \u{1F4D0} Chat Window Resizer Settings
-            </div>
-            <div style="font-size: 13px; color: #90a4ae; margin-top: 4px;">
-                Adjust the balance between character graphics and the chatroom message log.
-            </div>
-        `;
-      const backBtn = document.createElement("button");
-      backBtn.textContent = "\u2715 Back to Menu";
-      backBtn.style.cssText = `
-            padding: 10px 24px;
-            background: rgba(220, 50, 50, 0.85);
-            border: 1px solid #ef5350;
-            color: white;
-            font-size: 15px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.15s ease;
-        `;
-      backBtn.addEventListener("mouseover", () => {
-        backBtn.style.background = "#d32f2f";
-      });
-      backBtn.addEventListener("mouseout", () => {
-        backBtn.style.background = "rgba(220, 50, 50, 0.85)";
-      });
-      backBtn.addEventListener("click", () => this.exit());
-      header.appendChild(titleBox);
-      header.appendChild(backBtn);
-      container.appendChild(header);
-      const body = document.createElement("div");
-      body.style.cssText = `
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            padding-right: 6px;
-            box-sizing: border-box;
-        `;
-      const togglesCard = this.createCardElement("\u2699\uFE0F Feature Toggles");
-      const toggles = [
-        {
-          title: "Enable Chat Window Resizer",
-          desc: "Activates custom chat dimensions. When off, Bondage Club uses default 50/50 sizing.",
-          checked: modStorage.chatResizer.enabled,
-          toggle: () => {
-            modStorage.chatResizer.enabled = !modStorage.chatResizer.enabled;
-            saveStorage();
-            applyChatDimensions();
-            this.createUI();
-          }
-        },
-        {
-          title: "Show Draggable Divider in Chatrooms",
-          desc: "Draws an interactive vertical separator bar in chatrooms allowing live drag-and-drop resizing.",
-          checked: modStorage.chatResizer.showDivider,
-          toggle: () => {
-            modStorage.chatResizer.showDivider = !modStorage.chatResizer.showDivider;
-            saveStorage();
-            applyChatDimensions();
-            this.createUI();
-          }
-        }
-      ];
-      toggles.forEach((t) => {
-        togglesCard.appendChild(this.createToggleRow(t.title, t.desc, t.checked, t.toggle));
-      });
-      body.appendChild(togglesCard);
-      const sliderCard = this.createCardElement("\u{1F4CF} Screen Size Proportion", "Drag the slider to adjust how much screen space is allocated to graphics vs chat:");
-      const currentPercent = modStorage.chatResizer.splitPercent || DEFAULT_SPLIT_PERCENT;
-      const sliderContainer = document.createElement("div");
-      sliderContainer.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            margin-top: 14px;
-            padding: 8px 0;
-        `;
-      const slider = document.createElement("input");
-      slider.type = "range";
-      slider.min = `${MIN_SPLIT_PERCENT}`;
-      slider.max = `${MAX_SPLIT_PERCENT}`;
-      slider.value = `${currentPercent}`;
-      slider.style.cssText = `
-            flex: 1;
-            height: 10px;
-            cursor: pointer;
-            accent-color: #2196f3;
-            border-radius: 5px;
-        `;
-      const label = document.createElement("div");
-      label.style.cssText = `
-            min-width: 240px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #64b5f6;
-            text-align: right;
-            padding-right: 8px;
-        `;
-      label.textContent = `${currentPercent}% Graphic / ${100 - currentPercent}% Chat`;
-      slider.addEventListener("input", () => {
-        const val = Number(slider.value);
-        label.textContent = `${val}% Graphic / ${100 - val}% Chat`;
-        setSplitPercent(val);
-        this.highlightActivePreset(val);
-      });
-      this.sliderInput = slider;
-      this.sliderValueLabel = label;
-      sliderContainer.appendChild(slider);
-      sliderContainer.appendChild(label);
-      sliderCard.appendChild(sliderContainer);
-      body.appendChild(sliderCard);
-      const presetsCard = this.createCardElement("\u26A1 Quick Presets", "Click a preset to instantly apply proportions:");
-      const presetsGrid = document.createElement("div");
-      presetsGrid.id = "qoc-presets-grid";
-      presetsGrid.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-top: 10px;
-        `;
-      const presets = [
-        { label: "50% (Default)", val: 50 },
-        { label: "60% Graphic / 40% Chat", val: 60 },
-        { label: "65% Graphic / 35% Chat", val: 65 },
-        { label: "70% Graphic / 30% Chat", val: 70 },
-        { label: "75% Graphic / 25% Chat", val: 75 },
-        { label: "80% Graphic / 20% Chat", val: 80 }
-      ];
-      presets.forEach((p) => {
-        const isMatch = currentPercent === p.val;
-        const btn = document.createElement("button");
-        btn.dataset.val = `${p.val}`;
-        btn.style.cssText = `
-                padding: 14px 18px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: bold;
-                background: ${isMatch ? "rgba(25, 118, 210, 0.4)" : "rgba(35, 45, 60, 0.6)"};
-                border: 1px solid ${isMatch ? "#42a5f5" : "rgba(80, 100, 140, 0.35)"};
-                color: ${isMatch ? "#64b5f6" : "#e0e6ed"};
-                transition: all 0.15s ease;
-            `;
-        btn.textContent = p.label;
-        btn.addEventListener("click", () => {
-          this.updateSliderValue(p.val);
-        });
-        presetsGrid.appendChild(btn);
-      });
-      presetsCard.appendChild(presetsGrid);
-      body.appendChild(presetsCard);
-      const tip = document.createElement("div");
-      tip.style.cssText = `
-            font-size: 12px;
-            color: #8fa0b5;
-            text-align: center;
-            padding: 8px 0;
-        `;
-      tip.innerHTML = `\u{1F4A1} <b>Tip:</b> When enabled, drag the vertical line between the canvas and chat to resize live! <b>Double-click</b> the line to reset to 50/50.`;
-      body.appendChild(tip);
-      container.appendChild(body);
-      backdrop.appendChild(container);
-      document.body.appendChild(backdrop);
-      this.rootElement = backdrop;
-    }
-    updateSliderValue(val) {
-      setSplitPercent(val);
-      if (this.sliderInput) {
-        this.sliderInput.value = `${val}`;
-      }
-      if (this.sliderValueLabel) {
-        this.sliderValueLabel.textContent = `${val}% Graphic / ${100 - val}% Chat`;
-      }
-      this.highlightActivePreset(val);
-    }
-    highlightActivePreset(val) {
-      const grid = document.getElementById("qoc-presets-grid");
-      if (!grid) return;
-      const buttons = grid.querySelectorAll("button");
-      buttons.forEach((btn) => {
-        const btnVal = Number(btn.dataset.val);
-        const isMatch = btnVal === val;
-        btn.style.background = isMatch ? "rgba(25, 118, 210, 0.4)" : "rgba(35, 45, 60, 0.6)";
-        btn.style.borderColor = isMatch ? "#42a5f5" : "rgba(80, 100, 140, 0.35)";
-        btn.style.color = isMatch ? "#64b5f6" : "#e0e6ed";
-      });
-    }
-    createCardElement(title, subtitle) {
-      const card = document.createElement("div");
-      card.style.cssText = `
-            background: rgba(30, 36, 48, 0.85);
-            border: 1px solid rgba(80, 100, 140, 0.35);
-            border-radius: 8px;
-            padding: 16px 20px;
-            box-sizing: border-box;
-        `;
-      let headerHtml = `<div style="font-size: 16px; font-weight: bold; color: #64b5f6;">${title}</div>`;
-      if (subtitle) {
-        headerHtml += `<div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${subtitle}</div>`;
-      }
-      card.innerHTML = headerHtml;
-      return card;
-    }
-    createToggleRow(title, desc, isChecked, onToggle) {
-      const row = document.createElement("div");
-      row.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(80, 100, 140, 0.2);
-            cursor: pointer;
-        `;
-      row.addEventListener("click", onToggle);
-      const textBox = document.createElement("div");
-      textBox.style.cssText = "padding-right: 16px;";
-      textBox.innerHTML = `
-            <div style="font-size: 15px; font-weight: 600; color: #e0e6ed;">${title}</div>
-            <div style="font-size: 12px; color: #90a4ae; margin-top: 3px;">${desc}</div>
-        `;
-      const switchEl = document.createElement("div");
-      switchEl.style.cssText = `
-            width: 48px;
-            height: 26px;
-            background: ${isChecked ? "#1976d2" : "rgba(60, 70, 90, 0.7)"};
-            border-radius: 13px;
-            position: relative;
-            flex-shrink: 0;
-            transition: background 0.2s ease;
-            border: 1px solid ${isChecked ? "#42a5f5" : "rgba(80, 100, 140, 0.4)"};
-        `;
-      const knob = document.createElement("div");
-      knob.style.cssText = `
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            position: absolute;
-            top: 2px;
-            left: ${isChecked ? "24px" : "3px"};
-            transition: left 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-        `;
-      switchEl.appendChild(knob);
-      row.appendChild(textBox);
-      row.appendChild(switchEl);
-      return row;
-    }
-  };
 
   // src/modules/fusamManifest.ts
   var FUSAM_MANIFEST_URL = "https://sidiousious.gitlab.io/bc-addon-loader/manifest.json";
@@ -11324,16 +10732,6 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       profileBtnToggle.addEventListener("click", () => updatePref({ showProfileButton: !currentProfileBtn }));
       profileBtnRow.appendChild(profileBtnToggle);
       uiSection.appendChild(profileBtnRow);
-      const chatResizerNote = document.createElement("div");
-      chatResizerNote.style.cssText = "padding: 12px 16px; border-radius: 6px; background: rgba(30, 45, 65, 0.5); border: 1px dashed rgba(80, 100, 140, 0.5); display: flex; align-items: center; justify-content: space-between;";
-      chatResizerNote.innerHTML = `
-            <div>
-                <div style="font-size: 13px; font-weight: bold; color: #90caf9;">\u{1F4AC} Chat Resizer & Draggable Handle</div>
-                <div style="font-size: 12px; color: #78909c; margin-top: 2px;">Local client QoL only (split ratio & divider). Maintained locally and strictly exempt from remote dominant rules.</div>
-            </div>
-            <span style="font-size: 11px; color: #81c784; background: rgba(76, 175, 80, 0.15); border: 1px solid #4caf50; padding: 3px 8px; border-radius: 4px; font-weight: bold;">LOCAL ONLY</span>
-        `;
-      uiSection.appendChild(chatResizerNote);
       container.appendChild(uiSection);
       const catalogSection = document.createElement("div");
       catalogSection.style.cssText = "background: rgba(35, 43, 60, 0.85); border: 1px solid rgba(80, 100, 140, 0.4); border-radius: 8px; padding: 20px;";
@@ -11533,11 +10931,6 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       subtitle.style.color = "#90a4ae";
       const menuItems = [
         {
-          name: "Chat Window Resizer",
-          icon: createElement(SlidersVertical),
-          subscreen: () => new ChatResizerSubscreen()
-        },
-        {
           name: "Authority & Roles",
           icon: createElement(ShieldCheck),
           subscreen: () => new AuthoritySubscreen()
@@ -11553,9 +10946,9 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
           text: item.name,
           icon: item.icon,
           x: 165,
-          y: 280 + 125 * i,
+          y: 280 + 130 * i,
           width: 620,
-          height: 85,
+          height: 95,
           padding: 2,
           onClick: () => this.setSubscreen(item.subscreen())
         });
@@ -11584,10 +10977,6 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
       card.innerHTML = `
             <div style="font-size: 18px; font-weight: bold; color: #64b5f6; margin-bottom: 12px; border-bottom: 1px solid rgba(80,100,140,0.3); padding-bottom: 8px;">
                 Current System Overview
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                <span style="color: #90a4ae;">Chat Resizer:</span>
-                <b style="color: ${modStorage.chatResizer.enabled ? "#81c784" : "#ef5350"};">${modStorage.chatResizer.enabled ? "Enabled (" + modStorage.chatResizer.splitPercent + "%)" : "Disabled (Off)"}</b>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                 <span style="color: #90a4ae;">Authority Roles:</span>
@@ -11825,9 +11214,9 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
     if (hasInitialized) return;
     hasInitialized = true;
     try {
+      document.getElementById("qoc-chat-divider")?.remove();
       loadStorage();
       loadSettingsMenu();
-      initChatResizer();
       initNetworkSync();
       initProfileButton();
       initFusamManifest().catch(console.warn);
@@ -11837,7 +11226,6 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
         try {
           if (typeof Player !== "undefined" && typeof Player.MemberNumber === "number" && Player.MemberNumber > 0) {
             loadStorage();
-            applyChatDimensions();
             evaluateCompliance();
             restartPeriodicComplianceTimer();
           }
@@ -11864,9 +11252,6 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
         });
       } catch (_) {
       }
-      if (typeof CurrentScreen !== "undefined" && CurrentScreen === "ChatRoom") {
-        applyChatDimensions();
-      }
     } catch (err) {
       console.error(`[${MOD_NAME}] Initialization error:`, err);
     }
@@ -11879,7 +11264,6 @@ You will lose the ability to modify or reclaim this permission yourself \u2014 o
     repository: MOD_REPOSITORY,
     subscreens: {
       MainSubscreen: MainSubscreen2,
-      ChatResizerSubscreen,
       AuthoritySubscreen,
       InspectorSubscreen
     },

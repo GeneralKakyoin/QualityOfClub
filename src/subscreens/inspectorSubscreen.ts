@@ -2070,18 +2070,6 @@ export class InspectorSubscreen extends BaseSubscreen {
         profileBtnRow.appendChild(profileBtnToggle);
         uiSection.appendChild(profileBtnRow);
 
-        // Note about Chat Resizer
-        const chatResizerNote = document.createElement("div");
-        chatResizerNote.style.cssText = "padding: 12px 16px; border-radius: 6px; background: rgba(30, 45, 65, 0.5); border: 1px dashed rgba(80, 100, 140, 0.5); display: flex; align-items: center; justify-content: space-between;";
-        chatResizerNote.innerHTML = `
-            <div>
-                <div style="font-size: 13px; font-weight: bold; color: #90caf9;">💬 Chat Resizer & Draggable Handle</div>
-                <div style="font-size: 12px; color: #78909c; margin-top: 2px;">Local client QoL only (split ratio & divider). Maintained locally and strictly exempt from remote dominant rules.</div>
-            </div>
-            <span style="font-size: 11px; color: #81c784; background: rgba(76, 175, 80, 0.15); border: 1px solid #4caf50; padding: 3px 8px; border-radius: 4px; font-weight: bold;">LOCAL ONLY</span>
-        `;
-        uiSection.appendChild(chatResizerNote);
-
         container.appendChild(uiSection);
 
         // SECTION 5: Custom Addon Catalog Manager

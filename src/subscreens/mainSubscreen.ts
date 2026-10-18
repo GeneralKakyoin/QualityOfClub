@@ -1,9 +1,8 @@
 import { BaseSubscreen, setSubscreen } from "zois-core/ui";
-import { Bug, CodeXml, createElement, GitPullRequest, Lock, Search, ShieldCheck, Sliders } from "lucide";
+import { Bug, CodeXml, createElement, GitPullRequest, Lock, Search, ShieldCheck } from "lucide";
 import { version } from "../../package.json";
 import { MOD_NAME, MOD_REPOSITORY } from "src/constants";
 import { syncStorage, modStorage, ACCESS_LEVEL_NAMES, AccessLevel } from "modules/storage";
-import { ChatResizerSubscreen } from "./chatResizerSubscreen";
 import { AuthoritySubscreen } from "./authoritySubscreen";
 import { InspectorSubscreen } from "./inspectorSubscreen";
 import { getLoadedMods } from "modules/modDetection";
@@ -60,13 +59,8 @@ export class MainSubscreen extends BaseSubscreen {
         });
         subtitle.style.color = "#90a4ae";
 
-        // Navigation Menu Buttons (Left Column, exactly like BCC)
+        // Navigation Menu Buttons (Left Column)
         const menuItems = [
-            {
-                name: "Chat Window Resizer",
-                icon: createElement(Sliders),
-                subscreen: () => new ChatResizerSubscreen()
-            },
             {
                 name: "Authority & Roles",
                 icon: createElement(ShieldCheck),
@@ -84,9 +78,9 @@ export class MainSubscreen extends BaseSubscreen {
                 text: item.name,
                 icon: item.icon,
                 x: 165,
-                y: 280 + (125 * i),
+                y: 280 + (130 * i),
                 width: 620,
-                height: 85,
+                height: 95,
                 padding: 2,
                 onClick: () => this.setSubscreen(item.subscreen())
             });
@@ -118,10 +112,6 @@ export class MainSubscreen extends BaseSubscreen {
         card.innerHTML = `
             <div style="font-size: 18px; font-weight: bold; color: #64b5f6; margin-bottom: 12px; border-bottom: 1px solid rgba(80,100,140,0.3); padding-bottom: 8px;">
                 Current System Overview
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                <span style="color: #90a4ae;">Chat Resizer:</span>
-                <b style="color: ${modStorage.chatResizer.enabled ? '#81c784' : '#ef5350'};">${modStorage.chatResizer.enabled ? 'Enabled (' + modStorage.chatResizer.splitPercent + '%)' : 'Disabled (Off)'}</b>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                 <span style="color: #90a4ae;">Authority Roles:</span>
