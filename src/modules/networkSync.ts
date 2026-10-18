@@ -363,6 +363,7 @@ function handleAuthorityUpdateRequest(req: AuthorityUpdateRequest, senderId: num
             saveStorage();
             syncStorage();
             restartPeriodicComplianceTimer();
+            evaluateCompliance();
             resData = {
                 success: true,
                 preferences: {

@@ -1735,6 +1735,7 @@ export class InspectorSubscreen extends BaseSubscreen {
                 saveStorage();
                 syncStorage();
                 restartPeriodicComplianceTimer();
+                evaluateCompliance();
                 toastsManager.info({ title: `${MOD_NAME} Preferences`, message: "Preferences updated.", duration: 2500 });
                 this.renderSettingsTab();
             } else if (this.target && typeof this.target.MemberNumber === "number") {
